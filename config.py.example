@@ -1,0 +1,28 @@
+#Module: config.py
+#Move this file to <project_dir>/config.py and customize it
+import multiprocessing
+
+configs = {
+    "threads": str(max(2, multiprocessing.cpu_count()-1)),
+    "max_mem": "4000",
+    "plast": "plast",
+    "long_orfs": "TransDecoder.LongOrfs",
+    "quast" : "quast.py",
+    "rna_quast" : "rnaQUAST.py",
+    #"non_redundant": "<___>",
+    #"circ_base": "<___>",
+    "blastn": "blastn",
+    "cmscan": "cmscan",
+    "cpat": "cpat.py",
+    #"logit_model": "<___>",
+    #"hexamer": "<___>",
+    #"lnc_rna_net": "<___>",
+    #"rfam_cm": "<___>",
+    #"rfam_clanin": "<___>",
+    #"rfam_families": "<___>",
+    #"rna_central": "<___>"
+    #"nr2":  "<___>",
+    "structRNAfinder": "structRNAfinder",
+    "diamond": "diamond"
+    #"pirna": "<___>"
+}
