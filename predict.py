@@ -14,6 +14,9 @@ confs = {}
 for conf in configs:
     confs[conf] = configs[conf]
 
+all_methods = ["MIC","DC","PRS","SPR"]
+all_ontologies = ["molecular_function","cellular_component","biological_process"]
+
 def getArgs():
     ap = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("-cr", "--count-reads", required=True,
@@ -30,14 +33,13 @@ def getArgs():
 
     ap.add_argument("-met", "--method", required=False,
         default="MIC", help=("Correlation coefficient calculation method: MIC (default), "+
-        "DC (Distance Correlation) or PRS (Pearson Coefficient)."))
+        "DC (Distance Correlation), SPR (Spearman Coefficient) or PRS (Pearson Coefficient)."))
     ap.add_argument("-bh", "--benchmarking", required=False,
         default=False, help=("Enables the (much slower) leave one out strategy: regulators can be regulated too."
         +"Default: False."))
     default_threads = max(2, multiprocessing.cpu_count()-1)
     ap.add_argument("-p", "--processes", required=False,
         default=default_threads, help=("CPUs to use. Default: " + str(default_threads)+"."))
-
 
     ap.add_argument("-th", "--threshold", required=False,
         default=0.85, help=("Correlation coefficient threshold: 0.5 <= x <= 0.99. Default=0.85."))
@@ -67,12 +69,17 @@ count_reads_path = cmdArgs["count_reads"]
 regulators_path = cmdArgs["regulators"]
 coding_gene_ontology_path = cmdArgs["annotation"]
 tempDir = cmdArgs["output_dir"]
-go_path = confs["go_obos"]
+go_path = confs["go_obo"]
 
-ontology_type = cmdArgs["ontology_type"]
-method = cmdArgs["method"]
+ontology_type = cmdArgs["ontology_type"].split(",")
+if ontology_type[0] == "ALL":
+    ontology_type = all_ontologies
+
+method = cmdArgs["method"].split(",")
+if method[0] == "ALL":
+    method = all_methods
 benchmarking = cmdArgs["benchmarking"]
-threads = cmdArgs["processes"]
+threads = int(cmdArgs["processes"])
 
 threshold = cmdArgs["threshold"]
 pval = cmdArgs["pvalue"]
@@ -148,8 +155,8 @@ def find_correlated(reads, regulators, tempDir, methods, separate_regulators = F
     manager.shutdown()
     del manager
 
-print("Ontology type is " + ontology_type)
-print("Method is " + method)
+print("Ontology type is " + str(ontology_type))
+print("Method is " + str(method))
 
 reads = pd.read_csv(count_reads_path, sep='\t')
 print(str(len(reads)))
@@ -179,13 +186,13 @@ if not os.path.exists(correlations_file_path):
         mask = reads[reads.columns[0]].isin(regulators)
         regulators_reads = reads.loc[mask]
         if benchmarking:
-            find_correlated(reads, regulators_reads, tempDir, [method], separate_regulators = True)
+            find_correlated(reads, regulators_reads, tempDir, method, separate_regulators = True)
         else:
             non_regulators_reads = reads.loc[~mask]
             print(str(len(non_regulators_reads)) + " regulated.")
             print(str(len(regulators_reads)) + " regulators.")
             print("Generating correlations.")
-            find_correlated(non_regulators_reads, regulators_reads, tempDir, [method], separate_regulators = False)
+            find_correlated(non_regulators_reads, regulators_reads, tempDir, method, separate_regulators = False)
 coding_genes = {}
     #keys = rnas, values = sets of genes
 genes_coexpressed_with_ncRNA = {}
@@ -259,7 +266,7 @@ with open(coding_gene_ontology_path,'r') as stream:
             + " lines without proper number of columns (3 or 4 columns)")
     print(str(associations) + " valid associations loaded.")
 
-def predict(tempDir,ontology_type="molecular_function",method="MIC",
+def predict(tempDir,ontology_type="molecular_function",current_method="MIC",
             threshold=0.9,benchmarking=False,k_min_coexpressions=1,
             pval_threshold=0.05,fdr_threshold=0.05,
             min_n=5, min_M=5, min_m=1):
@@ -273,7 +280,7 @@ def predict(tempDir,ontology_type="molecular_function",method="MIC",
     valid_corr = 0
     for rna in genes_coexpressed_with_ncRNA.keys():
         for gene in genes_coexpressed_with_ncRNA[rna]:
-            key = (rna,gene,method)
+            key = (rna,gene,current_method)
             if key in correlation_values.keys():
                 corr = float(correlation_values[key])
                 correct_method += 1
@@ -402,7 +409,7 @@ def predict(tempDir,ontology_type="molecular_function",method="MIC",
     out_dir = tempDir+"/"+ontology_type
     if not os.path.exists(out_dir):
         os.mkdir(out_dir)
-    output_file = (out_dir + "/" +".".join([method,"th"+str(threshold),"K"+str(K),
+    output_file = (out_dir + "/" +".".join([current_method,"th"+str(threshold),"K"+str(K),
             run_mode,"pval"+str(pval_threshold),"fdr"+str(fdr_threshold),
             "n"+str(min_n),"M"+str(min_M),"m"+str(min_m),"tsv"]))
     print("Output annotation is " + output_file)
@@ -410,7 +417,9 @@ def predict(tempDir,ontology_type="molecular_function",method="MIC",
         for rna, term, pvalue, fdr in relevant_pvals:
             stream.write("\t".join([rna,term,str(pvalue),str(fdr)])+"\n")
 
-predict(tempDir,ontology_type=ontology_type,method=method,
-        threshold=threshold,benchmarking=benchmarking,k_min_coexpressions=K,
-        pval_threshold=pval,fdr_threshold=fdr,
-        min_n=min_n, min_M=min_M, min_m=min_m)
+for onto in ontology_type:
+    for meth in method:
+        predict(tempDir,ontology_type=onto,current_method=meth,
+                threshold=threshold,benchmarking=benchmarking,k_min_coexpressions=K,
+                pval_threshold=pval,fdr_threshold=fdr,
+                min_n=min_n, min_M=min_M, min_m=min_m)

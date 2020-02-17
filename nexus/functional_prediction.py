@@ -5,7 +5,7 @@ import pandas as pd
 from tqdm import tqdm
 from nexus.util import *
 import math
-from scipy.stats.stats import pearsonr
+from scipy.stats.stats import pearsonr, spearmanr
 from scipy.special import comb
 import multiprocessing
 import networkx
@@ -44,6 +44,10 @@ def leave_one_out(pid, coding_rows, regulators, show, methods, return_dict):
                 pearson_corr, p = pearsonr(reads1, reads2)
                 if(pearson_corr > 0.5) or (pearson_corr < -0.5):
                     coding_noncoding_pairs.append((row1[0], row2[0], pearson_corr, "PRS"))
+            if "SPR" in methods:
+                spearman_corr, p = spearmanr(reads1, reads2)
+                if(spearman_corr > 0.5) or (spearman_corr < -0.5):
+                    coding_noncoding_pairs.append((row1[0], row2[0], spearman_corr, "SPR"))
             if "DC" in methods:
                 dc_corr = dcor.distance_correlation(reads1, reads2)
                 if(dc_corr > 0.5) or (dc_corr < -0.5):
@@ -55,48 +59,29 @@ def leave_one_out(pid, coding_rows, regulators, show, methods, return_dict):
 def try_find_coexpression_process(pid, coding_rows, nc_rows, show, methods, return_dict):
     coding_noncoding_pairs = []
     mine = MINE()
-    if(show):
-        for i in tqdm(range(len(coding_rows))):
-            row1 = coding_rows.iloc[i]
-            reads1 = np.array(row1.values[1:],dtype=np.float32)
-            #if not is_constant(reads1):
-            for name, row2 in nc_rows.iterrows():
-                reads2 = np.array(row2.values[1:],dtype=np.float32)
-                #if not is_constant(reads2):
-                if "MIC" in methods:
-                    mine.compute_score(reads1, reads2)
-                    mic_corr = mine.mic()
-                    if(mic_corr > 0.5) or (mic_corr < -0.5):
-                        coding_noncoding_pairs.append((row1[0], row2[0], mic_corr, "MIC"))
-                if "PRS" in methods:
-                    pearson_corr, p = pearsonr(reads1, reads2)
-                    if(pearson_corr > 0.5) or (pearson_corr < -0.5):
-                        coding_noncoding_pairs.append((row1[0], row2[0], pearson_corr, "PRS"))
-                if "DC" in methods:
-                    dc_corr = dcor.distance_correlation(reads1, reads2)
-                    if(dc_corr > 0.5) or (dc_corr < -0.5):
-                        coding_noncoding_pairs.append((row1[0], row2[0], dc_corr, "DC"))
-    else:
-        for i in range(len(coding_rows)):
-            row1 = coding_rows.iloc[i]
-            reads1 = np.array(row1.values[1:],dtype=np.float32)
-            #if not is_constant(reads1):
-            for name, row2 in nc_rows.iterrows():
-                reads2 = np.array(row2.values[1:],dtype=np.float32)
-                #if not is_constant(reads2):
-                if "MIC" in methods:
-                    mine.compute_score(reads1, reads2)
-                    mic_corr = mine.mic()
-                    if(mic_corr > 0.5) or (mic_corr < -0.5):
-                        coding_noncoding_pairs.append((row1[0], row2[0], mic_corr, "MIC"))
-                if "PRS" in methods:
-                    pearson_corr, p = pearsonr(reads1, reads2)
-                    if(pearson_corr > 0.5) or (pearson_corr < -0.5):
-                        coding_noncoding_pairs.append((row1[0], row2[0], pearson_corr, "PRS"))
-                if "DC" in methods:
-                    dc_corr = dcor.distance_correlation(reads1, reads2)
-                    if(dc_corr > 0.5) or (dc_corr < -0.5):
-                        coding_noncoding_pairs.append((row1[0], row2[0], dc_corr, "DC"))
+    #print("Methods="+str(methods))
+    for i in get_iterator(range(len(coding_rows)), show=show):
+        row1 = coding_rows.iloc[i]
+        reads1 = np.array(row1.values[1:],dtype=np.float32)
+        for name, row2 in nc_rows.iterrows():
+            reads2 = np.array(row2.values[1:],dtype=np.float32)
+            if "MIC" in methods:
+                mine.compute_score(reads1, reads2)
+                mic_corr = mine.mic()
+                if(mic_corr > 0.5) or (mic_corr < -0.5):
+                    coding_noncoding_pairs.append((row1[0], row2[0], mic_corr, "MIC"))
+            if "PRS" in methods:
+                pearson_corr, p = pearsonr(reads1, reads2)
+                if(pearson_corr > 0.5) or (pearson_corr < -0.5):
+                    coding_noncoding_pairs.append((row1[0], row2[0], pearson_corr, "PRS"))
+            if "DC" in methods:
+                dc_corr = dcor.distance_correlation(reads1, reads2)
+                if(dc_corr > 0.5) or (dc_corr < -0.5):
+                    coding_noncoding_pairs.append((row1[0], row2[0], dc_corr, "DC"))
+            if "SPR" in methods:
+                spearman_corr, p = spearmanr(reads1, reads2)
+                if(spearman_corr > 0.5) or (spearman_corr < -0.5):
+                    coding_noncoding_pairs.append((row1[0], row2[0], spearman_corr, "SPR"))
     print(str(len(coding_noncoding_pairs)) + " correlation pairs found.")
     return_dict[pid] = coding_noncoding_pairs
 
