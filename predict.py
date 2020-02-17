@@ -81,13 +81,13 @@ if method[0] == "ALL":
 benchmarking = cmdArgs["benchmarking"]
 threads = int(cmdArgs["processes"])
 
-threshold = cmdArgs["threshold"]
-pval = cmdArgs["pvalue"]
-fdr = cmdArgs["fdr"]
-min_n = cmdArgs["min_n"]
-min_M = cmdArgs["min_M"]
-min_m = cmdArgs["min_m"]
-K = cmdArgs["k_min_coexpressions"]
+threshold = float(cmdArgs["threshold"])
+pval = float(cmdArgs["pvalue"])
+fdr = float(cmdArgs["fdr"])
+min_n = int(cmdArgs["min_n"])
+min_M = int(cmdArgs["min_M"])
+min_m = int(cmdArgs["min_m"])
+K = int(cmdArgs["k_min_coexpressions"])
 
 high_precision = {"threshold": 0.85, "K": 2, "pval":0.05,"fdr":0.05,"n":3,"M":8,"m":1}
 is_high = cmdArgs["high_precision"]

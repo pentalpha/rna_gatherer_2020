@@ -89,6 +89,10 @@ def get_ancestors(graph, parent_id):
     ancestors = networkx.ancestors(graph, parent_id)
     return ancestors
 
+def get_descendants(graph, parent_id):
+    descendants = networkx.descendants(graph, parent_id)
+    return descendants
+
 def pvalue(m, N, M, n):
         comb_sum = 0
         for i in range(m, min(n,M)+1):
