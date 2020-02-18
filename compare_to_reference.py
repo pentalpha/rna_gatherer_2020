@@ -8,7 +8,8 @@ import matplotlib.pyplot as plt
 
 reference_path = sys.argv[1]
 go_obo = sys.argv[2]
-annotation_paths = sys.argv[3:]
+output = sys.argv[3]
+annotation_paths = sys.argv[4:]
 print("Annotations to compare:" + str(annotation_paths))
 
 print("Loading GO network.")
@@ -189,4 +190,4 @@ plt.yticks(ind, labels)
 box = ax.get_position()
 ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
 plt.legend((bars1,bars2,bars3,bars4), part_labels,loc='center left', bbox_to_anchor=(1, 0.5))
-plt.savefig("comparison.png",bbox_inches='tight')
+plt.savefig(output,bbox_inches='tight')

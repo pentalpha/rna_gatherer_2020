@@ -62,6 +62,9 @@ def getArgs():
         +" Number of annotations is greatly reduced. Default: False.\n\t"
         +"Overrides other arguments: threshold=0.85, K=2, pval=0.05, fdr=0.05, n=3, M=8, m=1"))
 
+    ap.add_argument("-ch", "--cache-usage", required=False,
+        default=0.6, help=("Portion of the cache memory to use for storing the counts table."))
+
     return vars(ap.parse_args())
 
 cmdArgs = getArgs()
@@ -88,6 +91,9 @@ min_n = int(cmdArgs["min_n"])
 min_M = int(cmdArgs["min_M"])
 min_m = int(cmdArgs["min_m"])
 K = int(cmdArgs["k_min_coexpressions"])
+
+cache_usage = float(cmdArgs["cache_usage"])
+regulators_max_portion = 0.4
 
 high_precision = {"threshold": 0.85, "K": 2, "pval":0.05,"fdr":0.05,"n":3,"M":8,"m":1}
 is_high = cmdArgs["high_precision"]
@@ -123,7 +129,7 @@ def find_correlated(reads, regulators, tempDir, methods, separate_regulators = F
         p = multiprocessing.Process(target=func, 
             args=(i, parcial_df, regulators, showing, methods, return_dict, ))
         processes.append(p)
-        print("Spawned process from gene " + str(start) + " to " + str(end))
+        #print("Spawned process from gene " + str(start) + " to " + str(end))
         p.start()
         if showing:
             showing = False
@@ -137,7 +143,7 @@ def find_correlated(reads, regulators, tempDir, methods, separate_regulators = F
         p = multiprocessing.Process(target=func, 
             args=(last_pid+1, parcial_df, regulators, showing, methods, return_dict, ))
         processes.append(p)
-        print("Spawned process from gene " + str(end) + " to " + str(limit))
+        #print("Spawned process from gene " + str(end) + " to " + str(limit))
         p.start()
 
     for p in processes:
@@ -149,7 +155,7 @@ def find_correlated(reads, regulators, tempDir, methods, separate_regulators = F
 
     print(str(len(coding_noncoding_pairs)) + " correlation pairs found.")
     output = tempDir+"/correlated.tsv"
-    with open(output,'w') as stream:
+    with open(output,'a+') as stream:
         for coding_name, noncoding_name, corr, method in coding_noncoding_pairs:
             stream.write("\t".join([coding_name,noncoding_name,str(corr),method]) + "\n")
     manager.shutdown()
@@ -182,17 +188,43 @@ correlations_file_path = tempDir + "/correlated.tsv"
 print("Loading correlations from " + correlations_file_path + ".")
 
 if not os.path.exists(correlations_file_path):
-        print("Separating regulators from regulated.")
-        mask = reads[reads.columns[0]].isin(regulators)
-        regulators_reads = reads.loc[mask]
-        if benchmarking:
-            find_correlated(reads, regulators_reads, tempDir, method, separate_regulators = True)
+    print("Separating regulators from regulated.")
+    mask = reads[reads.columns[0]].isin(regulators)
+    regulators_reads = reads.loc[mask]
+    if benchmarking:
+        find_correlated(reads, regulators_reads, tempDir, method, separate_regulators = True)
+    else:
+        non_regulators_reads = reads.loc[~mask]
+        print(str(len(non_regulators_reads)) + " regulated.")
+        print(str(len(regulators_reads)) + " regulators.")
+        print("Generating correlations.")
+        
+        available_size = get_cache(usage=cache_usage)
+
+        max_for_regulators = available_size*regulators_max_portion
+        regs_size = getsizeof(regulators_reads)
+        regulator_dfs = [regulators_reads]
+        if regs_size > max_for_regulators:
+            regulator_dfs = split_df_to_max_mem(regulators_reads, max_for_regulators)
+            available_size -= max_for_regulators
         else:
-            non_regulators_reads = reads.loc[~mask]
-            print(str(len(non_regulators_reads)) + " regulated.")
-            print(str(len(regulators_reads)) + " regulators.")
-            print("Generating correlations.")
-            find_correlated(non_regulators_reads, regulators_reads, tempDir, method, separate_regulators = False)
+            available_size -= regs_size
+
+        dfs = split_df_to_max_mem(non_regulators_reads, available_size)
+        
+        print("Chunks for regulated: " + str(len(dfs)) 
+        + "\nChunks for regulators: " + str(len(regulator_dfs)))
+
+        df_pairs = []
+        for df in dfs:
+            for regulator_df in regulator_dfs:
+                df_pairs.append((df,regulator_df))
+
+        i = 1
+        for df,regulator_df in tqdm(df_pairs):
+            print("Processing chunk " + str(i) + "/" + str(len(df_pairs)))
+            find_correlated(df, regulators_reads, tempDir, method, separate_regulators = False)
+            i += 1
 coding_genes = {}
     #keys = rnas, values = sets of genes
 genes_coexpressed_with_ncRNA = {}
@@ -209,15 +241,17 @@ with open(correlations_file_path,'r') as stream:
                 gene = cells[0]
                 rna = cells[1]
                 corr = cells[2]
-                m = cells[3]
-                if not gene in coding_genes:
-                    coding_genes[gene] = 0
-                coding_genes[gene] += 1
-                
-                if not rna in genes_coexpressed_with_ncRNA:
-                    genes_coexpressed_with_ncRNA[rna] = set()
-                genes_coexpressed_with_ncRNA[rna].add(gene)
-                correlation_values[(rna,gene,m)] = corr
+                corr_val = float(corr)
+                if corr_val >= threshold or corr_val <= -threshold:
+                    m = cells[3]
+                    if not gene in coding_genes:
+                        coding_genes[gene] = 0
+                    coding_genes[gene] += 1
+                    
+                    if not rna in genes_coexpressed_with_ncRNA:
+                        genes_coexpressed_with_ncRNA[rna] = set()
+                    genes_coexpressed_with_ncRNA[rna].add(gene)
+                    correlation_values[(rna,gene,m)] = corr
             else:
                 invalid_lines += 1
             lines += 1
