@@ -7,12 +7,13 @@ import networkx
 import numpy as np
 import argparse
 import multiprocessing
-
 from config import configs
 #set configuration values
 confs = {}
 for conf in configs:
     confs[conf] = configs[conf]
+
+print("Available cache memory: " + str(int(get_cache()/1024)) + "KB")
 
 all_methods = ["MIC","DC","PRS","SPR"]
 all_ontologies = ["molecular_function","cellular_component","biological_process"]

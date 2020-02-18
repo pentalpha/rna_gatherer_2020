@@ -66,7 +66,43 @@ def get_iterator(my_list, show = False):
                 return range(len(my_list))
 
 def get_cache(usage=1.0):
-        return int((4*1024*1024)*usage)
+        default = 4*1024*1024
+
+        lscpu_out = subprocess.check_output("lscpu | grep 'cache'", shell=True).decode("utf-8").split("\n")
+        #print(str(lscpu_out))
+        if len(lscpu_out) >= 2:
+                raw_nums = []
+                for line in lscpu_out:
+                        if len(line) > 0:
+                                raw_nums.append(line.split()[-1])
+                #print(str(raw_nums))
+                nums = []
+                kilo_byte_notations = ["KB","K","k","kb","KiB","kib"]
+                mega_byte_notations = ["MB","M","m","mb","MiB","mib"]
+                if len(raw_nums) > 0:
+                        for raw_num in raw_nums:
+                                for notation in kilo_byte_notations:
+                                        if raw_num.endswith(notation):
+                                                try:
+                                                        nums.append(int(raw_num.replace(notation, ""))*1024)
+                                                except ValueError:
+                                                        print("Could not convert '" + raw_num + "' to bytes.")
+                                for notation in mega_byte_notations:
+                                        if raw_num.endswith(notation):
+                                                try:
+                                                        nums.append(int(raw_num.replace(notation, ""))*1024*1024)
+                                                except ValueError:
+                                                        print("Could not convert '" + raw_num + "' to bytes.")
+                        greater = 0
+                        for num in nums:
+                                if num > greater:
+                                        greater = num
+                        if greater > 0:
+                                default = greater
+                                #print("Available cache memory is " + str(default))
+        #quit()
+        #print(lscpu_out)
+        return int((default)*usage)
 
 # input - df: a Dataframe, chunkSize: the chunk size
 # output - a list of DataFrame
