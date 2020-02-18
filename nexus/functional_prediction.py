@@ -13,6 +13,8 @@ import obonet
 import statsmodels.stats.multitest as multitest
 import dcor
 from minepy import MINE
+from sys import getsizeof
+
 
 def is_constant(vec):
     first = vec[0]
@@ -134,43 +136,54 @@ def get_valid_associations(genes_coexpressed_with_ncRNA, genes_annotated_with_te
 
 
 def parallel_pvalues(N, possible_gene_term, valid_gene_term, genes_coexpressed_with_ncRNA,
-                    genes_annotated_with_term, threads):
+                    genes_annotated_with_term, threads, available_memory):
+    basic_process_mem_usage = (getsizeof(N)*2 + getsizeof(genes_coexpressed_with_ncRNA)
+        + getsizeof(genes_annotated_with_term))
+    available_memory -= (basic_process_mem_usage * threads)
+    min_for_chunks = threads * 24 * 1024
+    if available_memory < min_for_chunks:
+        available_memory = min_for_chunks
     print("Dividing chunks for parallel p-value calculation")
     gene_terms = []
     for i in range(len(possible_gene_term)):
         if valid_gene_term[i]:
             gene_terms.append(possible_gene_term[i])
     print("Calculating pvalues for " + str(len(gene_terms)) + " associations.")
-    #gene_terms = list(filter(lambda x: x == True))
-    calcs_per_thread = int(len(gene_terms) / threads)+1
-    calc_chunks = list(chunks(gene_terms, calcs_per_thread))
-    print("Calculating p-values")
+    one_size = getsizeof(gene_terms[0])
+    gene_terms_per_run = int(available_memory / one_size)
+    run_chunks = list(chunks(gene_terms, gene_terms_per_run))
+
     gene_term_pvalue = []
+    for run_chunk in tqdm(run_chunks):
+        print("Calculating pvalues for " + str(len(run_chunk)) + " associations in current chunk.")
+        #run_chunk = list(filter(lambda x: x == True))
+        calcs_per_thread = int(len(run_chunk) / threads)+1
+        calc_chunks = list(chunks(run_chunk, calcs_per_thread))
+        print("Calculating p-values")
 
-    manager = multiprocessing.Manager()
-    return_dict = manager.dict()
-    processes = []
-    showing = True
+        manager = multiprocessing.Manager()
+        return_dict = manager.dict()
+        processes = []
+        showing = False
+        i = 0
+        for chunk in calc_chunks:
+            p = multiprocessing.Process(target=pvalue_process,
+                    args=(N, chunk, genes_coexpressed_with_ncRNA,
+                        genes_annotated_with_term, showing, i, return_dict, ))
+            processes.append(p)
+            #print("Spawned process")
+            p.start()
+            if showing:
+                showing = False
+            i += 1
 
-    i = 0
-    for chunk in calc_chunks:
-        p = multiprocessing.Process(target=pvalue_process,
-                args=(N, chunk, genes_coexpressed_with_ncRNA,
-                    genes_annotated_with_term, showing, i, return_dict, ))
-        processes.append(p)
-        print("Spawned process")
-        p.start()
-        if showing:
-            showing = False
-        i += 1
+        for p in processes:
+            p.join()
+            #print("Finished process " + str(p.pid))
 
-    for p in processes:
-        p.join()
-        print("Finished process " + str(p.pid))
-
-    print("Merging results")
-    for value in return_dict.values():
-        gene_term_pvalue += value
-    print("Saved results from processes")
-    manager.shutdown()
+        #print("Merging results")
+        for value in return_dict.values():
+            gene_term_pvalue += value
+        #print("Saved results from processes")
+        manager.shutdown()
     return gene_term_pvalue

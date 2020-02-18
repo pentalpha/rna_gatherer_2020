@@ -401,7 +401,7 @@ def predict(tempDir,ontology_type="molecular_function",current_method="MIC",
     print("Calculating p-values")
     #N = len(coding_genes) #population size
     gene_term_pvalue = parallel_pvalues(N, possible_gene_term, valid_gene_term, valid_genes_coexpressed_with_ncRNA,
-                valid_genes_annotated_with_term, threads)
+                valid_genes_annotated_with_term, threads, get_cache(usage=cache_usage))
     print("Calculating corrected p-value (FDR)")
     pvalues = [pval for gene, term, pval in gene_term_pvalue]
     reject, fdrs, alphacSidak, alphacBonf = multitest.multipletests(pvalues, alpha=0.05, method='fdr_by')
