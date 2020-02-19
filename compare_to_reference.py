@@ -301,6 +301,8 @@ width = 0.7
 def sum(x,y):
     return [x[i]+y[i] for i in range(len(x))]
 
+on_reference = sum(part_of_reference, in_reference)
+
 f, ax = plt.subplots(figsize=(16, 1.2*N + 1))
 
 bars1 = ax.barh(ind, in_reference, width,
@@ -366,22 +368,24 @@ for i in range(len(labels)):
     threshold_str = "0." + label.split(".th0.")[-1].split(".")[0]
     threshold_val = float(threshold_str)
     ref = reference_found[i]
-    methods[method].append((threshold_val,ref))
+    methods[method].append((threshold_val,ref,on_reference[i],unrelated[i]))
 
 vecs = []
 for method in methods:
     pairs = methods[method]
     pairs.sort(key=lambda x: x[0])
-    ts = [t for t,r in pairs]
-    rs = [r for t,r in pairs]
-    vecs.append([method,ts,rs])
+    ts = [t for t,r,o,u in pairs]
+    rs = [r for t,r,o,u in pairs]
+    os = [o for t,r,o,u in pairs]
+    us = [u for t,r,o,u in pairs]
+    vecs.append([method,ts,rs,os,us])
 
 print(vecs)
 
 f, ax = plt.subplots(figsize=(20, 6))
 plt.style.use('seaborn-whitegrid')
 plt.title('Reference Annotations Recovered 2')
-for method, thresholds, reference_perc in vecs:
+for method, thresholds, reference_perc, on_reference, unknown in vecs:
     ax.plot(thresholds, reference_perc,label=method)
 ax.xaxis.set_minor_locator(ticker.MultipleLocator(0.01))
 ax.xaxis.set_major_locator(ticker.MultipleLocator(0.02))
@@ -392,6 +396,30 @@ plt.xlabel('Correlation coefficient threshold')
 ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
 plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
 plt.savefig(output+".3.png",bbox_inches='tight')
+
+
+
+f, ax = plt.subplots(figsize=(20, 6))
+plt.style.use('seaborn-whitegrid')
+plt.title('Prediction size over different thresholds')
+methods_to_print = list(set([m for m,t,r,o,u in vecs]))
+colors = ["#ebffa2","#c99800","#8d0000","#400040","008080"]
+method_color = {}
+for i in range(len(methods_to_print)):
+    method_color[methods_to_print[i]] = colors[i]
+for method, thresholds, reference_perc, on_reference, unknown in vecs:
+    ax.plot(thresholds, on_reference,color=method_color[method],label=method+", Part of Reference")
+    ax.plot(thresholds, unknown,color=method_color[method],label=method+", Unknown",linestyle='dashed')
+ax.xaxis.set_minor_locator(ticker.MultipleLocator(0.01))
+ax.xaxis.set_major_locator(ticker.MultipleLocator(0.02))
+ax.set_axisbelow(True)
+plt.grid(axis='x',which='both')
+plt.ylabel('Number of associations')
+plt.xlabel('Correlation coefficient threshold')
+ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
+plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+plt.savefig(output+".4.png",bbox_inches='tight')
+
 
 if len(dirs) > 0:
     print("Plotting semantic similarities")
