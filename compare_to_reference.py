@@ -38,7 +38,7 @@ def getFilesWith(directory, name_part):
 annotation_paths = []
 for path in annotation_path_dir:
     annotation_paths += get_annotations(path, ".tsv")
-print("Annotations to compare:" + str(annotation_paths))
+#print("Annotations to compare:" + str(annotation_paths))
 
 print("Loading GO network.")
 graph = obonet.read_obo(go_obo)
@@ -162,10 +162,10 @@ def overview(id2gos, name):
         else:
             len_dict[l] += 1
 
-    print(name+":")
+    '''print(name+":")
     print("\tGene->GO associations: " + str(associations))
     print("\tGenes annotated:" + str(genes))
-    print("\tGOs annotated:" + str(len(gos[name])))
+    print("\tGOs annotated:" + str(len(gos[name])))'''
     keys_list = []
     for key in len_dict.keys():
         keys_list.append(key)
@@ -186,7 +186,7 @@ def analyze_annotation(p):
         ont = "biological_process"
 
     id2gos = read_id2gos(p,ontology_type=ont)
-    print("This one is a " + ont + " annotation")
+    #print("This one is a " + ont + " annotation")
     file_name_parts = p.split("/")
     file_name = file_name_parts[-1].replace(".LNC","").replace(".tsv", "")
     if len(file_name_parts) > 1:
@@ -194,7 +194,7 @@ def analyze_annotation(p):
     
     lens_dict = overview(id2gos, file_name)
     
-    print("Calculating similarity to reference...")
+    #print("Calculating similarity to reference...")
     
     total = len(association_sets[file_name])
     in_reference = 0
@@ -254,14 +254,14 @@ def analyze_annotation(p):
     reference_found_perc    = (float(reference_found) / reference_total) * 100
     partially_found_perc    = (float(partially_found) / reference_total) * 100
     
-    print("Total associations: " + str(total)
+    '''print("Total associations: " + str(total)
             +"\n\tIn ref: "+str(in_reference_perc)
             +"\n\tPart of: "+str(part_of_reference_perc)
             +"\n\tUpper to: "+str(upper_to_reference_perc)
             +"\n\tNot in: "+str(unrelated_perc)
             +"\n\tComplete found: "+str(completelly_found_perc)
             +"\n\tReference found: "+str(reference_found_perc)
-            +"\n\tReference found (partially): "+str(partially_found_perc))
+            +"\n\tReference found (partially): "+str(partially_found_perc))'''
     
     return (file_name,[in_reference,part_of_reference,upper_to_reference,unrelated],lens_dict,
              [completelly_found_perc,reference_found_perc,partially_found_perc],ont)
@@ -278,7 +278,7 @@ part_labels_b = ["% of reference genes entirelly annotated",
                 "% of reference genes annotated", "% of reference genes partially annotated"]
 
 for annotation_path in tqdm(annotation_paths):
-    print(annotation_path)
+    #print(annotation_path)
     name, parts, lens, ref_found, ont_type = analyze_annotation(annotation_path)
     ontology_types.append(ont_type)
     labels.append(name)
@@ -291,9 +291,9 @@ part_of_reference = [x[1] for x in counts]
 upper_to_reference = [x[2] for x in counts]
 unrelated = [x[3] for x in counts]
 
-print("Plotting Similarities")
+'''print("Plotting Similarities")
 print(str(counts))
-print(str(labels))
+print(str(labels))'''
 N = len(labels)
 ind = np.arange(N)
 width = 0.7
@@ -356,6 +356,14 @@ ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
 plt.legend((barsb1,barsb2), part_labels_b[1:],loc='center left', bbox_to_anchor=(1, 0.5))
 plt.savefig(output+".2.png",bbox_inches='tight')
 
+def short_method_name(name):
+    name = name.replace("molecular_function","MF")
+    name = name.replace("biological_process","BP")
+    name = name.replace("cellular_component","CC")
+    name = name.replace("-pval=0.05-fdr=0.05", "-pval=fdr=0.05")
+    name = name.replace("-pval=0.01-fdr=0.01", "-pval=fdr=0.01")
+    return name
+
 ##########
 methods = {}
 for i in range(len(labels)):
@@ -363,6 +371,7 @@ for i in range(len(labels)):
     ont_type = ontology_types[i]
     label_parts = label.split("/")[-1].split(".")
     method = ont_type+"-"+label_parts[0]+"-pval=0."+label_parts[4]+"-fdr=0."+label_parts[6]
+    method = short_method_name(method)
     if not method in methods:
         methods[method] = []
     threshold_str = "0." + label.split(".th0.")[-1].split(".")[0]
@@ -380,13 +389,20 @@ for method in methods:
     us = [u for t,r,o,u in pairs]
     vecs.append([method,ts,rs,os,us])
 
-print(vecs)
+def get_method_color(method):
+    colors = {"PRS":'r',"MIC":'b',"DC":'g',"SPR":'k'}
+    for method_name, color in colors.items():
+        if method_name in method:
+            return color
 
-f, ax = plt.subplots(figsize=(20, 6))
+#print(vecs)
+size = (8,4)
+plt.rcParams.update({'font.size': 13})
+f, ax = plt.subplots(figsize=size)
 plt.style.use('seaborn-whitegrid')
 plt.title('Reference Annotations Recovered 2')
 for method, thresholds, reference_perc, on_reference, unknown in vecs:
-    ax.plot(thresholds, reference_perc,label=method)
+    ax.plot(thresholds, reference_perc,label=method,color=get_method_color(method))
 ax.xaxis.set_minor_locator(ticker.MultipleLocator(0.01))
 ax.xaxis.set_major_locator(ticker.MultipleLocator(0.02))
 ax.set_axisbelow(True)
@@ -399,7 +415,7 @@ plt.savefig(output+".3.png",bbox_inches='tight')
 
 
 
-f, ax = plt.subplots(figsize=(20, 6))
+f, ax = plt.subplots(figsize=size)
 plt.style.use('seaborn-whitegrid')
 plt.title('Prediction size over different thresholds')
 methods_to_print = list(set([m for m,t,r,o,u in vecs]))
@@ -408,8 +424,8 @@ method_color = {}
 for i in range(len(methods_to_print)):
     method_color[methods_to_print[i]] = colors[i]
 for method, thresholds, reference_perc, on_reference, unknown in vecs:
-    ax.plot(thresholds, on_reference,color=method_color[method],label=method+", Part of Reference")
-    ax.plot(thresholds, unknown,color=method_color[method],label=method+", Unknown",linestyle='dashed')
+    ax.plot(thresholds, on_reference,color=get_method_color(method),label=method+", Part of Reference")
+    ax.plot(thresholds, unknown,color=get_method_color(method),label=method+", Unknown",linestyle='dashed')
 ax.xaxis.set_minor_locator(ticker.MultipleLocator(0.01))
 ax.xaxis.set_major_locator(ticker.MultipleLocator(0.02))
 ax.set_axisbelow(True)

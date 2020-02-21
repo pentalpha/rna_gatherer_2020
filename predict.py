@@ -354,7 +354,7 @@ def predict(tempDir,ontology_type="molecular_function",current_method="MIC",
     print(str((float(valid_corr)/total)*100) + "% of coexpressions with relevant coefficient.")
     print("valid_coding_genes = "+str(len(valid_coding_genes.keys())))
     print("valid_genes_coexpressed_with_ncRNA = "+str(len(valid_genes_coexpressed_with_ncRNA.keys())))'''
-    print("len(valid_genes_coexpressed_with_ncRNA)=" + str(len(valid_genes_coexpressed_with_ncRNA)))
+    #print("len(valid_genes_coexpressed_with_ncRNA)=" + str(len(valid_genes_coexpressed_with_ncRNA)))
     #print("Discarding coding genes with too little correlations with regulators.")
     genes_to_discard = set()
     for coding_gene in valid_coding_genes.keys():
@@ -368,7 +368,7 @@ def predict(tempDir,ontology_type="molecular_function",current_method="MIC",
                 valid_genes_coexpressed_with_ncRNA[rna].remove(gene)
     '''print("valid_coding_genes = "+str(len(valid_coding_genes.keys())))
     print("valid_genes_coexpressed_with_ncRNA = "+str(len(valid_genes_coexpressed_with_ncRNA.keys())))'''
-    print("len(valid_genes_coexpressed_with_ncRNA)=" + str(len(valid_genes_coexpressed_with_ncRNA)))
+    #print("len(valid_genes_coexpressed_with_ncRNA)=" + str(len(valid_genes_coexpressed_with_ncRNA)))
 
     valid_id2gos = {}
     valid_genes_annotated_with_term = {}
@@ -386,8 +386,8 @@ def predict(tempDir,ontology_type="molecular_function",current_method="MIC",
                 if not term in valid_genes_annotated_with_term.keys():
                     valid_genes_annotated_with_term[term] = set()
                 valid_genes_annotated_with_term[term].add(_id)
-    print("len(valid_genes_annotated_with_term)= " + str(len(valid_genes_annotated_with_term)))
-    '''print("id2gos = "+str(len(id2gos.keys())))
+    '''print("len(valid_genes_annotated_with_term)= " + str(len(valid_genes_annotated_with_term)))
+    print("id2gos = "+str(len(id2gos.keys())))
     print("valid_id2gos = "+str(len(valid_id2gos.keys())))
     print("genes_annotated_with_term = "+str(len(genes_annotated_with_term.keys())))
     print("valid_genes_annotated_with_term = "+str(len(valid_genes_annotated_with_term.keys())))'''
@@ -417,9 +417,13 @@ def predict(tempDir,ontology_type="molecular_function",current_method="MIC",
     for rna in valid_genes_coexpressed_with_ncRNA.keys():
         for go in valid_genes_annotated_with_term.keys():
             possible_gene_term.append((rna, go))
-    print("len(valid_genes_coexpressed_with_ncRNA)=" + str(len(valid_genes_coexpressed_with_ncRNA)))
-    print("len(valid_genes_annotated_with_term)= " + str(len(valid_genes_annotated_with_term)))
-    print("Possible gene,term = " + str(len(possible_gene_term)))
+    if len(possible_gene_term) == 0:
+        print("No possible association to make, under current parameters and data."
+            + " Suggestions: Try a different correlation threshold or a different method.")
+        return
+    #print("len(valid_genes_coexpressed_with_ncRNA)=" + str(len(valid_genes_coexpressed_with_ncRNA)))
+    #print("len(valid_genes_annotated_with_term)= " + str(len(valid_genes_annotated_with_term)))
+    #print("Possible gene,term = " + str(len(possible_gene_term)))
     valid_gene_term, n_lens, M_lens, m_lens = get_valid_associations(valid_genes_coexpressed_with_ncRNA,
                                             valid_genes_annotated_with_term,
                                             possible_gene_term,
