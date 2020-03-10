@@ -55,7 +55,7 @@ def write_transcriptome(args, confs, tmpDir, stepDir):
 
 def make_ids2go(args, confs, tmpDir, stepDir):
     if "ids2go" in confs:
-        ids2go_path = confs["ids2go"]
+        ids2go_path = confs["rfam2go"]
         if os.path.exists(ids2go_path):
             print("Loading ids2go associations")
             global_ids2go = read_ids2go(ids2go_path)

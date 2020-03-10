@@ -9,7 +9,7 @@ from nexus.bioinfo import cluster_all_ranges
 from nexus.bioinfo import read_plast_extended, best_hit
 from nexus.bioinfo import get_gff_attributes, get_gff_attributes_str
 from nexus.bioinfo import get_rfam_from_rnacentral
-from nexus.util import runCommand, load_obj, save_obj, write_file, getFilesWith
+from nexus.util import runCommand, write_file, getFilesWith
 
 from config import configs
 
@@ -31,20 +31,20 @@ def getArgs():
     ap.add_argument("-i", "--infernal-output", required=False,
         help="Lazy-infernal output")
     ap.add_argument("-g", "--genome", required=False,
-        help="Input genome (sequence names equal to the ones in lazy-infernal output)")
+        help="Input genome")
     ap.add_argument("-o", "--output", required=True,
         help="Directory where the results of each pipeline step will be stored.")
     ap.add_argument("-sf", "--start-from", required=False,
         help="In case you already runned the entire pipeline, restart from a specific step.")
     ap.add_argument("-st", "--stop-at", required=False,
         help="Only run the pipeline until a specific step.")
-    ap.add_argument("-bh", "--best-hits", required=False,
-            help="Defalt: False. If True, structRNAfinder wont report all the results")
+    '''ap.add_argument("-bh", "--best-hits", required=False,
+            help="Defalt: False. If True, structRNAfinder wont report all the results")'''
     ap.add_argument("-gff", "--reference-gff", required=False,
         help="Reference annotation for the given genome.")
     ap.add_argument("-tr", "--transcriptome", required=False,
         help="Fasta file with transcripts that could be lncRNA molecules.")
-    ap.add_argument("-ct", "--coding-transcriptome", required=False,
+    '''ap.add_argument("-ct", "--coding-transcriptome", required=False,
         help="Fasta file with nucleotide sequences for coding genes.")
     ap.add_argument("-fq", "--fastq-directory", required=False,
         help="Directory containing sequencing fastq files (fq, fq.gz , fastq or fastq.gz).")
@@ -53,7 +53,7 @@ def getArgs():
     ap.add_argument("-K", "--k-min-coexpressions", required=False,
         default=1, help=("The minimum number of ncRNAs a Coding Gene must be coexpressed with."
                         +" Increasing the value improves accuracy of functional assignments, but"
-                        +" may restrict the results. Default: 1."))
+                        +" may restrict the results. Default: 1."))'''
     return vars(ap.parse_args())
 
 #parsing arguments
@@ -86,12 +86,19 @@ if not("threads" in confs):
     confs["threads"] = 1
 threads = confs["threads"]
 
+args["data_dir"] = outputdir + "/data"
+if not os.path.exists(args["data_dir"]):
+    runCommand("mkdir " + args["data_dir"])
+args["genome_link"] = args["data_dir"] + "/genome.fasta"
+
 #plast_cmd = [args['plast'], "-p plastx", "-d", NR, 
 #        '-i', query_fasta, "-e", "0.0001", "-a", str(threads), 
 #        "-outfmt 1", "-bargraph", "-o", tmpDir + "/plast.tsv"]
 
 if __name__ == '__main__':
-    stepFuncs = [("run_infernal", run_infernal),
+    stepFuncs = [("split_genome", split_genome),
+                ("run_infernal", run_infernal),
+                ("merge_infernal_outs", merge_infernal_outs),
                 ("parse_infernal", parse_infernal),
                 ("get_reference_rfam_ids", get_reference_rfam_ids),
                 ("filter_small_sequences", filter_small_sequences),
@@ -111,19 +118,10 @@ if __name__ == '__main__':
                 #("annotate_novel_names", annotate_novel_names),
                 ("review_annotations", review_annotations),
                 ("write_transcriptome", write_transcriptome),
-                ("make_ids2go", make_ids2go),
-                ("index_transcriptome", index_transcriptome),
-                ("quantify", quantify),
-                ("quantmerge", quantmerge),
-                ("quantify_coding", quantify_coding),
-                ("calculate_coexpression", calculate_coexpression),
-                ("assign_terms", assign_terms),
-                ("complete_id2go", complete_id2go)]
+                ("make_ids2go", make_ids2go)]
 
     pipe = Pipeline(args, confs, stepFuncs, args["output"])
     if pipe.ready:
-        #print("Saving argument values")
-        #save_obj(args, outputdir + "/config")
         print("Arguments file is " + argsfile)
         with open(argsfile, "w") as output_stream:
             args_str = str(args)

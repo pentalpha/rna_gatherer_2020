@@ -8,7 +8,7 @@ from nexus.bioinfo import cluster_all_ranges
 from nexus.bioinfo import read_plast_extended, best_hit
 from nexus.bioinfo import get_gff_attributes, get_gff_attributes_str
 from nexus.bioinfo import get_rfam_from_rnacentral
-from nexus.util import runCommand, load_obj, save_obj, write_file, getFilesWith
+from nexus.util import runCommand, write_file, getFilesWith
 
 def get_reference_rfam_ids(args, confs, tmpDir, stepDir):
     if "reference_gff" in args:
