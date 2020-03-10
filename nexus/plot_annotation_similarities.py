@@ -6,8 +6,7 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import statistics as stc
 
-ontology = sys.argv[1]
-dirs = sys.argv[2:]
+dirs = sys.argv[1:]
 
 def getFilesWith(directory, name_part):
     files = []

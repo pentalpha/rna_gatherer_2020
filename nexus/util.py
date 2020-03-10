@@ -1,5 +1,6 @@
 import subprocess
 import os
+from sys import getsizeof
 from tqdm import tqdm
 
 def runCommand(cmd, print_cmd=True):
@@ -45,21 +46,85 @@ def file_name(path):
         return name
 
 def get_subdirs(dir):
-    subs = os.listdir(dir)
-    subdirs = []
-    for sub in subs:
-        path = dir + "/" + sub
-        if os.path.isdir(path):
-            subdirs.append(path)
-    return subdirs
+        subs = os.listdir(dir)
+        subdirs = []
+        for sub in subs:
+                path = dir + "/" + sub
+                if os.path.isdir(path):
+                        subdirs.append(path)
+        return subdirs
 
 def chunks(lst, n):
-    """Yield successive n-sized chunks from lst."""
-    for i in range(0, len(lst), n):
-        yield lst[i:i + n]
+        """Yield successive n-sized chunks from lst."""
+        for i in range(0, len(lst), n):
+                yield lst[i:i + n]
 
 def get_iterator(my_list, show = False):
-    if show:
-        return tqdm(range(len(my_list)))
-    else:
-        return range(len(my_list))
+        if show:
+                return tqdm(range(len(my_list)))
+        else:
+                return range(len(my_list))
+
+def get_cache(usage=1.0):
+        default = 4*1024*1024
+
+        lscpu_out = subprocess.check_output("lscpu | grep 'cache'", shell=True).decode("utf-8").split("\n")
+        #print(str(lscpu_out))
+        if len(lscpu_out) >= 2:
+                raw_nums = []
+                for line in lscpu_out:
+                        if len(line) > 0:
+                                raw_nums.append(line.split()[-1])
+                #print(str(raw_nums))
+                nums = []
+                kilo_byte_notations = ["KB","K","k","kb","KiB","kib"]
+                mega_byte_notations = ["MB","M","m","mb","MiB","mib"]
+                if len(raw_nums) > 0:
+                        for raw_num in raw_nums:
+                                for notation in kilo_byte_notations:
+                                        if raw_num.endswith(notation):
+                                                try:
+                                                        nums.append(int(raw_num.replace(notation, ""))*1024)
+                                                except ValueError:
+                                                        print("Could not convert '" + raw_num + "' to bytes.")
+                                for notation in mega_byte_notations:
+                                        if raw_num.endswith(notation):
+                                                try:
+                                                        nums.append(int(raw_num.replace(notation, ""))*1024*1024)
+                                                except ValueError:
+                                                        print("Could not convert '" + raw_num + "' to bytes.")
+                        greater = 0
+                        for num in nums:
+                                if num > greater:
+                                        greater = num
+                        if greater > 0:
+                                default = greater
+                                #print("Available cache memory is " + str(default))
+        #quit()
+        #print(lscpu_out)
+        return int((default)*usage)
+
+# input - df: a Dataframe, chunkSize: the chunk size
+# output - a list of DataFrame
+# purpose - splits the DataFrame into smaller of max size chunkSize (last is smaller)
+def splitDataFrameIntoSmaller(df, chunkSize = 10000): 
+        listOfDf = list()
+        numberChunks = len(df) // chunkSize + 1
+        for i in range(numberChunks):
+                listOfDf.append(df[i*chunkSize:(i+1)*chunkSize])
+        return listOfDf
+
+def split_df_to_max_mem(df, available_size):
+        print("Available KB: " + str(available_size/1024))
+
+        lines_per_part = len(df)
+        counts_size = getsizeof(df)
+        print("Counts table size: " + str(counts_size/1024))
+        if counts_size > available_size:
+                percent_per_part = float(available_size) / float(counts_size)
+                print("percent_per_part: " + str(percent_per_part))
+                lines_per_part = int(len(df)*percent_per_part)
+                print("lines_per_part = " + str(lines_per_part))
+
+        dfs = splitDataFrameIntoSmaller(df, chunkSize=lines_per_part)
+        return dfs
