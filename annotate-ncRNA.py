@@ -16,6 +16,7 @@ from config import configs
 from nexus.pipeline import Pipeline
 
 from nexus.annotation_steps import *
+from nexus.tRNA_scan_se import *
 from nexus.reference_processing_steps import *
 from nexus.annotation_merging_steps import *
 from nexus.lnc_steps import *
@@ -28,8 +29,6 @@ for conf in configs:
 
 def getArgs():
     ap = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("-i", "--infernal-output", required=False,
-        help="Lazy-infernal output")
     ap.add_argument("-g", "--genome", required=False,
         help="Input genome")
     ap.add_argument("-o", "--output", required=True,
@@ -38,22 +37,10 @@ def getArgs():
         help="In case you already runned the entire pipeline, restart from a specific step.")
     ap.add_argument("-st", "--stop-at", required=False,
         help="Only run the pipeline until a specific step.")
-    '''ap.add_argument("-bh", "--best-hits", required=False,
-            help="Defalt: False. If True, structRNAfinder wont report all the results")'''
     ap.add_argument("-gff", "--reference-gff", required=False,
         help="Reference annotation for the given genome.")
     ap.add_argument("-tr", "--transcriptome", required=False,
         help="Fasta file with transcripts that could be lncRNA molecules.")
-    '''ap.add_argument("-ct", "--coding-transcriptome", required=False,
-        help="Fasta file with nucleotide sequences for coding genes.")
-    ap.add_argument("-fq", "--fastq-directory", required=False,
-        help="Directory containing sequencing fastq files (fq, fq.gz , fastq or fastq.gz).")
-    ap.add_argument("-go", "--coding-gene-ontology", required=False,
-        help="id2gos file corresponding to the sequences in the coding transcriptome.")
-    ap.add_argument("-K", "--k-min-coexpressions", required=False,
-        default=1, help=("The minimum number of ncRNAs a Coding Gene must be coexpressed with."
-                        +" Increasing the value improves accuracy of functional assignments, but"
-                        +" may restrict the results. Default: 1."))'''
     return vars(ap.parse_args())
 
 #parsing arguments
@@ -109,6 +96,8 @@ if __name__ == '__main__':
                 ("align_to_dbs", align_to_dbs),
                 ("lnc_alignment", lnc_alignment),
                 ("lnc_alignment_parsing", lnc_alignment_parsing),
+                ("run_trnascan", run_trnascan),
+                ("parse_trna", parse_trna),
                 #("analyze", analyze),
                 ("run_gffcompare", run_gffcompare),
                 ("remove_redundancies", remove_redundancies),
@@ -118,7 +107,7 @@ if __name__ == '__main__':
                 #("annotate_novel_names", annotate_novel_names),
                 ("review_annotations", review_annotations),
                 ("write_transcriptome", write_transcriptome),
-                ("make_ids2go", make_ids2go)]
+                ("make_id2go", make_id2go)]
 
     pipe = Pipeline(args, confs, stepFuncs, args["output"])
     if pipe.ready:

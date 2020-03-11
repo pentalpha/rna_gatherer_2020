@@ -38,27 +38,29 @@ def write_transcriptome(args, confs, tmpDir, stepDir):
     annotation = pd.read_csv(stepDir["remove_redundancies"] + "/annotation.gff", sep="\t", header=None,
                 names = ["seqname", "source", "feature", "start", "end", "score", "strand", "frame", "attribute"])
     print("Loading genome")
-    genome_dict = seqListToDict(readSeqsFromFasta(args['genome']))
+    genome_dict = seqListToDict(readSeqsFromFasta(args['genome_link']))
     transcriptome = []
     print("Creating transcriptome file")
     for index, row in annotation.iterrows():
         #print(fasta_header)
         s = genome_dict[row["seqname"]] #cant find key PGUA01000001.1 #TODO
         new_header = get_gff_attributes(row["attribute"])["ID"]
-        from_seq =int(row["start"])-1
-        to_seq =int(row["end"])
-        new_seq = s[from_seq:to_seq]
+        from_seq = int(row["start"])
+        to_seq = int(row["end"])
+        begin = min(from_seq,to_seq)-1
+        up_to = max(from_seq,to_seq)
+        new_seq = s[begin:up_to]
         transcriptome.append((new_header, new_seq))
     print("Writing transcriptome")
     writeFastaSeqs(transcriptome, tmpDir + "/transcriptome.fasta")
     return True
 
-def make_ids2go(args, confs, tmpDir, stepDir):
+def make_id2go(args, confs, tmpDir, stepDir):
     if "ids2go" in confs:
-        ids2go_path = confs["rfam2go"]
-        if os.path.exists(ids2go_path):
+        id2go_path = confs["rfam2go"]
+        if os.path.exists(id2go_path):
             print("Loading ids2go associations")
-            global_ids2go = read_ids2go(ids2go_path)
+            global_ids2go = read_ids2go(id2go_path)
             print("Loading annotation")
             annotation = pd.read_csv(stepDir["remove_redundancies"] + "/annotation.gff", sep="\t", header=None,
                 names = ["seqname", "source", "feature", "start", "end", "score", "strand", "frame", "attribute"])
@@ -81,7 +83,7 @@ def make_ids2go(args, confs, tmpDir, stepDir):
                     stream.write(ID + "\n")
             return True
         else:
-            print(ids2go_path + " does not exist.")
+            print(id2go_path + " does not exist.")
             return False
     else:
         print("No RFAM ids2go file specified in config.py")
@@ -289,7 +291,7 @@ def quantify_coding(args, confs, tmpDir, stepDir):
 
 def complete_id2go(args, confs, tmpDir, stepDir):
     new_id2gos = read_ids2go(stepDir['assign_terms'] + "/new_terms.id2gos")
-    old_id2gos = read_ids2go(stepDir['make_ids2go'] + "/ids2go.tsv")
+    old_id2gos = read_ids2go(stepDir['make_id2go'] + "/ids2go.tsv")
     for ID in new_id2gos.keys():
         if ID in old_id2gos:
             old_id2gos[ID].update(new_id2gos[ID])

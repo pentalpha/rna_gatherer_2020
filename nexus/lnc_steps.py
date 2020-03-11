@@ -156,7 +156,7 @@ def align_to_dbs(args, confs, tmpDir, stepDir):
 def lnc_alignment(args, confs, tmpDir, stepDir):
     lnc_fasta = stepDir["align_to_dbs"] + "/lncRNA_only.fasta"
     if os.path.exists(lnc_fasta):
-        code = blast(lnc_fasta, args["genome"], tmpDir, 
+        code = blast(lnc_fasta, args["genome_link"], tmpDir, 
             threads=confs["threads"], blast_type=(confs["plast"] + " -p plastn"),
             source="LncADeep")
         return code
@@ -166,7 +166,7 @@ def lnc_alignment(args, confs, tmpDir, stepDir):
 def lnc_alignment_parsing(args, confs, tmpDir, stepDir):
     lnc_fasta = stepDir["align_to_dbs"] + "/lncRNA_only.fasta"
     if os.path.exists(lnc_fasta):
-        success = blast_annotate(lnc_fasta, args["genome"], tmpDir, 
+        success = blast_annotate(lnc_fasta, args["genome_link"], tmpDir, 
             threads=confs["threads"], blast_type=(confs["plast"] + " -p plastn"),
             source="LGC", run_blast=False, alternative_outputdir=stepDir["lnc_alignment"])
         if not success:

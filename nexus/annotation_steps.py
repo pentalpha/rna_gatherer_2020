@@ -54,8 +54,8 @@ def start(output_dir, cmscan, rfam, threads):
         
 def erase_comments(path):
     tmp = path+".tmp"
-    util.runCommand("grep -v '^#' " + path + " > " + tmp)
-    util.runCommand("mv " + tmp + " " + path)
+    runCommand("grep -v '^#' " + path + " > " + tmp)
+    runCommand("mv " + tmp + " " + path)
 
 def get_infernal_output(output_dir, output_file):
     paths = getFilesWith(output_dir, ".tsv")
@@ -66,7 +66,7 @@ def get_infernal_output(output_dir, output_file):
             runCommand("cat " + results2 + " > " + output_file.rstrip(".tsv")+".out")
             erase_comments(output_file.rstrip(".tsv")+".out")
         results = " ".join(paths)
-        runCommand("cat " + results + " > " + output_file)
+        runCommand("cat " + results + " > " + output_file + ".tsv")
         erase_comments(output_file)
         return True
     else:
@@ -80,7 +80,7 @@ def read_infernal_output(infernal_path):
     print("Reading lines from infernal tabular output")
     with open(infernal_tsv) as f:
         line = f.readline()
-        to_print = 4
+        to_print = 0
         while line != "":
             if line[0] != "#":
                 elements = [x for x in line.split() if x != ""]
@@ -104,9 +104,11 @@ def read_infernal_output(infernal_path):
             name_used[base_name] = 0
         unique_name = base_name+"_"+str(name_used[base_name])
         name_used[base_name] += 1
+        start = min(int(hit["qstart"]),int(hit["qend"]))
+        end = max(int(hit["qstart"]),int(hit["qend"]))
         row = {"seqname": hit['seqname'], "source": "cmscan",
-        "feature": "transcript", "start": hit["qstart"],
-        "end":hit["qend"], "score": hit["evalue"],
+        "feature": "transcript", "start": start,
+        "end":end, "score": hit["evalue"],
         "strand": hit["strand"],
         "frame": ".", "attribute":"ID="+unique_name+";name="+hit['rna_name']
             +";evalue="+hit['evalue']+";rfam="+hit['rfam']}

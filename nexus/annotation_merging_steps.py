@@ -19,9 +19,10 @@ def filter_non_transcripts(gff_path, gff_output_path):
 
 def run_gffcompare(args, confs, tmpDir, stepDir):
     rfam_mappings = stepDir["parse_infernal"] + "/rfam_annotation_genome.gff"
+    tRNA_mappings = stepDir["parse_trna"] + "/tRNAs.gff"
     novel_mappings = tmpDir + "/novel_mappings.gff"
     filter_non_transcripts(rfam_mappings, novel_mappings)
-    gffs = [novel_mappings]
+    gffs = [novel_mappings,tRNA_mappings]
 
     lnc_mappings = stepDir["lnc_alignment_parsing"] + "/lncRNA_annotation.gff"
     if os.path.exists(lnc_mappings):
@@ -65,6 +66,8 @@ def best_id(ids, hits):
         best_by_source[source] = best_id_in_source(id_by_source[source], hits, source)
     if "RNAcentral" in best_by_source:
         return best_by_source["RNAcentral"]
+    elif "tRNAscan-SE" in best_by_source:
+        return best_by_source["tRNAscan-SE"]
     elif "cmscan" in best_by_source:
         return best_by_source["cmscan"]
     elif "LGC" in best_by_source:
@@ -322,7 +325,7 @@ def make_complete_annotation(args, confs, tmpDir, stepDir):
     #print("Assigned RFAM id to " + str(rfam_assigns)+ " transcripts")
 
     print("Reading genome")
-    genome_dict = seqListToDict(readSeqsFromFasta(args['genome']))
+    genome_dict = seqListToDict(readSeqsFromFasta(args['genome_link']))
     transcriptome = []
     transcriptome_gff = []
     print("Creating transcriptome file")

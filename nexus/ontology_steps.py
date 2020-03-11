@@ -30,7 +30,7 @@ def write_transcriptome(args, confs, tmpDir, stepDir):
     annotation = pd.read_csv(stepDir["remove_redundancies"] + "/annotation.gff", sep="\t", header=None,
                 names = ["seqname", "source", "feature", "start", "end", "score", "strand", "frame", "attribute"])
     print("Loading genome")
-    genome_dict = seqListToDict(readSeqsFromFasta(args['genome']))
+    genome_dict = seqListToDict(readSeqsFromFasta(args['genome_link']))
     transcriptome = []
     print("Creating transcriptome file")
     for index, row in annotation.iterrows():
@@ -45,7 +45,7 @@ def write_transcriptome(args, confs, tmpDir, stepDir):
     writeFastaSeqs(transcriptome, tmpDir + "/transcriptome.fasta")
     return True
 
-def make_ids2go(args, confs, tmpDir, stepDir):
+def make_id2go(args, confs, tmpDir, stepDir):
     if "ids2go" in confs:
         ids2go_path = confs["rfam2go"]
         if os.path.exists(ids2go_path):
