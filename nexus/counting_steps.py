@@ -28,10 +28,23 @@ def read_ids2go(filepath):
             gos_dict[rfam_id] = set(go_ids)
     return gos_dict
 
-def write_ids2go(filepath, gos_dict):
+def read_rfam2go(filepath):
+    gos_dict = {}
+    with open(filepath, 'r') as stream:
+        for raw_line in stream.readlines():
+            cols = raw_line.rstrip("\n").split()
+            rfam_id = cols[0].split(":")[-1]
+            if not rfam_id in gos_dict:
+                gos_dict[rfam_id] = set()
+            go_str = cols[-1]
+            gos_dict[rfam_id].add(go_str)
+    return gos_dict
+
+def write_id2go(filepath, gos_dict):
     with open(filepath, 'w') as stream:
-        for key in gos_dict.keys():
-            stream.write(key + "\t" + ";".join(gos_dict[key]) + "\n")
+        for key, gos in gos_dict.items():
+            for go in gos:
+                stream.write(key + "\t" + go + "\n")
 
 def write_transcriptome(args, confs, tmpDir, stepDir):
     print("Loading annotation")
@@ -56,37 +69,33 @@ def write_transcriptome(args, confs, tmpDir, stepDir):
     return True
 
 def make_id2go(args, confs, tmpDir, stepDir):
-    if "ids2go" in confs:
-        id2go_path = confs["rfam2go"]
-        if os.path.exists(id2go_path):
-            print("Loading ids2go associations")
-            global_ids2go = read_ids2go(id2go_path)
-            print("Loading annotation")
-            annotation = pd.read_csv(stepDir["remove_redundancies"] + "/annotation.gff", sep="\t", header=None,
-                names = ["seqname", "source", "feature", "start", "end", "score", "strand", "frame", "attribute"])
-            local_ids2go = {}
-            print("Associating IDs to GO terms")
-            ids = []
-            for index, row in annotation.iterrows():
-                attrs = get_gff_attributes(row["attribute"])
-                ID = attrs["ID"]
-                ids.append(ID)
-                if "rfam" in attrs:
-                    rfam_id = attrs["rfam"]
-                    if rfam_id in global_ids2go:
-                        go_list = global_ids2go[rfam_id]
-                        local_ids2go[ID] = go_list
-            write_ids2go(tmpDir + "/ids2go.tsv", local_ids2go)
-            print("Writing population: " + str(len(ids)) + " ids")
-            with open(tmpDir + "/ids.txt", 'w') as stream:
-                for ID in ids:
-                    stream.write(ID + "\n")
-            return True
-        else:
-            print(id2go_path + " does not exist.")
-            return False
+    id2go_path = confs["rfam2go"]
+    if os.path.exists(id2go_path):
+        print("Loading ids2go associations")
+        global_ids2go = read_rfam2go(id2go_path)
+        print("Loading annotation")
+        annotation = pd.read_csv(stepDir["remove_redundancies"] + "/annotation.gff", sep="\t", header=None,
+            names = ["seqname", "source", "feature", "start", "end", "score", "strand", "frame", "attribute"])
+        local_ids2go = {}
+        print("Associating IDs to GO terms")
+        ids = []
+        for index, row in annotation.iterrows():
+            attrs = get_gff_attributes(row["attribute"])
+            ID = attrs["ID"]
+            ids.append(ID)
+            if "rfam" in attrs:
+                rfam_id = attrs["rfam"]
+                if rfam_id in global_ids2go:
+                    go_list = global_ids2go[rfam_id]
+                    local_ids2go[ID] = go_list
+        write_id2go(tmpDir + "/id2go.tsv", local_ids2go)
+        print("Writing population: " + str(len(ids)) + " ids")
+        with open(tmpDir + "/ids.txt", 'w') as stream:
+            for ID in ids:
+                stream.write(ID + "\n")
+        return True
     else:
-        print("No RFAM ids2go file specified in config.py")
+        print(id2go_path + " does not exist.")
         return False
 
 def index_transcriptome(args, confs, tmpDir, stepDir):

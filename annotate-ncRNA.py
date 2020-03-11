@@ -78,6 +78,9 @@ if not os.path.exists(args["data_dir"]):
     runCommand("mkdir " + args["data_dir"])
 args["genome_link"] = args["data_dir"] + "/genome.fasta"
 
+global_data = os.path.dirname(os.path.realpath(__file__)) + "/data"
+confs["rfam2go"] = global_data + "/rfam2go"
+
 #plast_cmd = [args['plast'], "-p plastx", "-d", NR, 
 #        '-i', query_fasta, "-e", "0.0001", "-a", str(threads), 
 #        "-outfmt 1", "-bargraph", "-o", tmpDir + "/plast.tsv"]
