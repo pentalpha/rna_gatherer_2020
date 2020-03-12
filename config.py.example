@@ -3,6 +3,7 @@
 import multiprocessing
 
 configs = {
+    "coordinates_ftp": "ftp://ftp.ebi.ac.uk/pub/databases/RNAcentral/current_release/genome_coordinates/gff3/",
     "threads": str(max(2, multiprocessing.cpu_count()-1)),
     "max_mem": "4000",
     "go_obo": "go.obo",
