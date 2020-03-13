@@ -112,6 +112,7 @@ if __name__ == '__main__':
                 ("get_functional_reference", get_functional_reference),
                 ("map_to_genome", map_to_genome),
                 ("get_reference_rfam_ids", get_reference_rfam_ids),
+                ("get_rnacentral_info", get_rnacentral_info),
                 ("run_trnascan", run_trnascan),
                 ("parse_trna", parse_trna),
                 #("analyze", analyze),

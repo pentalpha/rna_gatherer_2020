@@ -41,6 +41,16 @@ def get_rnacentral_id_by(argument, value):
         print(value + "Does not match an real ID in RNACentral")
         return None
 
+def get_rnacentral_json(value):
+    url = 'https://rnacentral.org/api/v1/rna/'+value
+    r = requests.get(url, params = {"format": "json"})
+    #print(str(r.json()))
+    data = r.json()
+    if 'rnacentral_id' in data:
+        return data
+    else:
+        return None
+
 def confirm_rnacentral_id(value):
     """
     Parse json output and return the RNAcentral id.
@@ -303,6 +313,39 @@ def get_reference_rfam_ids(args, confs, tmpDir, stepDir):
                         if not("rfam" in attributes):
                             out_str.write("Could not assign rfam id to " + attributes["ID"]+"\n")
                             #print("Could not assign rfam id to " + attributes["ID"]+"\n")
+            return get_gff_attributes_str(attributes)
+        annotation["attribute"] = annotation.apply(lambda row: update_attribute(row),axis=1)
+        annotation.to_csv(tmpDir + "/reference.gff", sep="\t", index=False, header=False)
+        out_str.close()
+    return True
+
+def get_rnacentral_info(args, confs, tmpDir, stepDir):
+    ref = stepDir["get_reference_rfam_ids"] + "/reference.gff"
+    if os.path.exists(ref):
+        annotation = pd.read_csv(ref, sep="\t", header=None, names=["seqname", 
+            "source", "feature", "start", "end", "score", "strand", "frame", "attribute"])
+        print("Looking for info over RNACentral API")
+        log = tmpDir + "/log.txt"
+        out_str = open(log, 'w')
+        def update_attribute(row):
+            attr_str = row["attribute"]
+            attributes = None
+            try:
+                attributes = get_gff_attributes(attr_str)
+            except:
+                print("Row could not have attributes parsed:\n\t"+str(row))
+            if attributes != None:
+                if not("rfam" in attributes):
+                    short_id = attributes["ID"]
+                    if "URS" in short_id:
+                        short_id = attributes["ID"].split(".")[0].split("_")[0]
+                        rnacentral_json = get_rnacentral_json(short_id)
+                        if rnacentral_json != None:
+                            if not "description" in attributes and "description" in rnacentral_json:
+                                attributes["description"] = rnacentral_json["description"]
+                            if not "type" in attributes and "rna_type" in rnacentral_json:
+                                attributes["type"] = rnacentral_json["rna_type"]
+                            print("Retrieved info for " + short_id)
             return get_gff_attributes_str(attributes)
         annotation["attribute"] = annotation.apply(lambda row: update_attribute(row),axis=1)
         annotation.to_csv(tmpDir + "/reference.gff", sep="\t", index=False, header=False)

@@ -29,7 +29,7 @@ def run_gffcompare(args, confs, tmpDir, stepDir):
         gffs = gffs + [lnc_mappings]
 
     if "reference_gff" in args:
-        ref = stepDir["get_reference_rfam_ids"] + "/reference.gff"
+        ref = stepDir["get_rnacentral_info"] + "/reference.gff"
         ref_output = tmpDir + "/reference.gff"
         filter_non_transcripts(ref, ref_output)
         gffs = [os.path.abspath(ref)] + gffs
