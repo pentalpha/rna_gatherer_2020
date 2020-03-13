@@ -5,6 +5,9 @@ from nexus.util import runCommand
 import pandas as pd
 #import hashlib
 import requests
+import os
+
+rnacentral2rfam = {}
 
 def readSeqsFromFasta(input_fasta):
     seqs = list()
@@ -25,6 +28,7 @@ def readSeqsFromFasta(input_fasta):
                         seq += "\n"
                     seq += line.rstrip("\n").lstrip("\n")
         seq = seq.replace("\n","")
+        contigName = contigName.replace("\n","")
         seqs.append((contigName,seq))
     return seqs
 
@@ -63,7 +67,7 @@ def writeFastaSeqs(validSeqs, output_fasta, lineWidth = 60):
         contig = ""
         for i in range(0,len(slices)):
             contig += slices[i] + "\n"
-        contig += "\n"
+        #contig += "\n"
         seqs.append((header,contig))
 
     with open(output_fasta, "w") as fasta:
@@ -413,14 +417,27 @@ def get_gff_attributes_str(attrs):
     x = x.rstrip(";")
     return x
 
+def load_rnacentral2rfam():
+    global_data = os.path.dirname(os.path.realpath(__file__)) + "/data"
+    with open(global_data+"/rfam2rnacentral.tsv",'r') as input_stream:
+        for line in input_stream.readlines():
+            cells = line.rstrip("\n").split()
+            rnacentral = "URS"+cells[0]
+            rfam = "RF"+cells[1]
+            rnacentral2rfam[rnacentral] = rfam
+
 def get_rfam_from_rnacentral(id, print_response=False):
-    url = 'https://rnacentral.org/api/v1/rna/'+id+'/?flat=true&format=json&database=&database=rfam'
-    r = requests.get(url)
-    data = r.json()
-    '''if print_response:
-        print("response for " + id)
-        print(str(data))'''
-    if 'genes' in data:
-        if len(data['genes']) > 0:
-            return data['genes'][0]
-    return None
+    if len(rnacentral2rfam.keys()) == 0:
+        load_rnacentral2rfam()
+    if id in rnacentral2rfam:
+        return rnacentral2rfam[id]
+    elif id.split("_"[0]) in rnacentral2rfam:
+        return rnacentral2rfam[id.split("_"[0])]
+    else:
+        return None
+'''url = 'https://rnacentral.org/api/v1/rna/'+id+'/?format=json&&database=rfam'
+r = requests.get(url)
+data = r.json()
+if 'genes' in data:
+    if len(data['genes']) > 0:
+        return data['genes'][0]'''

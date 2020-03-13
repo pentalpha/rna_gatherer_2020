@@ -38,7 +38,11 @@ def getArgs():
     ap.add_argument("-st", "--stop-at", required=False,
         help="Only run the pipeline until a specific step.")
     ap.add_argument("-gff", "--reference-gff", required=False,
-        help="Reference annotation for the given genome.")
+        help=("Reference annotation for the given genome. Such reference annotations are"
+            +" available for several species at " + confs["coordinates_ftp"]))
+    ap.add_argument("-ref", "--reference-fasta", required=False,
+        help=("Reference sequences of ncRNA for this genome. RNA Nexus will try to find "
+            +" their genomic mapping and also retrieve information about them from RNACentral and QuickGO."))
     ap.add_argument("-tr", "--transcriptome", required=False,
         help="Fasta file with transcripts that could be lncRNA molecules.")
     return vars(ap.parse_args())
@@ -57,10 +61,6 @@ for arg in cmdArgs:
     if cmdArgs[arg] is not None:
         args[arg] = cmdArgs[arg]
 
-if not "genome" in args:
-    print("No --genome defined, cannot run.")
-    quit()
-
 if not "best_hits" in args:
     args["best_hits"] = "False"
 
@@ -76,7 +76,15 @@ threads = confs["threads"]
 args["data_dir"] = outputdir + "/data"
 if not os.path.exists(args["data_dir"]):
     runCommand("mkdir " + args["data_dir"])
+
 args["genome_link"] = args["data_dir"] + "/genome.fasta"
+if "genome" in args:
+    runCommand("ln -s " + args["genome"] + " " + args["genome_link"])
+else:
+    if not os.path.exists(args["genome_link"]):
+        print("No path to genome in arguments giver now or previously,"
+              +" please specify a genome to use.")
+        quit()
 
 global_data = os.path.dirname(os.path.realpath(__file__)) + "/data"
 confs["rfam2go"] = global_data + "/rfam2go"
@@ -90,7 +98,6 @@ if __name__ == '__main__':
                 ("run_infernal", run_infernal),
                 ("merge_infernal_outs", merge_infernal_outs),
                 ("parse_infernal", parse_infernal),
-                ("get_reference_rfam_ids", get_reference_rfam_ids),
                 ("filter_small_sequences", filter_small_sequences),
                 ("filter_long_orfs", filter_long_orfs),
                 ("test_coding_potential", test_coding_potential),
@@ -99,6 +106,8 @@ if __name__ == '__main__':
                 ("align_to_dbs", align_to_dbs),
                 ("lnc_alignment", lnc_alignment),
                 ("lnc_alignment_parsing", lnc_alignment_parsing),
+                ("get_rnacentral_ids", get_rnacentral_ids),
+                ("get_reference_rfam_ids", get_reference_rfam_ids),
                 ("run_trnascan", run_trnascan),
                 ("parse_trna", parse_trna),
                 #("analyze", analyze),
