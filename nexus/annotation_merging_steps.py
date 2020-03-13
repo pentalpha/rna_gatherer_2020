@@ -48,9 +48,6 @@ def best_id_in_source(ids, hits, source):
         current_len = int(hit['end']) - int(hit['start'])
         if current_len > best_len:
             best = i
-    '''if source == "RNAcentral":
-    elif source == "cmscan":
-    elif source == "LGC":'''
     return best
 
 def best_id(ids, hits):
@@ -66,6 +63,8 @@ def best_id(ids, hits):
         best_by_source[source] = best_id_in_source(id_by_source[source], hits, source)
     if "RNAcentral" in best_by_source:
         return best_by_source["RNAcentral"]
+    elif "ReferenceMapping" in best_by_source:
+        return best_by_source["ReferenceMapping"]
     elif "tRNAscan-SE" in best_by_source:
         return best_by_source["tRNAscan-SE"]
     elif "cmscan" in best_by_source:
