@@ -166,10 +166,10 @@ def lnc_alignment(args, confs, tmpDir, stepDir):
 def lnc_alignment_parsing(args, confs, tmpDir, stepDir):
     lnc_fasta = stepDir["align_to_dbs"] + "/lncRNA_only.fasta"
     if os.path.exists(lnc_fasta):
-        success = blast_annotate(lnc_fasta, args["genome_link"], tmpDir, 
+        success, gff_path = blast_annotate(lnc_fasta, args["genome_link"], tmpDir, 
             threads=confs["threads"], blast_type=(confs["plast"] + " -p plastn"),
             source="LGC", run_blast=False, alternative_outputdir=stepDir["lnc_alignment"])
-        if not success:
+        if success:
             return False
         annotation = tmpDir + "/lncRNA_only.to.gigas_genome-short_found.gff"
         runCommand("mv " + annotation + " " + tmpDir + "/lncRNA_annotation.gff")

@@ -201,20 +201,34 @@ def blast_annotate(query, db, output_dir, max_evalue = 0.0000000001, threads=8, 
     import pandas as pd
 
     print("Blasting query to DB")
+
+    create_db = True
+    if os.path.exists(db+".nhr"):
+        create_db = False
+    
+    if create_db:
+        cmd = " ".join(["makeblastdb -in " + db + " -dbtype nucl"])
+        code = runCommand(cmd)
+        if code != 0:
+            print("Could not create database for given genome.")
+            return False, ""
+
     db_name = os.path.basename(db).split(".")[0]
     if source == "db_name":
         source = db_name
     query_name = os.path.basename(query).split(".")[0]
     search_name = query_name+".to."+db_name
     output = output_dir + "/"+search_name+"_results.tsv"
-    #cmd = " ".join([blast_type, "-db", db, "-query", query,
-    #    "-out", output, "-outfmt", "'6 qaccver saccver pident length mismatch gapopen qstart qend sstart send evalue bitscore qcovs'", "-num_threads", str(threads), "-evalue", str(max_evalue)])
-    cmd = " ".join([blast_type, "-d", db, "-i", query, "-e", str(max_evalue), "-a", 
-                str(threads), "-outfmt 1", "-o", output])
+    cmd = " ".join([blast_type, "-db", db, "-query", query,
+        "-out", output, "-outfmt", 
+        "'6 qaccver saccver pident length mismatch gapopen qstart qend sstart send evalue bitscore qcovs'", 
+        "-num_threads", str(threads), "-evalue", str(max_evalue)])
+    #cmd = " ".join([blast_type, "-d", db, "-i", query, "-e", str(max_evalue), "-a", 
+    #            str(threads), "-outfmt 1", "-o", output])
     if run_blast:
         code = runCommand(cmd)
         if code != 0:
-            return False
+            return False, ""
     else:
         if alternative_outputdir != None:
             output = alternative_outputdir + "/"+search_name+"_results.tsv"
@@ -232,13 +246,15 @@ def blast_annotate(query, db, output_dir, max_evalue = 0.0000000001, threads=8, 
     seq_lens = {}
     for seq in seqs:
         seq_lens[seq[0].rstrip("\n").lstrip(">")] = len(seq[1])
-    print("Some sequence length keys: " + str(seq_lens.keys()[:5]))
-    blast_df = pd.read_csv(output, sep='\t', header=None,
+    example_sequence_names = list(seq_lens.keys())[:5]
+    print("Some sequence keys: " + str(example_sequence_names))
+    blast_df = pd.read_csv(output, sep='\t', header=None, index_col=False,
             names=["qseqid", "sseqid", "pident", "length", "mismatch",
                 "gapopen", "qstart", "qend", "sstart", "send", "evalue", "bitscore"])
     blast_df = blast_df.astype({"pident": 'float32', "length": 'int32', "mismatch": 'int32',
                 "gapopen": 'int32', "qstart": 'int32', "qend": 'int32',
                 "sstart": 'int32', "send": 'int32', "evalue": 'float64', "bitscore": 'float64'})
+    print(str(blast_df.head()))
     print("Calculating coverage")
     blast_df["coverage"] = blast_df.apply(lambda row: row["length"] / seq_lens[row['qseqid']], axis=1)
     best_hits = dict()
@@ -283,7 +299,7 @@ def blast_annotate(query, db, output_dir, max_evalue = 0.0000000001, threads=8, 
         "end":str(end), "score": ".",
         "strand": get_strand(int(hit["qstart"]),int(hit["qend"]),int(hit["sstart"]),int(hit["send"])),
         "frame": ".",
-        "attribute":"ID="+name+";type=lncRNA;evalue="+str(hit["evalue"])
+        "attribute":"ID="+name+";evalue="+str(hit["evalue"])
         +";coverage="+str(hit["coverage"])+";pident="+str(hit["pident"])}
         rows.append(row)
     gff = pd.DataFrame(rows, columns = ["seqname", "source",
@@ -307,7 +323,7 @@ def blast_annotate(query, db, output_dir, max_evalue = 0.0000000001, threads=8, 
     writeFastaSeqs(knownSeqs, gff_name.rstrip("gff")+"fasta")
     print(str(len(gff)) + " detected and annotated on " + gff_name)
     print(str(len(unknownSeqs)) + " unknown seqs remaining on " + fasta_name)'''
-    return True
+    return True, gff_name
 
 def read_plast_extended(path):
     df = pd.read_csv(path, sep="\t", header=None)
@@ -418,26 +434,21 @@ def get_gff_attributes_str(attrs):
     return x
 
 def load_rnacentral2rfam():
-    global_data = os.path.dirname(os.path.realpath(__file__)) + "/data"
-    with open(global_data+"/rfam2rnacentral.tsv",'r') as input_stream:
+    global_data = os.path.dirname(os.path.realpath(__file__)) + "/../data"
+    with open(global_data+"/rnacentral2rfam.tsv",'r') as input_stream:
         for line in input_stream.readlines():
             cells = line.rstrip("\n").split()
             rnacentral = "URS"+cells[0]
             rfam = "RF"+cells[1]
             rnacentral2rfam[rnacentral] = rfam
 
-def get_rfam_from_rnacentral(id, print_response=False):
+def get_rfam_from_rnacentral(id_, print_response=False):
     if len(rnacentral2rfam.keys()) == 0:
         load_rnacentral2rfam()
-    if id in rnacentral2rfam:
-        return rnacentral2rfam[id]
-    elif id.split("_"[0]) in rnacentral2rfam:
-        return rnacentral2rfam[id.split("_"[0])]
+
+    if id_ in rnacentral2rfam:
+        return rnacentral2rfam[id_]
+    elif id_.split("_")[0] in rnacentral2rfam:
+        return rnacentral2rfam[id_.split("_"[0])]
     else:
         return None
-'''url = 'https://rnacentral.org/api/v1/rna/'+id+'/?format=json&&database=rfam'
-r = requests.get(url)
-data = r.json()
-if 'genes' in data:
-    if len(data['genes']) > 0:
-        return data['genes'][0]'''

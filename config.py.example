@@ -1,8 +1,9 @@
 #Module: config.py
-#Move this file to <project_dir>/config.py and customize it
+#Rename this file as "config.py" and customize it
 import multiprocessing
 
 configs = {
+    "quickgo_api": "https://www.ebi.ac.uk/QuickGO/services/annotation/downloadSearch",
     "coordinates_ftp": "ftp://ftp.ebi.ac.uk/pub/databases/RNAcentral/current_release/genome_coordinates/gff3/",
     "threads": str(max(2, multiprocessing.cpu_count()-1)),
     "max_mem": "4000",

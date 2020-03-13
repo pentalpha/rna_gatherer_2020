@@ -43,6 +43,8 @@ def getArgs():
     ap.add_argument("-ref", "--reference-fasta", required=False,
         help=("Reference sequences of ncRNA for this genome. RNA Nexus will try to find "
             +" their genomic mapping and also retrieve information about them from RNACentral and QuickGO."))
+    ap.add_argument("-tx", "--taxon-id", required=False,
+        help="Taxon ID for the species, required to retrieve annotations from QuickGo")
     ap.add_argument("-tr", "--transcriptome", required=False,
         help="Fasta file with transcripts that could be lncRNA molecules.")
     return vars(ap.parse_args())
@@ -107,6 +109,8 @@ if __name__ == '__main__':
                 ("lnc_alignment", lnc_alignment),
                 ("lnc_alignment_parsing", lnc_alignment_parsing),
                 ("get_rnacentral_ids", get_rnacentral_ids),
+                ("get_functional_reference", get_functional_reference),
+                ("map_to_genome", map_to_genome),
                 ("get_reference_rfam_ids", get_reference_rfam_ids),
                 ("run_trnascan", run_trnascan),
                 ("parse_trna", parse_trna),

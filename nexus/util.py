@@ -128,3 +128,10 @@ def split_df_to_max_mem(df, available_size):
 
         dfs = splitDataFrameIntoSmaller(df, chunkSize=lines_per_part)
         return dfs
+
+def read_to_list(file_path):
+        if os.path.exists(file_path):
+                with open(file_path,'r') as stream:
+                        return [line.rstrip("\n") for line in stream.readlines()]
+        else:
+                return None
