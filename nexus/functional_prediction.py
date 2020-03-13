@@ -24,9 +24,47 @@ def is_constant(vec):
             return False
     return True
 
-def leave_one_out(pid, coding_rows, regulators, show, methods, return_dict):
+def calc_sobolev(reads1,reads2):
+    z1 = ((np.square(reads1) / np.sum(np.square(reads1))) -
+        (np.square(reads2) / np.sum(np.square(reads2))))
+    fourier_transform = np.fft.fft(z1)
+    w = (2*math.pi
+        *(np.array([x for x in range(0,len(fourier_transform))], dtype=np.float32))
+        /(len(fourier_transform)))
+    s = np.square(np.sum((1+w)*np.square(np.abs(fourier_transform))),0.5)
+    return s
+
+def calc_fisher_information(reads1,reads2):
+    t = ((np.square(reads1) / np.sum(np.square(reads1))) *
+        (np.square(reads2) / np.sum(np.square(reads2))))
+    return np.arccos(np.sum(np.sqrt(t)))
+
+def calc_mic(reads1,reads2,mine):
+    mine.compute_score(reads1, reads2)
+    return mine.mic()
+
+def prs(reads1,reads2):
+    pearson_corr, p = pearsonr(reads1, reads2)
+    return pearson_corr
+
+def spr(reads1,reads2):
+    spearman_corr, p = spearmanr(reads1, reads2)
+    return spearman_corr
+
+def dc(reads1,reads2):
+    return dcor.distance_correlation(reads1, reads2)
+
+def leave_one_out(pid, coding_rows, regulators, show, method_ids, return_dict):
     coding_noncoding_pairs = []
     mine = MINE()
+    mic = lambda reads1,reads2: calc_mic(reads1,reads2,mine)
+
+    method_names = {"MIC": mic, "PRS": prs, "SPR": spr, "DC": dc, 
+                    "FSH": calc_fisher_information, "SOB": calc_sobolev}
+    methods = []
+    names = []
+    for method_name in method_ids:
+        methods.append(method_names[method_name])
     '''if show:
         print("Regulators list:\n\t"+str(regulators.head())+"\nLen="+str(len(regulators)))
         print(str(coding_rows.head())+"\nLen="+str(len(coding_rows)))'''
@@ -37,8 +75,11 @@ def leave_one_out(pid, coding_rows, regulators, show, methods, return_dict):
         for i in range(len(rows)):
             row1 = coding_rows.iloc[i]
             reads1 = np.array(row1.values[1:],dtype=np.float32)
-            
-            if "MIC" in methods:
+            for i in range(len(method_ids)):
+                corr = methods[i](reads1,reads2)
+                if(corr > 0.5) or (corr < -0.5):
+                    coding_noncoding_pairs.append((row1[0], row2[0], corr, method_ids[i]))
+            '''if "MIC" in methods:
                 mine.compute_score(reads1, reads2)
                 mic_corr = mine.mic()
                 if(mic_corr > 0.5) or (mic_corr < -0.5):
@@ -55,6 +96,14 @@ def leave_one_out(pid, coding_rows, regulators, show, methods, return_dict):
                 dc_corr = dcor.distance_correlation(reads1, reads2)
                 if(dc_corr > 0.5) or (dc_corr < -0.5):
                     coding_noncoding_pairs.append((row1[0], row2[0], dc_corr, "DC"))
+            if "FSH" in methods:
+                fisher_information = calc_fisher_information(reads1,reads2)
+                if(fisher_information > 0.5) or (fisher_information < -0.5):
+                    coding_noncoding_pairs.append((row1[0], row2[0], fisher_information, "FSH"))
+            if "SOB" in methods:
+                sobolev_metric = calc_sobolev(reads1,reads2)
+                if(sobolev_metric > 0.5) or (sobolev_metric < -0.5):
+                    coding_noncoding_pairs.append((row1[0], row2[0], sobolev_metric, "SOB"))'''
             
     print(str(len(coding_noncoding_pairs)) + " correlation pairs found.")
     return_dict[pid] = coding_noncoding_pairs
@@ -62,13 +111,29 @@ def leave_one_out(pid, coding_rows, regulators, show, methods, return_dict):
 def try_find_coexpression_process(pid, coding_rows, nc_rows, show, methods, return_dict):
     coding_noncoding_pairs = []
     mine = MINE()
+    mic = lambda reads1,reads2: calc_mic(reads1,reads2,mine)
+
+    method_names = {"MIC": mic, "PRS": prs, "SPR": spr, "DC": dc, 
+                    "FSH": calc_fisher_information, "SOB": calc_sobolev}
+    methods = []
+    names = []
+    for method_name in method_ids:
+        methods.append(method_names[method_name])
     #print("Methods="+str(methods))
     for i in get_iterator(range(len(coding_rows)), show=show):
         row1 = coding_rows.iloc[i]
         reads1 = np.array(row1.values[1:],dtype=np.float32)
         for name, row2 in nc_rows.iterrows():
             reads2 = np.array(row2.values[1:],dtype=np.float32)
-            if "MIC" in methods:
+            for i in range(len(rows)):
+            row1 = coding_rows.iloc[i]
+            reads1 = np.array(row1.values[1:],dtype=np.float32)
+
+            for i in range(len(method_ids)):
+                corr = methods[i](reads1,reads2)
+                if(corr > 0.5) or (corr < -0.5):
+                    coding_noncoding_pairs.append((row1[0], row2[0], corr, method_ids[i]))
+            '''if "MIC" in methods:
                 mine.compute_score(reads1, reads2)
                 mic_corr = mine.mic()
                 if(mic_corr > 0.5) or (mic_corr < -0.5):
@@ -85,6 +150,14 @@ def try_find_coexpression_process(pid, coding_rows, nc_rows, show, methods, retu
                 spearman_corr, p = spearmanr(reads1, reads2)
                 if(spearman_corr > 0.5) or (spearman_corr < -0.5):
                     coding_noncoding_pairs.append((row1[0], row2[0], spearman_corr, "SPR"))
+            if "FSH" in methods:
+                fisher_information = calc_fisher_information(reads1,reads2)
+                if(fisher_information > 0.5) or (fisher_information < -0.5):
+                    coding_noncoding_pairs.append((row1[0], row2[0], fisher_information, "FSH"))
+            if "SOB" in methods:
+                sobolev_metric = calc_sobolev(reads1,reads2)
+                if(sobolev_metric > 0.5) or (sobolev_metric < -0.5):
+                    coding_noncoding_pairs.append((row1[0], row2[0], sobolev_metric, "SOB"))'''
     print(str(len(coding_noncoding_pairs)) + " correlation pairs found.")
     return_dict[pid] = coding_noncoding_pairs
 
