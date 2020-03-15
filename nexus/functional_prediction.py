@@ -15,6 +15,7 @@ import statsmodels.stats.multitest as multitest
 import dcor
 from minepy import MINE
 from sys import getsizeof
+import warnings
 
 
 def is_constant(vec):
@@ -24,6 +25,12 @@ def is_constant(vec):
             return False
     return True
 
+def normalize_sob_and_fisher(value):
+    value = 1.0 - value
+    if value < 0.0:
+        value = 0.0
+    return value
+
 def calc_sobolev(reads1,reads2):
     z1 = ((np.square(reads1) / np.sum(np.square(reads1))) -
         (np.square(reads2) / np.sum(np.square(reads2))))
@@ -31,13 +38,36 @@ def calc_sobolev(reads1,reads2):
     w = (2*math.pi
         *(np.array([x for x in range(0,len(fourier_transform))], dtype=np.float32))
         /(len(fourier_transform)))
-    s = np.square(np.sum((1+w)*np.square(np.abs(fourier_transform))),0.5)
-    return s
+    abs_fourier = np.abs(fourier_transform)
+    squared_fourier = np.square(abs_fourier)
+    w_plus_one = 1+w
+    weighted_fourier = w_plus_one*squared_fourier
+    fourier_sum = np.sum(weighted_fourier)
+    sum_power = np.power(fourier_sum,0.5)
+    reduced_sum = sum_power / 20.0
+    corrected_corr = 1.0 - reduced_sum
+    if corrected_corr < 0.0:
+            corrected_corr = 0
+    return corrected_corr
 
 def calc_fisher_information(reads1,reads2):
-    t = ((np.square(reads1) / np.sum(np.square(reads1))) *
-        (np.square(reads2) / np.sum(np.square(reads2))))
-    return np.arccos(np.sum(np.sqrt(t)))
+    square1 = np.square(reads1)
+    square2 = np.square(reads2)
+    square_sum1 = np.sum(square1)
+    square_sum2 = np.sum(square2)
+    try:
+        div1 = square1 / square_sum1
+        div2 = square2 / square_sum2
+        t = div1 * div2
+        total = np.sum(np.sqrt(t))
+        raw_corr = np.arccos(total)
+        corrected_corr = 1.0 - raw_corr
+        if corrected_corr < 0.0:
+            corrected_corr = 0
+        return corrected_corr
+    except Warning:
+        #print("Numpy invalid division1:\n\t"+str(square1)+"\n\t"+str(square2))
+        return 0.0
 
 def calc_mic(reads1,reads2,mine):
     mine.compute_score(reads1, reads2)
@@ -55,6 +85,8 @@ def dc(reads1,reads2):
     return dcor.distance_correlation(reads1, reads2)
 
 def leave_one_out(pid, coding_rows, regulators, show, method_ids, return_dict):
+    print("Turning warnings into errors.")
+    warnings.filterwarnings('error')
     coding_noncoding_pairs = []
     mine = MINE()
     mic = lambda reads1,reads2: calc_mic(reads1,reads2,mine)
@@ -126,38 +158,38 @@ def try_find_coexpression_process(pid, coding_rows, nc_rows, show, methods, retu
         for name, row2 in nc_rows.iterrows():
             reads2 = np.array(row2.values[1:],dtype=np.float32)
             for i in range(len(rows)):
-            row1 = coding_rows.iloc[i]
-            reads1 = np.array(row1.values[1:],dtype=np.float32)
+                row1 = coding_rows.iloc[i]
+                reads1 = np.array(row1.values[1:],dtype=np.float32)
 
-            for i in range(len(method_ids)):
-                corr = methods[i](reads1,reads2)
-                if(corr > 0.5) or (corr < -0.5):
-                    coding_noncoding_pairs.append((row1[0], row2[0], corr, method_ids[i]))
-            '''if "MIC" in methods:
-                mine.compute_score(reads1, reads2)
-                mic_corr = mine.mic()
-                if(mic_corr > 0.5) or (mic_corr < -0.5):
-                    coding_noncoding_pairs.append((row1[0], row2[0], mic_corr, "MIC"))
-            if "PRS" in methods:
-                pearson_corr, p = pearsonr(reads1, reads2)
-                if(pearson_corr > 0.5) or (pearson_corr < -0.5):
-                    coding_noncoding_pairs.append((row1[0], row2[0], pearson_corr, "PRS"))
-            if "DC" in methods:
-                dc_corr = dcor.distance_correlation(reads1, reads2)
-                if(dc_corr > 0.5) or (dc_corr < -0.5):
-                    coding_noncoding_pairs.append((row1[0], row2[0], dc_corr, "DC"))
-            if "SPR" in methods:
-                spearman_corr, p = spearmanr(reads1, reads2)
-                if(spearman_corr > 0.5) or (spearman_corr < -0.5):
-                    coding_noncoding_pairs.append((row1[0], row2[0], spearman_corr, "SPR"))
-            if "FSH" in methods:
-                fisher_information = calc_fisher_information(reads1,reads2)
-                if(fisher_information > 0.5) or (fisher_information < -0.5):
-                    coding_noncoding_pairs.append((row1[0], row2[0], fisher_information, "FSH"))
-            if "SOB" in methods:
-                sobolev_metric = calc_sobolev(reads1,reads2)
-                if(sobolev_metric > 0.5) or (sobolev_metric < -0.5):
-                    coding_noncoding_pairs.append((row1[0], row2[0], sobolev_metric, "SOB"))'''
+                for i in range(len(method_ids)):
+                    corr = methods[i](reads1,reads2)
+                    if(corr > 0.5) or (corr < -0.5):
+                        coding_noncoding_pairs.append((row1[0], row2[0], corr, method_ids[i]))
+                '''if "MIC" in methods:
+                    mine.compute_score(reads1, reads2)
+                    mic_corr = mine.mic()
+                    if(mic_corr > 0.5) or (mic_corr < -0.5):
+                        coding_noncoding_pairs.append((row1[0], row2[0], mic_corr, "MIC"))
+                if "PRS" in methods:
+                    pearson_corr, p = pearsonr(reads1, reads2)
+                    if(pearson_corr > 0.5) or (pearson_corr < -0.5):
+                        coding_noncoding_pairs.append((row1[0], row2[0], pearson_corr, "PRS"))
+                if "DC" in methods:
+                    dc_corr = dcor.distance_correlation(reads1, reads2)
+                    if(dc_corr > 0.5) or (dc_corr < -0.5):
+                        coding_noncoding_pairs.append((row1[0], row2[0], dc_corr, "DC"))
+                if "SPR" in methods:
+                    spearman_corr, p = spearmanr(reads1, reads2)
+                    if(spearman_corr > 0.5) or (spearman_corr < -0.5):
+                        coding_noncoding_pairs.append((row1[0], row2[0], spearman_corr, "SPR"))
+                if "FSH" in methods:
+                    fisher_information = calc_fisher_information(reads1,reads2)
+                    if(fisher_information > 0.5) or (fisher_information < -0.5):
+                        coding_noncoding_pairs.append((row1[0], row2[0], fisher_information, "FSH"))
+                if "SOB" in methods:
+                    sobolev_metric = calc_sobolev(reads1,reads2)
+                    if(sobolev_metric > 0.5) or (sobolev_metric < -0.5):
+                        coding_noncoding_pairs.append((row1[0], row2[0], sobolev_metric, "SOB"))'''
     print(str(len(coding_noncoding_pairs)) + " correlation pairs found.")
     return_dict[pid] = coding_noncoding_pairs
 

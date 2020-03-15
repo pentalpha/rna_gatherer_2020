@@ -15,7 +15,7 @@ for conf in configs:
 
 print("Available cache memory: " + str(int(get_cache()/1024)) + "KB")
 
-all_methods = ["MIC","DC","PRS","SPR"]
+all_methods = ["MIC","DC","PRS","SPR","SOB","FSH"]
 all_ontologies = ["molecular_function","cellular_component","biological_process"]
 
 def getArgs():
@@ -276,8 +276,14 @@ with open(correlations_file_path,'r') as stream:
             else:
                 invalid_lines += 1
             lines += 1
-        print(str(float(invalid_lines)/lines)
-            + " lines without proper number of columns (4 columns)")
+        if lines == 0:
+            print("Fatal error, no correlations could be loaded from "
+                    + correlations_file_path + "\n(The file may be "
+                    + "corrupted or just empty)")
+            quit()
+        else: 
+            print(str(float(invalid_lines)/lines)
+                + " lines without proper number of columns (4 columns)")
 print("correlation_values = "+str(len(correlation_values.keys())))
 print("genes_coexpressed_with_ncRNA = "+str(len(genes_coexpressed_with_ncRNA.keys())))
 print("coding_genes = "+str(len(coding_genes.keys())))

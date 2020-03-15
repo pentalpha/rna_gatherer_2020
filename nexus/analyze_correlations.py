@@ -21,18 +21,24 @@ with open(sims_path,'r') as stream:
     #lines_splited = [line.split("\t") for line in lines]
     #sim_tuples = [(gene1,gene2,float(sim)) for gene1,gene2,sim in lines_splited]
     for line in stream:
-        gene1,gene2,sim = line.rstrip("\n").split("\t")
-        sim = float(sim)
-        if sim > 0.0:
-            if not gene1 in sims:
-                sims[gene1] = {}
-            if not gene2 in sims:
-                sims[gene2] = {}
-            #sims[gene1][gene2] = sim
-            sims[gene2][gene1] = sim
+        cells = line.rstrip("\n").split("\t")
+        if len(cells) == 3:
+            gene1,gene2,sim = cells
+            sim = float(sim)
+            if sim > 0.0:
+                if not gene1 in sims:
+                    sims[gene1] = {}
+                if not gene2 in sims:
+                    sims[gene2] = {}
+                #sims[gene1][gene2] = sim
+                sims[gene2][gene1] = sim
+        elif len(cells) > 0:
+            print("Line with too many values:\n\t"+line)
 
 print("Reading correlations")
 sim_correlations = []
+corrs_with_sim = 0
+total_corrs = 0
 with open(correlations_path, 'r') as stream:
     #line = stream.readline()
     for line in stream:
@@ -42,9 +48,13 @@ with open(correlations_path, 'r') as stream:
             if cells[1] in gene_sims:
                 if float(cells[2]) >= thresholds[0]:
                     sim_correlations.append((cells[-1],float(cells[2]),gene_sims[cells[1]]))
+                    corrs_with_sim += 1
+        total_corrs += 1
         #else:
         #    sim_correlations.append((cells[-1],float(cells[2]),0.0))
 
+print(str(float((corrs_with_sim)/float(total_corrs))*100.0) 
+        + "% of the correlations had a corresponding similarity")
 print("Sorting " + str(len(sim_correlations)) + " items")
 sim_correlations.sort(key=lambda x: x[1])
 current_threshold = 0
@@ -66,29 +76,19 @@ for i in tqdm(range(len(locations))):
     threshold = thresholds[i]
     #print("Threshold " + str(threshold))
     sub_vec = sim_correlations[loc:]
-    method_vecs = {"PRS":[],"SPR":[],"MIC":[],"DC":[]}
+    method_vecs = {"PRS":[],"SPR":[],"MIC":[],"DC":[],"SOB":[],"FSH":[]}
     for m,corr,sim in sub_vec:
         method_vecs[m].append(sim)
-    for method,vec in method_vecs.items():
-        print(method + " has " + str(len(vec)) + " elements")
     for method in methods:
         method_vec = np.array(method_vecs[method])
         n = len(method_vec)
-        lower_quantile = np.quantile(method_vec,0.25)
-        middle_quantile = np.quantile(method_vec,0.50)
-        upper_quantile = np.quantile(method_vec,0.75)
-        avg = np.mean(method_vec)
-        print(method+": " + ",".join([str(lower_quantile),str(middle_quantile),str(upper_quantile)]))
-        '''print("Method " + method)
-        total = 0.0
-        n = 0.0
-        for m,corr,sim in sub_vec:
-            if m == method:
-                total += sim
-                n += 1
-        avg = total/n
-        results.append((method,threshold,n,avg))'''
-        results.append((method,threshold,n,lower_quantile,middle_quantile,upper_quantile,avg))
+        if n > 0:
+            if method != "SOB" or threshold >= 0.9:
+                lower_quantile = np.quantile(method_vec,0.25)
+                middle_quantile = np.quantile(method_vec,0.50)
+                upper_quantile = np.quantile(method_vec,0.75)
+                avg = np.mean(method_vec)
+                results.append((method,threshold,n,lower_quantile,middle_quantile,upper_quantile,avg))
 
 #print(str(results))
 
@@ -112,13 +112,14 @@ for method in methods:
 #printprint(str(data_points))
 
 
-f, ax = plt.subplots(figsize=(20.5, 8))
+f, ax = plt.subplots(figsize=(12, 7))
 #plt.style.use('seaborn-whitegrid')
 plt.rcParams.update({'font.size': 15})
 plt.title('Relation between correlation coefficient and GO similarity')
 
 def get_method_color(method):
-    colors = {"PRS":'r',"MIC":'b',"DC":'g',"SPR":'k'}
+    colors = {"PRS":'#ff0000',"MIC":'#dd0074',"DC":'#006600',
+            "SPR":'#000099',"SOB":'#000000',"FSH":'#00ff00'}
     for method_name, color in colors.items():
         if method_name in method:
             return color
@@ -128,18 +129,20 @@ def get_method_color(method):
 for method, thresholds, lower_quantiles,middle_quantiles,upper_quantiles,avgs in data_points:
     print("Plotting " + method)
     method_color = get_method_color(method)
-    ax.plot(thresholds, middle_quantiles, 
+    '''ax.plot(thresholds, middle_quantiles, 
         label=method+", median",color=method_color)
     ax.plot(thresholds, lower_quantiles, 
         label=method+", 0.25 quantile",marker='v',color=method_color)
     ax.plot(thresholds, upper_quantiles, 
-        label=method+", 0.75 quantile",marker='^',color=method_color)
+        label=method+", 0.75 quantile",marker='^',color=method_color)'''
     ax.plot(thresholds, avgs, 
-        label=method+", average",marker='o',linestyle='dashed',color=method_color)
+        label=method+", average",color=method_color)
     #color_i += 1
     #break
-ax.xaxis.set_minor_locator(ticker.MultipleLocator(0.01))
-ax.xaxis.set_major_locator(ticker.MultipleLocator(0.02))
+ax.xaxis.set_minor_locator(ticker.MultipleLocator(0.025))
+ax.xaxis.set_major_locator(ticker.MultipleLocator(0.05))
+ax.yaxis.set_major_locator(ticker.MultipleLocator(0.05))
+
 ax.set_axisbelow(True)
 plt.grid(axis='x',which='both')
 plt.ylabel('Semantic similarity between genes with correlation above threshold')
