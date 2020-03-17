@@ -12,6 +12,14 @@ configs = {
     "long_orfs": "TransDecoder.LongOrfs",
     "plast": "plast",
     "blastn": "blastn",
+    "thresholds":{
+        "FSH": 0.970,
+        "MIC": 0.751,
+        "SPR": 0.893,
+        "DC": 0.999,
+        "SOB": 0.999,
+        "PRS": 0.999
+    },
     #"quast" : "quast.py",
     #"non_redundant": "<___>",
     #"rfam_cm": "<___>",
