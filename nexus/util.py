@@ -90,7 +90,7 @@ def get_cache(usage=1.0):
                                 for notation in mega_byte_notations:
                                         if raw_num.endswith(notation):
                                                 try:
-                                                        nums.append(int(raw_num.replace(notation, ""))*1024*1024)
+                                                        nums.append(int(raw_num.replace(notation, ""))*(1024*1024))
                                                 except ValueError:
                                                         print("Could not convert '" + raw_num + "' to bytes.")
                         greater = 0
@@ -101,7 +101,6 @@ def get_cache(usage=1.0):
                                 default = greater
                                 #print("Available cache memory is " + str(default))
         #quit()
-        #print(lscpu_out)
         return int((default)*usage)
 
 # input - df: a Dataframe, chunkSize: the chunk size
@@ -125,9 +124,11 @@ def split_df_to_max_mem(df, available_size):
                 print("percent_per_part: " + str(percent_per_part))
                 lines_per_part = int(len(df)*percent_per_part)
                 print("lines_per_part = " + str(lines_per_part))
-
-        dfs = splitDataFrameIntoSmaller(df, chunkSize=lines_per_part)
-        return dfs
+                dfs = splitDataFrameIntoSmaller(df, chunkSize=lines_per_part)
+                return dfs
+        else:
+                return [df]
+        
 
 def read_to_list(file_path):
         if os.path.exists(file_path):

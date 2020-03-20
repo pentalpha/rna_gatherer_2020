@@ -1,7 +1,6 @@
 import sys
 import obonet
 import networkx
-from nexus.functional_prediction import get_ancestors, get_descendants
 from tqdm import tqdm
 import numpy as np
 import matplotlib.pyplot as plt
@@ -12,10 +11,11 @@ import statistics as stc
 
 reference_path = sys.argv[1]
 go_obo = sys.argv[2]
-output = sys.argv[3]
-annotation_path_dir = [sys.argv[4]]
-if len(sys.argv) >= 6:
-    dirs = sys.argv[5:]
+aspect = sys.argv[3].split(",")
+output = sys.argv[4]
+annotation_path_dir = [sys.argv[5]]
+if len(sys.argv) >= 7:
+    dirs = sys.argv[6:]
 else:
     dirs = []
 
@@ -59,16 +59,16 @@ def plot_scores(data_points):
     sns.plotting_context("talk", font_scale=1.5)
     sns.set_context("talk")
     print("Making plot")
-    f, ax = plt.subplots(figsize=(19, 40))
+    f, ax = plt.subplots(figsize=(14, (len(values)*3) + 2))
     #ax.set_xscale("log")
     ax = sns.boxplot(data=values, orient='h', palette="vlag")
     #ax = seaborn.swarmplot(data=values, color=".2")
     ax.set(yticklabels=names)
     axes = ax.axes
     axes.set_xlim(0.0,1.0)
-    ax.xaxis.set_major_locator(ticker.MultipleLocator(0.05))
+    ax.xaxis.set_major_locator(ticker.MultipleLocator(0.1))
     #ax = (ax.set_axis_labels("Z-Scores")).set(xlim=(-1,1))
-    plt.title("Similarities")
+    plt.title("Semantic Similarity to Reference Annotation")
     #plt.show(ax)
     print("Saving")
     plt.savefig(output+"similarities.png",bbox_inches='tight')
@@ -89,28 +89,36 @@ def read_data(path):
 def file_name(path):
     return ".".join(os.path.basename(path).split(".")[:-1])
 
-def read_id2gos(filepath,ontology_type="All"):
+def read_id2gos(filepath,ontology_type=["molecular_function",
+                                        "biological_process",
+                                        "cellular_component"]):
     gos_dict = {}
     with open(filepath, 'r') as stream:
         for raw_line in stream.readlines():
             cols = raw_line.rstrip("\n").split("\t")
             rfam_id = cols[0]
             gos_str = cols[1]
-            if not rfam_id in gos_dict:
-                gos_dict[rfam_id] = set()
-            go_ids = gos_str.split(";")
-            for go in go_ids:
-                gos_dict[rfam_id].add(go)
-                if ontology_type != "All":
-                    id_2_ontology[go] = ontology_type
-                else:
-                    if len(cols) > 2:
-                        ontology = cols[2]
-                        id_2_ontology[go] = ontology
+            aspect = cols[2]
+            if aspect in ontology_type:
+                if not rfam_id in gos_dict:
+                    gos_dict[rfam_id] = set()
+                go_ids = gos_str.split(";")
+                for go in go_ids:
+                    gos_dict[rfam_id].add(go)
+                    id_2_ontology[go] = aspect
     return gos_dict
 
-reference = read_id2gos(reference_path)
+reference = read_id2gos(reference_path, ontology_type = aspect)
 reference_name = reference_path.split("/")[-1]
+
+
+def get_ancestors(graph, parent_id):
+    ancestors = networkx.ancestors(graph, parent_id)
+    return ancestors
+
+def get_descendants(graph, parent_id):
+    descendants = networkx.descendants(graph, parent_id)
+    return descendants
 
 def get_lower_terms(go_id):
     if not go_id in descendants:
@@ -178,14 +186,7 @@ def overview(id2gos, name):
     return len_dict
 
 def analyze_annotation(p):
-    if "CC" in p or "cellular_component" in p:
-        ont = "cellular_component"
-    elif "MF" in p or "molecular_function" in p:
-        ont = "molecular_function"
-    else:
-        ont = "biological_process"
-
-    id2gos = read_id2gos(p,ontology_type=ont)
+    id2gos = read_id2gos(p, ontology_type=aspect)
     #print("This one is a " + ont + " annotation")
     file_name_parts = p.split("/")
     file_name = file_name_parts[-1].replace(".LNC","").replace(".tsv", "")
@@ -196,6 +197,32 @@ def analyze_annotation(p):
     
     #print("Calculating similarity to reference...")
     
+    association_found = 0
+    association_children_found = 0
+    association_parent_found = 0
+    association_missing = len(association_sets[reference_name])
+    for association in tqdm(association_sets[reference_name]):
+        if association in association_sets[file_name]:
+            association_found += 1
+            association_missing -= 1
+        else:
+            name = association[0]
+            term = association[1]
+            matching_predictions = set()
+            if name in id2gos:
+                matching_predictions.update(id2gos[name])
+            '''for pred_name,pred_term in association_sets[file_name]:
+                if pred_name == name:
+                    matching_predictions.add(pred_term)'''
+            if len(matching_predictions) > 0:
+                if is_upper_to(term,matching_predictions):
+                    association_children_found += 1
+                    association_missing -= 1
+                elif is_part_of(term,matching_predictions):
+                    association_parent_found += 1
+                    association_missing -= 1
+        
+
     total = len(association_sets[file_name])
     in_reference = 0
     part_of_reference = 0
@@ -225,71 +252,74 @@ def analyze_annotation(p):
     for name in reference.keys():
         if name in id2gos:
             reference_set = reference[name]
-            reference_set_ont = set()
-            contains_right_ontology = False
-            for go_id in reference_set:
-                if id_2_ontology[go_id] == ont:
-                    reference_set_ont.add(go_id)
-            if len(reference_set_ont) > 0:
-                reference_total += 1
-                new_set = id2gos[name]
-                n_found = len(reference_set_ont.intersection(new_set))
-                if n_found == reference_set_ont:
-                    completelly_found += 1
-                elif n_found > 0:
-                    reference_found += 1
-                else:
-                    for go_id in reference_set_ont:
-                        lower = set(get_lower_terms(go_id))
-                        if len(lower.intersection(new_set)) > 1:
-                            partially_found += 1
-                            break
+            reference_total += 1
+            new_set = id2gos[name]
+            n_found = len(reference_set.intersection(new_set))
+            if n_found == reference_set:
+                completelly_found += 1
+            elif n_found > 0:
+                reference_found += 1
+            else:
+                for go_id in reference_set:
+                    lower = set(get_lower_terms(go_id))
+                    if len(lower.intersection(new_set)) > 1:
+                        partially_found += 1
+                        break
                             
+    if total > 0:
+        in_reference_perc       = (float(in_reference) / total) * 100
+        part_of_reference_perc  = (float(part_of_reference) / total) * 100
+        upper_to_reference_perc = (float(upper_to_reference) / total) * 100
+        unrelated_perc          = (float(unrelated) / total) * 100
+        completelly_found_perc    = (float(completelly_found) / reference_total) * 100
+        reference_found_perc    = (float(reference_found) / reference_total) * 100
+        partially_found_perc    = (float(partially_found) / reference_total) * 100
+        print("Total associations: " + str(total)
+                +"\n\tIn ref: "+str(in_reference_perc)
+                +"\n\tPart of: "+str(part_of_reference_perc)
+                +"\n\tUpper to: "+str(upper_to_reference_perc)
+                +"\n\tNot in: "+str(unrelated_perc)
+                +"\n\tComplete found: "+str(completelly_found_perc)
+                +"\n\tReference found: "+str(reference_found_perc)
+                +"\n\tReference found (partially): "+str(partially_found_perc)
+                +"\n\tAssociation found: "+str(association_found)
+                +"\n\tAssociation children found: "+str(association_children_found)
+                +"\n\tAssociation parent found: "+str(association_parent_found)
+        )
+        
+        return (file_name.split("/")[-1],[in_reference,part_of_reference,upper_to_reference,unrelated],lens_dict,
+                [completelly_found_perc,reference_found_perc,partially_found_perc],
+                [association_found,association_children_found,association_parent_found,association_missing])
+    else:
+        return (file_name.split("/")[-1],[0,0,0,0],lens_dict,
+                [0,0,0],
+                [association_found,association_children_found,association_parent_found,association_missing])
 
-    in_reference_perc       = (float(in_reference) / total) * 100
-    part_of_reference_perc  = (float(part_of_reference) / total) * 100
-    upper_to_reference_perc = (float(upper_to_reference) / total) * 100
-    unrelated_perc          = (float(unrelated) / total) * 100
-    completelly_found_perc    = (float(completelly_found) / reference_total) * 100
-    reference_found_perc    = (float(reference_found) / reference_total) * 100
-    partially_found_perc    = (float(partially_found) / reference_total) * 100
-    
-    '''print("Total associations: " + str(total)
-            +"\n\tIn ref: "+str(in_reference_perc)
-            +"\n\tPart of: "+str(part_of_reference_perc)
-            +"\n\tUpper to: "+str(upper_to_reference_perc)
-            +"\n\tNot in: "+str(unrelated_perc)
-            +"\n\tComplete found: "+str(completelly_found_perc)
-            +"\n\tReference found: "+str(reference_found_perc)
-            +"\n\tReference found (partially): "+str(partially_found_perc))'''
-    
-    return (file_name,[in_reference,part_of_reference,upper_to_reference,unrelated],lens_dict,
-             [completelly_found_perc,reference_found_perc,partially_found_perc],ont)
-
-overview(reference, reference_path.split("/")[-1])
+overview(reference, reference_name)
 
 labels = []
-ontology_types = []
 counts = []
 lens_dicts = []
 ref_founds = []
-part_labels = ["In reference", "Part of reference", "Reference is part of", "Unknown"]
-part_labels_b = ["% of reference genes entirelly annotated", 
-                "% of reference genes annotated", "% of reference genes partially annotated"]
+ref_association_search = []
+#part_labels = ["Na referência", "Parte da referência", "Referência é parte de", "Desconhecidos"]
+#part_labels_b = ["% of reference genes entirelly annotated", 
+#                "% of reference genes annotated", "% of reference genes partially annotated"]
+part_labels_c = ["Recuperada", "Termo descendente recuperado", "Termo antepassado recuperado", "Não recuperada"]
+#part_labels_c = ["a", "b", "c", "d"]
 
+results = []
 for annotation_path in tqdm(annotation_paths):
-    #print(annotation_path)
-    name, parts, lens, ref_found, ont_type = analyze_annotation(annotation_path)
-    ontology_types.append(ont_type)
+    results.append((analyze_annotation(annotation_path), annotation_path))
+results.sort(key=lambda result: result[0][-1][-1])
+
+for result, annotation_path in results:
+    name, parts, lens, ref_found, ref_associations = result
     labels.append(name)
     counts.append(parts)
     lens_dicts.append(lens)
     ref_founds.append(ref_found)
-
-in_reference = [x[0] for x in counts]
-part_of_reference = [x[1] for x in counts]
-upper_to_reference = [x[2] for x in counts]
-unrelated = [x[3] for x in counts]
+    ref_association_search.append(ref_associations)
 
 '''print("Plotting Similarities")
 print(str(counts))
@@ -301,9 +331,46 @@ width = 0.7
 def sum(x,y):
     return [x[i]+y[i] for i in range(len(x))]
 
+association_found = [x[0] for x in ref_association_search]
+association_children_found = [x[1] for x in ref_association_search]
+association_parent_found = [x[2] for x in ref_association_search]
+association_missing = [x[3] for x in ref_association_search]
+x = 8
+y = 0.8*N + 1
+f, ax = plt.subplots(figsize=(x, y))
+
+bars1 = ax.barh(ind, association_found, width,
+                color="#0400ff",label=part_labels_c[0])
+left = association_found
+bars2 = ax.barh(ind, association_children_found, width, 
+                left=left,color="#8052ff",label=part_labels_c[1])
+left = sum(left,association_children_found)
+bars3 = ax.barh(ind, association_parent_found, width, 
+                left=left,color="#ff61f7",label=part_labels_c[2])
+left = sum(left,association_parent_found)
+bars4 = ax.barh(ind, association_missing, width, 
+                left=left,color="#ff2b59",label=part_labels_c[3])
+
+#print("Formating")
+#ax.xaxis.set_major_locator(ticker.MultipleLocator(0.05))
+plt.xlabel('Número de Associações')
+plt.title('Associações de Referência Recuperadas' + " ("+",".join(aspect)+")")
+plt.yticks(ind, labels)
+#plt.yticks(np.arange(0, 100, 10))
+
+box = ax.get_position()
+ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
+#plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+plt.savefig(output+".0.png",bbox_inches='tight')
+'''
+in_reference = [x[0] for x in counts]
+part_of_reference = [x[1] for x in counts]
+upper_to_reference = [x[2] for x in counts]
+unrelated = [x[3] for x in counts]
+
 on_reference = sum(part_of_reference, in_reference)
 
-f, ax = plt.subplots(figsize=(16, 1.2*N + 1))
+f, ax = plt.subplots(figsize=(x, y))
 
 bars1 = ax.barh(ind, in_reference, width,
                 color="#0400ff")
@@ -320,7 +387,7 @@ bars4 = ax.barh(ind, unrelated, width,
 #print("Formating")
 #ax.xaxis.set_major_locator(ticker.MultipleLocator(0.05))
 plt.xlabel('Number of Associations')
-plt.title('Similarity to Reference Annotation')
+plt.title('Similarity to Reference Annotation' + "("+",".join(aspect)+")")
 plt.yticks(ind, labels)
 #plt.yticks(np.arange(0, 100, 10))
 
@@ -334,11 +401,11 @@ print("Plotting reference found")
 reference_found = [x[1] for x in ref_founds]
 partially_found = [x[2] for x in ref_founds]
 
-f, ax = plt.subplots(figsize=(16, 1.2*N + 1))
+f, ax = plt.subplots(figsize=(x, y))'''
 
 '''barsb1 = ax.barh(ind, complete_found, width,
                 color="#0000a0")
-left = reference_found'''
+left = reference_found''''''
 ax.set_axisbelow(True)
 plt.grid(axis='x')
 barsb1 = ax.barh(ind, reference_found, width,
@@ -346,16 +413,16 @@ barsb1 = ax.barh(ind, reference_found, width,
 left = reference_found
 barsb2 = ax.barh(ind, partially_found, width, 
                 left=left,color="#8052ff")
-plt.xlabel('%')
-plt.title('Reference Annotations Recovered')
+plt.xlabel('% of reference genes')
+plt.title('Reference Annotations Recovered' + "("+",".join(aspect)+")")
 plt.yticks(ind, labels)
-ax.xaxis.set_major_locator(ticker.MultipleLocator(3))
+ax.xaxis.set_major_locator(ticker.MultipleLocator(5))
 #plt.xticks(np.arange(0, 100, 10))
 box = ax.get_position()
 ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
 plt.legend((barsb1,barsb2), part_labels_b[1:],loc='center left', bbox_to_anchor=(1, 0.5))
 plt.savefig(output+".2.png",bbox_inches='tight')
-
+'''
 def short_method_name(name):
     name = name.replace("molecular_function","MF")
     name = name.replace("biological_process","BP")
@@ -365,12 +432,16 @@ def short_method_name(name):
     return name
 
 ##########
-methods = {}
+'''methods = {}
 for i in range(len(labels)):
     label = labels[i]
     ont_type = ontology_types[i]
     label_parts = label.split("/")[-1].split(".")
-    method = ont_type+"-"+label_parts[0]+"-pval=0."+label_parts[4]+"-fdr=0."+label_parts[6]
+    method = ont_type+"-"+label_parts[0]
+    if len(label_parts) >= 5:
+        method += "-pval=0."+label_parts[4]
+        if len(label_parts) >= 7:
+            method += "-fdr=0."+label_parts[6]
     method = short_method_name(method)
     if not method in methods:
         methods[method] = []
@@ -414,7 +485,6 @@ plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
 plt.savefig(output+".3.png",bbox_inches='tight')
 
 
-
 f, ax = plt.subplots(figsize=size)
 plt.style.use('seaborn-whitegrid')
 plt.title('Prediction size over different thresholds')
@@ -435,16 +505,4 @@ plt.xlabel('Correlation coefficient threshold')
 ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
 plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
 plt.savefig(output+".4.png",bbox_inches='tight')
-
-
-if len(dirs) > 0:
-    print("Plotting semantic similarities")
-    print("Reading files")
-    data = []
-    for d in dirs:
-        for f in getFilesWith(d, ".tsv"):
-            d = read_data(f)
-            name = f.split("/")[-1].replace("-Wang-BMA", "-") + " ("+str(len(d))+")"
-            data.append([name,d])
-
-    plot_scores(data)
+'''

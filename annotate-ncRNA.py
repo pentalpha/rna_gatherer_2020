@@ -88,9 +88,6 @@ else:
               +" please specify a genome to use.")
         quit()
 
-global_data = os.path.dirname(os.path.realpath(__file__)) + "/data"
-confs["rfam2go"] = global_data + "/rfam2go"
-
 #plast_cmd = [args['plast'], "-p plastx", "-d", NR, 
 #        '-i', query_fasta, "-e", "0.0001", "-a", str(threads), 
 #        "-outfmt 1", "-bargraph", "-o", tmpDir + "/plast.tsv"]
