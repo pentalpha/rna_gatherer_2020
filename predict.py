@@ -1,8 +1,6 @@
 import sys
 from nexus.functional_prediction import *
 from nexus.util import *
-from nexus.correlation_loading import *
-from nexus.confidence_levels import *
 #from bioinfo import *
 import obonet
 import networkx
@@ -30,19 +28,14 @@ def getArgs():
     ap.add_argument("-ann", "--annotation", required=True,
         help=("Functional annotation file of the genes."))
     ap.add_argument("-o", "--output-dir", required=True, help=("Output directory."))
-    ap.add_argument("-conf", "--confidence-level", required=False,
-        default="3", help=("Level of confidence in the correlation metrics. Lower values "
-        +"result in more results and false positives, higher values result in less "
-        +"results and less false positives. Values: 0, 1, 2, 3(default), 4, 5 or 6."))
     ap.add_argument("-ont", "--ontology-type", required=False,
-        default="ALL", help=("One or more of the following "
-        +"(separated by ,): molecular_function, cellular_component or biological_process."
-        +" Default = ALL."))
+        default="molecular_function", help=("One of the following: molecular_function (default),"
+        +" cellular_component or biological_process."))
 
-    ap.add_argument("-met", "--method", required=False, default="MIC",
-        help=("Correlation coefficient calculation method: MIC, "+
+    ap.add_argument("-met", "--method", required=False,
+        default="MIC,SPR,FSH", help=("Correlation coefficient calculation method: MIC (default), "+
         "DC (Distance Correlation), SPR (Spearman Coefficient), PRS (Pearson Coefficient), "
-        +"FSH (Fisher Information Metric) or SOB (Sobolev Metric). Default: MIC."))
+        +"FSH (Fisher Information Metric) or SOB (Sobolev Metric)."))
     ap.add_argument("-bh", "--benchmarking", required=False,
         default=False, help=("Enables the (much slower) leave one out strategy: regulators can be regulated too."
         +"Default: False."))
@@ -50,8 +43,8 @@ def getArgs():
     ap.add_argument("-p", "--processes", required=False,
         default=default_threads, help=("CPUs to use. Default: " + str(default_threads)+"."))
 
-    '''ap.add_argument("-th", "--threshold", required=False,
-        default=None, help=("Sets an unique correlation coefficient threshold for all methods: 0.5 <= x <= 0.99."))'''
+    ap.add_argument("-th", "--threshold", required=False,
+        default=None, help=("Sets an unique correlation coefficient threshold for all methods: 0.5 <= x <= 0.99."))
     ap.add_argument("-K", "--k-min-coexpressions", required=False,
         default=1, help=("The minimum number of ncRNAs a Coding Gene must be coexpressed with."
                         +" Increasing the value improves accuracy of functional assignments, but"
@@ -66,21 +59,18 @@ def getArgs():
         default=1, help=("Minimum M value. Default: 1"))
     ap.add_argument("-n", "--min-n", required=False,
         default=1, help=("Minimum n value. Default: 1"))
-    '''ap.add_argument("-TH", "--threshold-level", required=False, default="Medium",
-        help=("How much RNA Nexus restricts the results. Values: High (default) or Medium."))'''
-    ap.add_argument("-t", "--test", required=False, default="SF",
-        help=("The P-Value test to be used. Values: SF (Survival Function, default)"
-                + " or CUSTOM (Custom Hypergeometric Test)."))
+    ap.add_argument("-H", "--high-precision", required=False,
+        default=False, help=("Set of arguments to find only high quality annotations. "
+        +" Number of annotations is greatly reduced. Default: False.\n\t"
+        +"Overrides other arguments: threshold=0.85, K=2, pval=0.05, fdr=0.05, n=3, M=8, m=1"))
 
     ap.add_argument("-chu", "--cache-usage", required=False,
         default=0.6, help=("Portion of the cache memory to use for storing the counts table."))
     ap.add_argument("-ch", "--cache-size", required=False,
-        help=("Sets the size of the cache memory. Default: auto-detection of CPU cache size."))
-    '''ap.add_argument("-st", "--threshold-step", required=False,
+        default=display_cache, help=("Sets the size of the cache memory. Default: auto-detection of CPU cache size."))
+    ap.add_argument("-st", "--threshold-step", required=False,
         default=None, help=("Run the prediction for many thresold values, up to a maximum. Example: "+
-                            "step=0.01,maximum=0.95: 0.01,0.95"))'''
-    ap.add_argument("-min", "--minimum-coefficient",required=False, default=0.7,
-        help="The minimum correlation coefficient. Values below this will be discarded after calculation.")
+                            "step=0.01,maximum=0.95: 0.01,0.95"))
 
     return vars(ap.parse_args())
 
@@ -91,28 +81,38 @@ coding_gene_ontology_path = cmdArgs["annotation"]
 tempDir = cmdArgs["output_dir"]
 go_path = confs["go_obo"]
 
-minimum_coef = float(cmdArgs["minimum_coefficient"])
-
 ontology_type = cmdArgs["ontology_type"].split(",")
 if ontology_type[0] == "ALL":
     ontology_type = all_ontologies
 
-if "method" in cmdArgs:
-    method = cmdArgs["method"].split(",")
-    if method[0] == "ALL":
-        method = all_methods
-method.sort()
-
+method = cmdArgs["method"].split(",")
+if method[0] == "ALL":
+    method = all_methods
 benchmarking = cmdArgs["benchmarking"]
 threads = int(cmdArgs["processes"])
 
+thresholds = None
+if cmdArgs["threshold"] != None:
+    thresholds = [float(th_str) for th_str in cmdArgs["threshold"].split(",")]
+    min_threshold = thresholds[0]
+    for th in thresholds:
+        if th < min_threshold:
+            min_threshold = th
+
+threshold_step = cmdArgs["threshold_step"]
+if threshold_step != None and thresholds != None:
+    parts = threshold_step.split(",")
+    step = float(parts[0])
+    maximum = float(parts[1])
+    thresholds = [float(x) for x in list(np.arange(min_threshold,maximum,step).round(3))]
+    print("Correlation coefficient thresholds: " + str(thresholds))
+
 cache_usage = float(cmdArgs["cache_usage"])
 available_cache = get_cache(usage=cache_usage)
-if cmdArgs["cache_size"] != None:
-    available_cache = int(int(cmdArgs["cache_size"])*1024 * cache_usage)
-    print("Custom cache memory: " + str(int(available_cache/1024)) + "KB")
-else:
-    print("Available cache memory: " + str(int(available_cache/1024)) + "KB")
+if "cache" in cmdArgs:
+    available_cache = int(int(args["cache"]) * cache_usage)
+print("Available cache memory: " + str(int(available_cache/1024)) + "KB")
+
 
 pval = float(cmdArgs["pvalue"])
 fdr = float(cmdArgs["fdr"])
@@ -121,46 +121,175 @@ min_M = int(cmdArgs["min_M"])
 min_m = int(cmdArgs["min_m"])
 K = int(cmdArgs["k_min_coexpressions"])
 
+regulators_max_portion = 0.4
+
+def find_correlated(reads, regulators, tempDir, methods, separate_regulators = False):
+    coding_noncoding_pairs = []
+    func = try_find_coexpression_process
+    if separate_regulators:
+        print("Running 'leave one out' (benchmarking) mode.")
+        func = leave_one_out
+    genes_per_process = int(len(reads) / threads)
+    limit = len(reads)-1
+    last = -1
+    manager = multiprocessing.Manager()
+    return_dict = manager.dict()
+    processes = []
+    showing = True
+    last_pid = 0
+    for i in range(threads-1):
+        start = last+1
+        end = start + genes_per_process
+        if end >= limit:
+            end = limit
+        parcial_df = reads.iloc[start:end]
+        p = multiprocessing.Process(target=func, 
+            args=(i, parcial_df, regulators, showing, methods, return_dict, ))
+        processes.append(p)
+        #print("Spawned process from gene " + str(start) + " to " + str(end))
+        p.start()
+        if showing:
+            showing = False
+        last = end
+
+        last_pid = i
+        if end == limit:
+            break
+    if end < limit:
+        parcial_df = reads.iloc[end:limit]
+        p = multiprocessing.Process(target=func, 
+            args=(last_pid+1, parcial_df, regulators, showing, methods, return_dict, ))
+        processes.append(p)
+        #print("Spawned process from gene " + str(end) + " to " + str(limit))
+        p.start()
+
+    for p in processes:
+        p.join()
+
+    print("Merging results")
+    for value in return_dict.values():
+        coding_noncoding_pairs += value
+
+    print(str(len(coding_noncoding_pairs)) + " correlation pairs found.")
+    output = tempDir+"/correlated.tsv"
+    with open(output,'a+') as stream:
+        for coding_name, noncoding_name, corr, method in coding_noncoding_pairs:
+            stream.write("\t".join([coding_name,noncoding_name,str(corr),method]) + "\n")
+    manager.shutdown()
+    del manager
+
 print("Ontology type is " + str(ontology_type))
 print("Method is " + str(method))
 
+reads = pd.read_csv(count_reads_path, sep='\t')
+print(str(len(reads)))
+reads["constant"] = reads.drop([reads.columns[0]], axis=1).apply(
+        lambda row: is_constant(np.array(row.values,dtype=np.float32)),axis=1
+    )
+mask = reads["constant"] == False
+reads = reads[mask]
+del reads["constant"]
+print(reads.head())
+print(str(len(reads)))
+
 if not os.path.exists(tempDir):
-        os.mkdir(tempDir)
+    os.mkdir(tempDir)
 
-confidence_levels = [int(x) for x in cmdArgs["confidence_level"].split(",")]
-confidence_thresholds = load_confidence(confs["intervals_file"])
+print("Reading regulators")
+regulators = []
+with open(regulators_path,'r') as stream:
+    for line in stream.readlines():
+        regulators.append(line.rstrip("\n"))
 
-min_confidence = confidence_levels[0]
-min_thresholds = confidence_thresholds[min_confidence]
+correlations_file_path = tempDir + "/correlated.tsv"
 
-#########################################################################################
-# Loading and Calculating Correlations
-#########################################################################################
 
-print("Loading correlations from " + tempDir + "/correlations")
+if not os.path.exists(correlations_file_path):
+    print("Separating regulators from regulated.")
+    mask = reads[reads.columns[0]].isin(regulators)
+    regulators_reads = reads.loc[mask]
 
-correlation_values={}
-coding_genes={}
-genes_coexpressed_with_ncRNA={}
-print("Loading correlation values for " + ",".join(method))
-missing_metrics = load_correlations(tempDir, method, min_thresholds,
-    correlation_values,coding_genes,genes_coexpressed_with_ncRNA)
-if len(missing_metrics) > 0:
-    print("Calculating correlation values for " + ",".join(missing_metrics))
-    calc_correlation_in_chunks(count_reads_path, regulators_path, benchmarking, available_cache,
-        missing_metrics, tempDir, minimum_coef, threads)
-    print("Loading correlation values for " + ",".join(missing_metrics))
-    load_correlations(tempDir, missing_metrics, min_thresholds,
-        correlation_values,coding_genes,genes_coexpressed_with_ncRNA)
+    non_regulators_reads = reads
+    if not benchmarking:
+        non_regulators_reads = reads.loc[~mask]
+    print(str(len(non_regulators_reads)) + " regulated.")
+    print(str(len(regulators_reads)) + " regulators.")
+    print("Generating correlations.")
+    
+    available_size = available_cache
 
+    max_for_regulators = available_size*regulators_max_portion
+    regs_size = getsizeof(regulators_reads)
+    regulator_dfs = [regulators_reads]
+    if regs_size > max_for_regulators:
+        regulator_dfs = split_df_to_max_mem(regulators_reads, max_for_regulators)
+        available_size -= max_for_regulators
+    else:
+        available_size -= regs_size
+
+    dfs = split_df_to_max_mem(non_regulators_reads, available_size)
+    
+    print("Chunks for regulated: " + str(len(dfs)) 
+    + "\nChunks for regulators: " + str(len(regulator_dfs)))
+
+    df_pairs = []
+    for df in dfs:
+        for regulator_df in regulator_dfs:
+            df_pairs.append((df,regulator_df))
+
+    i = 1
+    for df,regulator_df in tqdm(df_pairs):
+        print("Processing chunk " + str(i) + "/" + str(len(df_pairs)))
+        find_correlated(df, regulators_reads, tempDir, method, separate_regulators = benchmarking)
+        i += 1
+
+print("Loading correlations from " + correlations_file_path + ".")
+coding_genes = {}
+    #keys = rnas, values = sets of genes
+genes_coexpressed_with_ncRNA = {}
+#keys = (rna,gene), values = (correlation,method)
+correlation_values = {}
+#correlation_lines = []
+with open(correlations_file_path,'r') as stream:
+        lines = 0
+        invalid_lines = 0
+        for raw_line in stream.readlines():
+            cells = raw_line.rstrip("\n").split("\t")
+            if len(cells) == 4:
+                #correlation_lines.append([cells[0].upper(),cells[1].upper(),float(cells[2]),cells[3]])
+                gene = cells[0]
+                rna = cells[1]
+                corr = cells[2]
+                corr_val = float(corr)
+                m = cells[3]
+                if m in method:
+                    valid_corr = (corr_val >= confs["thresholds"][m] or corr_val <= -confs["thresholds"][m])
+                    if thresholds != None:
+                        valid_corr = (corr_val >= min_threshold or corr_val <= -min_threshold)
+                    if valid_corr:
+                        if not gene in coding_genes:
+                            coding_genes[gene] = 0
+                        coding_genes[gene] += 1
+                        
+                        if not rna in genes_coexpressed_with_ncRNA:
+                            genes_coexpressed_with_ncRNA[rna] = set()
+                        genes_coexpressed_with_ncRNA[rna].add(gene)
+                        correlation_values[(rna,gene,m)] = corr
+            else:
+                invalid_lines += 1
+            lines += 1
+        if lines == 0:
+            print("Fatal error, no correlations could be loaded from "
+                    + correlations_file_path + "\n(The file may be "
+                    + "corrupted or just empty)")
+            quit()
+        else: 
+            print(str(float(invalid_lines)/lines)
+                + " lines without proper number of columns (4 columns)")
 print("correlation_values = "+str(len(correlation_values.keys())))
 print("genes_coexpressed_with_ncRNA = "+str(len(genes_coexpressed_with_ncRNA.keys())))
-N = len(coding_genes.keys())
-print("coding_genes = "+str(N))
-
-#########################################################################################
-# Reading Gene Ontology and Annotation
-#########################################################################################
+print("coding_genes = "+str(len(coding_genes.keys())))
+N = len(reads)
 
 print("Loading GO network.")
 graph = obonet.read_obo(go_path)
@@ -200,44 +329,14 @@ with open(coding_gene_ontology_path,'r') as stream:
             + " lines without proper number of columns (3 or 4 columns)")
     print(str(associations) + " valid associations loaded.")
 
-#########################################################################################
-# GO enrichment phase
-#########################################################################################
-
-def predict(tempDir,conf_level,
-            ontology_type="molecular_function",
-            current_method=["MIC","SPR","FSH"],
-            benchmarking=False,k_min_coexpressions=1,
+def predict(tempDir,ontology_type="molecular_function",current_method=["MIC","SPR","FSH"],
+            threshold_arg=None,benchmarking=False,k_min_coexpressions=1,
             pval_threshold=0.05,fdr_threshold=0.05,
             min_n=5, min_M=5, min_m=1):
-    thresholds = confidence_thresholds[conf_level]
-    K = k_min_coexpressions
     print("Current method = " + str(current_method) + ", ontology type = " + ontology_type
-            + ", pvalue = " + str(pval_threshold) + ", fdr = " + str(fdr_threshold)
-            +", thresholds = "+ str(thresholds))
-
-    ontology_type_mini = ontology_type.replace("biological_process","BP")
-    ontology_type_mini = ontology_type_mini.replace("molecular_function","MF")
-    ontology_type_mini = ontology_type_mini.replace("cellular_component","CC")
-    
-    out_dir = tempDir+"/"+ontology_type_mini
-    if not os.path.exists(out_dir):
-        os.mkdir(out_dir)
-    longer = []
-    if K != 1 or min_n != 1 or min_M != 1 or min_m != 1:
-        longer = ["K"+str(K),"n"+str(min_n),"M"+str(min_M),"m"+str(min_m)]
-    run_mode = "LNC"
-    if benchmarking:
-        run_mode = "BENCH"
-    output_file = (out_dir + "/" +".".join(["-".join(current_method),"c"+str(conf_level),
-            run_mode,"pval"+str(pval_threshold),"fdr"+str(fdr_threshold)]
-            + longer + ["tsv"])).replace(".LNC.",".")
-    output_file = output_file.replace(".thNone.",".")
-    
-    if os.path.exists(output_file):
-        print(output_file + " already exists, skiping.")
-        return output_file
-
+            + ", pvalue = " + str(pval_threshold) + ", fdr = " + str(fdr_threshold))
+    K = k_min_coexpressions
+    threshold = threshold_arg
     print("Selecting significant genes for processing")
     valid_coding_genes = {}
     valid_genes_coexpressed_with_ncRNA = {}
@@ -247,12 +346,13 @@ def predict(tempDir,conf_level,
     for rna in genes_coexpressed_with_ncRNA.keys():
         for gene in genes_coexpressed_with_ncRNA[rna]:
             for metric in current_method:
-                metric_conf_th = thresholds[metric]
+                if threshold == None:
+                    threshold = confs["thresholds"][metric]
                 key = (rna,gene,metric)
                 if key in correlation_values.keys():
                     corr = float(correlation_values[key])
                     correct_method += 1
-                    if corr >= metric_conf_th or corr <= -metric_conf_th:
+                    if corr >= threshold or corr <= -threshold:
                         valid_corr += 1
                         if not gene in valid_coding_genes:
                             valid_coding_genes[gene] = 0
@@ -332,7 +432,7 @@ def predict(tempDir,conf_level,
     #N = len(coding_genes) #population size
     gene_term_pvalue = parallel_pvalues(N, possible_gene_term, 
                                         valid_gene_term, n_lens, M_lens, m_lens, 
-                                        threads, available_cache,cmdArgs["test"])
+                                        threads, available_cache)
     print("Calculating corrected p-value (FDR)")
     pvalues = [pval for gene, term, pval in gene_term_pvalue]
     reject, fdrs, alphacSidak, alphacBonf = multitest.multipletests(pvalues, alpha=0.05, method='fdr_by')
@@ -365,45 +465,56 @@ def predict(tempDir,conf_level,
             + str((fdr_passed/len(gene_term_pvalue))*100) + "%)")
     
     print("Writing results")
+    ontology_type_mini = ontology_type.replace("biological_process","BP")
+    ontology_type_mini = ontology_type_mini.replace("molecular_function","MF")
+    ontology_type_mini = ontology_type_mini.replace("cellular_component","CC")
     
+    out_dir = tempDir+"/"+ontology_type_mini
+    if not os.path.exists(out_dir):
+        os.mkdir(out_dir)
+    longer = []
+    if K != 1 or min_n != 1 or min_M != 1 or min_m != 1:
+        longer = ["K"+str(K),"n"+str(min_n),"M"+str(min_M),"m"+str(min_m)]
+    run_mode = "LNC"
+    if benchmarking:
+        run_mode = "BENCH"
+    output_file = (out_dir + "/" +".".join(["-".join(current_method),"th"+str(threshold_arg),
+            run_mode,"pval"+str(pval_threshold),"fdr"+str(fdr_threshold)]
+            + longer + ["tsv"])).replace(".LNC.",".")
+    output_file = output_file.replace(".thNone.",".")
     print("Output annotation is " + output_file)
     with open(output_file, 'w') as stream:
         for rna, term, pvalue, fdr in relevant_pvals:
             stream.write("\t".join([rna,term,ontology_type,str(pvalue),str(fdr)])+"\n")
     return output_file
 
-#########################################################################################
-# MAIN
-#########################################################################################
+output_files = []
+for onto in ontology_type:
+    if thresholds != None:
+        for meth in method:
+            for th in thresholds:
+                predict(tempDir,ontology_type=onto,current_method=[meth],
+                        threshold_arg=th,benchmarking=benchmarking,k_min_coexpressions=K,
+                        pval_threshold=pval,fdr_threshold=fdr,
+                        min_n=min_n, min_M=min_M, min_m=min_m)
+    else:
+        output_file = predict(tempDir,ontology_type=onto,current_method=method,
+                threshold_arg=None,benchmarking=benchmarking,k_min_coexpressions=K,
+                pval_threshold=pval,fdr_threshold=fdr,
+                min_n=min_n, min_M=min_M, min_m=min_m)
+        output_files.append((output_file,onto))
 
-def annotation_union(output_files, path):
+print("Writing annotation file with all ontologies")
+if len(output_files) > 1:
     lines = []
     for output_file,ontology_type in output_files:
         with open(output_file,'r') as stream:
             new_lines = [line for line in stream.readlines()]
             lines += new_lines
-    print("Writing annotation file with all ontologies:")
-    print("\t"+path)
-    with open(path,'w') as stream:
+    output_file = (tempDir + "/" + ".".join(
+                        ["-".join(method),"bh="+str(benchmarking),
+                        "pval"+str(pval),"fdr"+str(fdr),"tsv"]
+                    ))
+    with open(output_file,'w') as stream:
         for line in lines:
             stream.write(line)
-
-for i in confidence_levels:
-    output_files = []
-    for onto in ontology_type:
-        output_file = predict(tempDir, i,
-                ontology_type=onto, current_method=method,
-                benchmarking=benchmarking, k_min_coexpressions=K,
-                pval_threshold=pval, fdr_threshold=fdr,
-                min_n=min_n, min_M=min_M, min_m=min_m)
-        output_files.append((output_file,onto))
-
-    if len(output_files) > 1:
-        all_dir = tempDir+"/ALL/"
-        if not os.path.exists(all_dir):
-            os.mkdir(all_dir)
-        output_file = (all_dir + ".".join(
-                            ["-".join(method),"c"+str(i),
-                            "pval"+str(pval),"fdr"+str(fdr),"tsv"]
-                        ))
-        annotation_union(output_files,output_file)

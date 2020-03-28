@@ -84,7 +84,7 @@ def spr(reads1,reads2):
 def dc(reads1,reads2):
     return dcor.distance_correlation(reads1, reads2)
 
-def leave_one_out(pid, coding_rows, regulators, show, method_ids, minimum_coef, return_dict):
+def leave_one_out(pid, coding_rows, regulators, show, method_ids, return_dict):
     print("Turning warnings into errors.")
     warnings.filterwarnings('error')
     coding_noncoding_pairs = []
@@ -109,23 +109,23 @@ def leave_one_out(pid, coding_rows, regulators, show, method_ids, minimum_coef, 
             reads1 = np.array(row1.values[1:],dtype=np.float32)
             for i in range(len(method_ids)):
                 corr = methods[i](reads1,reads2)
-                if(corr > minimum_coef) or (corr < -minimum_coef):
+                if(corr > 0.5) or (corr < -0.5):
                     coding_noncoding_pairs.append((row1[0], row2[0], corr, method_ids[i]))
             
     print(str(len(coding_noncoding_pairs)) + " correlation pairs found.")
     return_dict[pid] = coding_noncoding_pairs
 
-def try_find_coexpression_process(pid, coding_rows, nc_rows, show, method_ids, minimum_coef, return_dict):
+def try_find_coexpression_process(pid, coding_rows, nc_rows, show, method_ids, return_dict):
     coding_noncoding_pairs = []
     mine = MINE()
     mic = lambda reads1,reads2: calc_mic(reads1,reads2,mine)
 
-    metric_func_by_name = {"MIC": mic, "PRS": prs, "SPR": spr, "DC": dc, 
+    method_names = {"MIC": mic, "PRS": prs, "SPR": spr, "DC": dc, 
                     "FSH": calc_fisher_information, "SOB": calc_sobolev}
     methods = []
     names = []
     for method_name in method_ids:
-        methods.append(metric_func_by_name[method_name])
+        methods.append(method_names[method_name])
     #print("Methods="+str(methods))
     for i in get_iterator(range(len(coding_rows)), show=show):
         row1 = coding_rows.iloc[i]
@@ -134,7 +134,7 @@ def try_find_coexpression_process(pid, coding_rows, nc_rows, show, method_ids, m
             reads2 = np.array(row2.values[1:],dtype=np.float32)
             for i in range(len(method_ids)):
                 corr = methods[i](reads1,reads2)
-                if(corr > minimum_coef) or (corr < -minimum_coef):
+                if(corr > 0.5) or (corr < -0.5):
                     coding_noncoding_pairs.append((row1[0], row2[0], corr, method_ids[i]))
     print(str(len(coding_noncoding_pairs)) + " correlation pairs found.")
     return_dict[pid] = coding_noncoding_pairs
@@ -147,23 +147,22 @@ def get_descendants(graph, parent_id):
     descendants = networkx.descendants(graph, parent_id)
     return descendants
 
-'''
-M = number of successes in the population
-m = number of drawn successes
-N = sample size
-n = n
-'''
-def custom_pvalue(m, N, M, n):
-    comb_sum = 0
+def pvalue(m, N, M, n):
+    '''
+    M = number of successes in the population
+    m = number of drawn successes
+    N = sample size
+    n = n
+    '''
+    '''comb_sum = 0
     for i in range(m, min(n,M)+1):
         comb_sum += comb(M, i, exact=True)*comb(N-M, n-i, exact=True)
     p = comb_sum / comb(N, n, exact=True)
-    return p
-
-def sf_pvalue(m, N, M, n):
+    return p'''
+    #return hypergeom.sf(m, N, M, n)
     return hypergeom.sf(m, N, M, n)
 
-def pvalue_process(N, params, pid, test_func, return_dict):
+def pvalue_process(N, params, pid, return_dict):
     '''gene_term_pvalue = []
     n_lens = [len(genes_coexpressed_with_ncRNA[possible_gene_term[i][0]]) for i in range(len(possible_gene_term))]
     M_lens = [len(genes_annotated_with_term[possible_gene_term[i][1]]) for i in range(len(possible_gene_term))]
@@ -186,7 +185,7 @@ def pvalue_process(N, params, pid, test_func, return_dict):
         pval = pvalue(m, N, M, n)
         gene_term_pvalue.append((possible_gene_term[i][0][0],
                             possible_gene_term[i][0][1],pval))'''
-    return_dict[pid] = [(i,test_func(m, N, M, n)) for i, n, M, m in params]
+    return_dict[pid] = [(i,pvalue(m, N, M, n)) for i, n, M, m in params]
 
 def get_valid_associations(genes_coexpressed_with_ncRNA, genes_annotated_with_term, possible_gene_term,
                             min_n, min_M, min_m):
@@ -201,10 +200,7 @@ def get_valid_associations(genes_coexpressed_with_ncRNA, genes_annotated_with_te
 
 def parallel_pvalues(N, possible_gene_term, valid_gene_term, 
                     n_lens, M_lens, m_lens, 
-                    threads, available_memory,test_type):
-    test_func = sf_pvalue
-    if test_type == "CUSTOM":
-        test_func = custom_pvalue
+                    threads, available_memory):
     #basic_process_mem_usage = (getsizeof(N)*2 + getsizeof(genes_coexpressed_with_ncRNA)
     #    + getsizeof(genes_annotated_with_term))
     #available_memory -= (basic_process_mem_usage * threads)
@@ -243,7 +239,7 @@ def parallel_pvalues(N, possible_gene_term, valid_gene_term,
         i = 0
         for chunk in calc_chunks:
             p = multiprocessing.Process(target=pvalue_process,
-                    args=(N, chunk, i, test_func, return_dict, ))
+                    args=(N, chunk, i, return_dict, ))
             processes.append(p)
             #print("Spawned process")
             p.start()

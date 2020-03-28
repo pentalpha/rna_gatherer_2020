@@ -85,8 +85,6 @@ def high_similarity(min_corr,corrs_vec):
     else:
         return None
 
-low_quality = 0.789
-high_quality = 0.97
 def find_threshold(vec, sim_calculator, 
                 initial_threshold=0.7, initial_step=0.01,
                 good_similarity=0.97,execs=4):

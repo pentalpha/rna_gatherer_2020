@@ -1,9 +1,6 @@
 #Module: config.py
 #Rename this file as "config.py" and customize it
 import multiprocessing
-import os
-
-project_dir = os.path.dirname(os.path.realpath(__file__))
 
 configs = {
     "quickgo_api": "https://www.ebi.ac.uk/QuickGO/services/annotation/downloadSearch",
@@ -15,28 +12,21 @@ configs = {
     "long_orfs": "TransDecoder.LongOrfs",
     "plast": "plast",
     "blastn": "blastn",
-    "high_quality_methods": ["FSH","MIC","SPR"],
-    "medium_quality_methods": ["FSH","MIC","SPR","SOB","DC","PRS"],
     "thresholds":{
         "FSH": 0.970,
         "MIC": 0.751,
         "SPR": 0.893,
-        "DC": 0.9999,
-        "SOB": 0.9999,
-        "PRS": 0.9999
+        "DC": 0.999,
+        "SOB": 0.999,
+        "PRS": 0.999
     },
-    "medium_thresholds":{
-        "FSH": 0.8377,
-        "MIC": 0.74355,
-        "SPR": 0.80877,
-        "DC": 0.9848,
-        "SOB": 0.9729,
-        "PRS": 0.9899
-    },
-    "rfam2go": project_dir + "/data/rfam2go",
-    "intervals_file": project_dir + "/data/confidence_intervals.csv",
-    "lgc": project_dir + "/lib/LGC-1.0.py"
+    #"quast" : "quast.py",
     #"non_redundant": "<___>",
     #"rfam_cm": "<___>",
-    #"diamond": "diamond"
+    #"rfam_families": "<___>",
+    #"rfam2go": "<___>",
+    #"rfam_fastas": "<___>"
+    #"rna_central": "<___>",
+    #"diamond": "diamond",
+    #"lgc": "<___>"
 }
