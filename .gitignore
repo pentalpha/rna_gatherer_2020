@@ -4,3 +4,5 @@ __pycache__
 config.py
 .f*
 .Rhistory
+test/th_*
+test/conf_*
