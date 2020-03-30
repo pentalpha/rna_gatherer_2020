@@ -16,7 +16,7 @@ import dcor
 from minepy import MINE
 from sys import getsizeof
 import warnings
-
+from nexus.confidence_levels import *
 
 def is_constant(vec):
     first = vec[0]
@@ -87,6 +87,9 @@ def dc(reads1,reads2):
 def leave_one_out(pid, coding_rows, regulators, show, method_ids, return_dict):
     print("Turning warnings into errors.")
     warnings.filterwarnings('error')
+    minimum_coefs = load_confidence(os.path.dirname(os.path.realpath(__file__)) 
+                                    + "/../data/confidence_intervals.csv")[0]
+
     coding_noncoding_pairs = []
     mine = MINE()
     mic = lambda reads1,reads2: calc_mic(reads1,reads2,mine)
@@ -96,7 +99,9 @@ def leave_one_out(pid, coding_rows, regulators, show, method_ids, return_dict):
     methods = []
     names = []
     for method_name in method_ids:
-        methods.append(method_names[method_name])
+        methods.append(
+            metric_with_filter(
+                method_names[method_name],minimum_coefs[method_name]))
     '''if show:
         print("Regulators list:\n\t"+str(regulators.head())+"\nLen="+str(len(regulators)))
         print(str(coding_rows.head())+"\nLen="+str(len(coding_rows)))'''
@@ -109,13 +114,25 @@ def leave_one_out(pid, coding_rows, regulators, show, method_ids, return_dict):
             reads1 = np.array(row1.values[1:],dtype=np.float32)
             for i in range(len(method_ids)):
                 corr = methods[i](reads1,reads2)
-                if(corr > 0.5) or (corr < -0.5):
+                if corr != None:
                     coding_noncoding_pairs.append((row1[0], row2[0], corr, method_ids[i]))
             
     print(str(len(coding_noncoding_pairs)) + " correlation pairs found.")
     return_dict[pid] = coding_noncoding_pairs
 
+def filter(val, min_value):
+    if val <= -min_value or val >= min_value:
+        return val
+    else:
+        return None
+
+def metric_with_filter(metric, min_value):
+    return lambda a,b: filter(metric(a,b),min_value)
+
 def try_find_coexpression_process(pid, coding_rows, nc_rows, show, method_ids, return_dict):
+    minimum_coefs = load_confidence(os.path.dirname(os.path.realpath(__file__)) 
+                                    + "/../data/confidence_intervals.csv")[0]
+
     coding_noncoding_pairs = []
     mine = MINE()
     mic = lambda reads1,reads2: calc_mic(reads1,reads2,mine)
@@ -125,7 +142,10 @@ def try_find_coexpression_process(pid, coding_rows, nc_rows, show, method_ids, r
     methods = []
     names = []
     for method_name in method_ids:
-        methods.append(method_names[method_name])
+        methods.append(
+            metric_with_filter(
+                method_names[method_name],minimum_coefs[method_name]))
+        #methods.append(method_names[method_name])
     #print("Methods="+str(methods))
     for i in get_iterator(range(len(coding_rows)), show=show):
         row1 = coding_rows.iloc[i]
@@ -134,7 +154,8 @@ def try_find_coexpression_process(pid, coding_rows, nc_rows, show, method_ids, r
             reads2 = np.array(row2.values[1:],dtype=np.float32)
             for i in range(len(method_ids)):
                 corr = methods[i](reads1,reads2)
-                if(corr > 0.5) or (corr < -0.5):
+                #if(corr > 0.74) or (corr < -0.74):
+                if corr != None:
                     coding_noncoding_pairs.append((row1[0], row2[0], corr, method_ids[i]))
     print(str(len(coding_noncoding_pairs)) + " correlation pairs found.")
     return_dict[pid] = coding_noncoding_pairs
