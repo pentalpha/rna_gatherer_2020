@@ -84,7 +84,7 @@ def spr(reads1,reads2):
 def dc(reads1,reads2):
     return dcor.distance_correlation(reads1, reads2)
 
-def leave_one_out(pid, coding_rows, regulators, show, method_ids, return_dict):
+def leave_one_out(pid, coding_rows, regulators, method_ids, return_dict):
     print("Turning warnings into errors.")
     warnings.filterwarnings('error')
     minimum_coefs = load_confidence(os.path.dirname(os.path.realpath(__file__)) 
@@ -105,7 +105,7 @@ def leave_one_out(pid, coding_rows, regulators, show, method_ids, return_dict):
     '''if show:
         print("Regulators list:\n\t"+str(regulators.head())+"\nLen="+str(len(regulators)))
         print(str(coding_rows.head())+"\nLen="+str(len(coding_rows)))'''
-    for i in get_iterator(range(len(regulators)), show=show):
+    for i in range(len(regulators)):
         row2 = regulators.iloc[i]
         reads2 = np.array(row2.values[1:],dtype=np.float32)
         rows = coding_rows[coding_rows[coding_rows.columns[0]] != row2[coding_rows.columns[0]]]
@@ -117,7 +117,7 @@ def leave_one_out(pid, coding_rows, regulators, show, method_ids, return_dict):
                 if corr != None:
                     coding_noncoding_pairs.append((row1[0], row2[0], corr, method_ids[i]))
             
-    print(str(len(coding_noncoding_pairs)) + " correlation pairs found.")
+    #print(str(len(coding_noncoding_pairs)) + " correlation pairs found.")
     return_dict[pid] = coding_noncoding_pairs
 
 def filter(val, min_value):
@@ -129,7 +129,7 @@ def filter(val, min_value):
 def metric_with_filter(metric, min_value):
     return lambda a,b: filter(metric(a,b),min_value)
 
-def try_find_coexpression_process(pid, coding_rows, nc_rows, show, method_ids, return_dict):
+def try_find_coexpression_process(pid, coding_rows, nc_rows, method_ids, return_dict):
     minimum_coefs = load_confidence(os.path.dirname(os.path.realpath(__file__)) 
                                     + "/../data/confidence_intervals.csv")[0]
 
@@ -147,7 +147,7 @@ def try_find_coexpression_process(pid, coding_rows, nc_rows, show, method_ids, r
                 method_names[method_name],minimum_coefs[method_name]))
         #methods.append(method_names[method_name])
     #print("Methods="+str(methods))
-    for i in get_iterator(range(len(coding_rows)), show=show):
+    for i in range(len(coding_rows)):
         row1 = coding_rows.iloc[i]
         reads1 = np.array(row1.values[1:],dtype=np.float32)
         for name, row2 in nc_rows.iterrows():
@@ -157,7 +157,7 @@ def try_find_coexpression_process(pid, coding_rows, nc_rows, show, method_ids, r
                 #if(corr > 0.74) or (corr < -0.74):
                 if corr != None:
                     coding_noncoding_pairs.append((row1[0], row2[0], corr, method_ids[i]))
-    print(str(len(coding_noncoding_pairs)) + " correlation pairs found.")
+    #print(str(len(coding_noncoding_pairs)) + " correlation pairs found.")
     return_dict[pid] = coding_noncoding_pairs
 
 def get_ancestors(graph, parent_id):

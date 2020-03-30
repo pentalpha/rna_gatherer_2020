@@ -133,7 +133,18 @@ K = int(cmdArgs["k_min_coexpressions"])
 
 regulators_max_portion = 0.4
 
-def find_correlated(reads, regulators, tempDir, methods, separate_regulators = False):
+
+if not os.path.exists(tempDir):
+    os.mkdir(tempDir)
+
+correlations_dir = tempDir + "/correlations"
+if not os.path.exists(correlations_dir):
+    os.mkdir(correlations_dir)
+
+def get_metric_file(metric_name):
+    return open(correlations_dir + "/" + metric_name + ".tsv", 'a+')
+
+def find_correlated(reads, regulators, tempDir, methods, method_streams, separate_regulators = False):
     coding_noncoding_pairs = []
     func = try_find_coexpression_process
     if separate_regulators:
@@ -145,7 +156,6 @@ def find_correlated(reads, regulators, tempDir, methods, separate_regulators = F
     manager = multiprocessing.Manager()
     return_dict = manager.dict()
     processes = []
-    showing = True
     last_pid = 0
     for i in range(threads-1):
         start = last+1
@@ -154,12 +164,10 @@ def find_correlated(reads, regulators, tempDir, methods, separate_regulators = F
             end = limit
         parcial_df = reads.iloc[start:end]
         p = multiprocessing.Process(target=func, 
-            args=(i, parcial_df, regulators, showing, methods, return_dict, ))
+            args=(i, parcial_df, regulators, methods, return_dict, ))
         processes.append(p)
         #print("Spawned process from gene " + str(start) + " to " + str(end))
         p.start()
-        if showing:
-            showing = False
         last = end
 
         last_pid = i
@@ -168,7 +176,7 @@ def find_correlated(reads, regulators, tempDir, methods, separate_regulators = F
     if end < limit:
         parcial_df = reads.iloc[end:limit]
         p = multiprocessing.Process(target=func, 
-            args=(last_pid+1, parcial_df, regulators, showing, methods, return_dict, ))
+            args=(last_pid+1, parcial_df, regulators, methods, return_dict, ))
         processes.append(p)
         #print("Spawned process from gene " + str(end) + " to " + str(limit))
         p.start()
@@ -176,15 +184,16 @@ def find_correlated(reads, regulators, tempDir, methods, separate_regulators = F
     for p in processes:
         p.join()
 
-    print("Merging results")
+    #print("Merging results")
     for value in return_dict.values():
         coding_noncoding_pairs += value
 
-    print(str(len(coding_noncoding_pairs)) + " correlation pairs found.")
+    #print(str(len(coding_noncoding_pairs)) + " correlation pairs found.")
     output = tempDir+"/correlated.tsv"
-    with open(output,'a+') as stream:
-        for coding_name, noncoding_name, corr, method in coding_noncoding_pairs:
-            stream.write("\t".join([coding_name,noncoding_name,str(corr),method]) + "\n")
+    #with open(output,'a+') as stream:
+    for coding_name, noncoding_name, corr, method_name in coding_noncoding_pairs:
+        method_streams[method_name].write("\t".join([coding_name,noncoding_name,str(corr)]) + "\n")
+
     manager.shutdown()
     del manager
 
@@ -202,8 +211,6 @@ del reads["constant"]
 print(reads.head())
 print(str(len(reads)))
 
-if not os.path.exists(tempDir):
-    os.mkdir(tempDir)
 
 print("Reading regulators")
 regulators = []
@@ -211,11 +218,18 @@ with open(regulators_path,'r') as stream:
     for line in stream.readlines():
         regulators.append(line.rstrip("\n"))
 
-correlations_file_path = tempDir + "/correlated.tsv"
+correlation_files = {method_name:correlations_dir+"/"+method_name+".tsv" for method_name in method}
 
+missing_metrics = []
+for key,val in correlation_files.items():
+    if not os.path.exists(val):
+        missing_metrics.append(key)
 
-if not os.path.exists(correlations_file_path):
-    print("Separating regulators from regulated.")
+if len(missing_metrics) > 0:
+    print("Calculating correlation coefficients for the following metrics: "
+        + str(missing_metrics))
+#if not os.path.exists(correlations_file_path):
+    #print("Separating regulators from regulated.")
     mask = reads[reads.columns[0]].isin(regulators)
     regulators_reads = reads.loc[mask]
 
@@ -224,7 +238,7 @@ if not os.path.exists(correlations_file_path):
         non_regulators_reads = reads.loc[~mask]
     print(str(len(non_regulators_reads)) + " regulated.")
     print(str(len(regulators_reads)) + " regulators.")
-    print("Generating correlations.")
+    #print("Generating correlations.")
     
     available_size = available_cache
 
@@ -239,40 +253,48 @@ if not os.path.exists(correlations_file_path):
 
     dfs = split_df_to_max_mem(non_regulators_reads, available_size)
     
-    print("Chunks for regulated: " + str(len(dfs)) 
-    + "\nChunks for regulators: " + str(len(regulator_dfs)))
+    '''print("Chunks for regulated: " + str(len(dfs)) 
+    + "\nChunks for regulators: " + str(len(regulator_dfs)))'''
 
     df_pairs = []
     for df in dfs:
         for regulator_df in regulator_dfs:
             df_pairs.append((df,regulator_df))
 
+    method_streams = {metric_name:get_metric_file(metric_name) for metric_name in missing_metrics}
+
     i = 1
     for df,regulator_df in tqdm(df_pairs):
-        print("Processing chunk " + str(i) + "/" + str(len(df_pairs)))
-        find_correlated(df, regulators_reads, tempDir, method, separate_regulators = benchmarking)
+        #print("Processing chunk " + str(i) + "/" + str(len(df_pairs)))
+        find_correlated(df, regulators_reads, tempDir, missing_metrics, 
+                    method_streams, separate_regulators = benchmarking)
         i += 1
+    
+    for method_name, stream in method_streams.items():
+        stream.close()
 
-print("Loading correlations from " + correlations_file_path + ".")
+#print("Loading correlations from " + correlations_file_path + ".")
 coding_genes = {}
     #keys = rnas, values = sets of genes
 genes_coexpressed_with_ncRNA = {}
 #keys = (rna,gene), values = (correlation,method)
 correlation_values = {}
 #correlation_lines = []
-with open(correlations_file_path,'r') as stream:
-    lines = 0
-    invalid_lines = 0
-    for raw_line in stream.readlines():
-        cells = raw_line.rstrip("\n").split("\t")
-        if len(cells) == 4:
-            #correlation_lines.append([cells[0].upper(),cells[1].upper(),float(cells[2]),cells[3]])
-            gene = cells[0]
-            rna = cells[1]
-            corr = cells[2]
-            corr_val = float(corr)
-            m = cells[3]
-            if m in method:
+#getFilesWith(tempDir+"/correlations/", ".tsv")
+
+for m,correlation_file_path in correlation_files.items():
+    print("Loading correlations from " + correlation_file_path + ".")
+    with open(correlation_file_path,'r') as stream:
+        lines = 0
+        invalid_lines = 0
+        for raw_line in stream.readlines():
+            cells = raw_line.rstrip("\n").split("\t")
+            if len(cells) == 3:
+                #correlation_lines.append([cells[0].upper(),cells[1].upper(),float(cells[2]),cells[3]])
+                gene = cells[0]
+                rna = cells[1]
+                corr = cells[2]
+                corr_val = float(corr)
                 valid_corr = False
                 valid_corr = (corr_val >= min_thresholds[m] or corr_val <= -min_thresholds[m])
                 if valid_corr:
@@ -284,17 +306,17 @@ with open(correlations_file_path,'r') as stream:
                         genes_coexpressed_with_ncRNA[rna] = set()
                     genes_coexpressed_with_ncRNA[rna].add(gene)
                     correlation_values[(rna,gene,m)] = corr
-        else:
-            invalid_lines += 1
-        lines += 1
-    if lines == 0:
-        print("Fatal error, no correlations could be loaded from "
-                + correlations_file_path + "\n(The file may be "
-                + "corrupted or just empty)")
-        quit()
-    else: 
-        print(str(float(invalid_lines)/lines)
-            + " lines without proper number of columns (4 columns)")
+            else:
+                invalid_lines += 1
+            lines += 1
+        if lines == 0:
+            print("Fatal error, no correlations could be loaded from "
+                    + correlations_file_path + "\n(The file may be "
+                    + "corrupted or just empty)")
+            quit()
+        else: 
+            print(str(float(invalid_lines)/lines)
+                + " lines without proper number of columns (4 columns)")
 print("correlation_values = "+str(len(correlation_values.keys())))
 print("genes_coexpressed_with_ncRNA = "+str(len(genes_coexpressed_with_ncRNA.keys())))
 print("coding_genes = "+str(len(coding_genes.keys())))
