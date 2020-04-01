@@ -25,7 +25,7 @@ base_command = ("cd ../ && "
             +"python predict.py -cr test_data/counts/mus_musculus_tpm.tsv"
             +" -reg test_data/lnc_list/mus_musculus_lncRNA.txt"
             +" -ann test_data/annotation/mgi_genes_annotation.tsv"
-            +" -o output/mgi_tpm_combs -conf 0,1,2,3,4,5,6"
+            +" -o ~/experiments/predictions/mgi_tpm_combos -conf 0,1,2,3,4,5,6"
             +" -ont molecular_function,biological_process,cellular_component"
             +" -met [METRICS] -p " + str(threads))
 

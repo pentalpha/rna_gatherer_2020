@@ -276,6 +276,7 @@ def parallel_pvalues(N, possible_gene_term, valid_gene_term,
         for value in return_dict.values():
             index_pvalue += value
         #print("Saved results from processes")
+        manager._process.terminate()
         manager.shutdown()
     print("Aggregating pvalue information to (gene,term) pairs")
     gene_term_pvalue = []

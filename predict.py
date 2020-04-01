@@ -86,9 +86,9 @@ coding_gene_ontology_path = cmdArgs["annotation"]
 tempDir = cmdArgs["output_dir"]
 go_path = confs["go_obo"]
 
-ontology_type = cmdArgs["ontology_type"].split(",")
-if ontology_type[0] == "ALL":
-    ontology_type = all_ontologies
+ontology_types_arg = cmdArgs["ontology_type"].split(",")
+if ontology_types_arg[0] == "ALL":
+    ontology_types_arg = all_ontologies
 
 method = cmdArgs["method"].split(",")
 if method[0] == "ALL":
@@ -197,7 +197,7 @@ def find_correlated(reads, regulators, tempDir, methods, method_streams, separat
     manager.shutdown()
     del manager
 
-print("Ontology type is " + str(ontology_type))
+print("Ontology type is " + str(ontology_types_arg))
 print("Method is " + str(method))
 
 reads = pd.read_csv(count_reads_path, sep='\t')
@@ -532,7 +532,7 @@ def predict(tempDir,ontology_type="molecular_function",current_method=["MIC","SP
 
 for conf in confidence_levels:
     output_files = []
-    for onto in ontology_type:
+    for onto in ontology_types_arg:
         out_file = predict(tempDir,ontology_type=onto,current_method=method,
                 conf_arg=conf,
                 benchmarking=benchmarking,k_min_coexpressions=K,
@@ -544,11 +544,11 @@ for conf in confidence_levels:
     if len(output_files) > 1:
         lines = []
         ontos = set()
-        for output_file,ontology_type in output_files:
+        for output_file,onto_value in output_files:
             with open(output_file,'r') as stream:
                 new_lines = [line for line in stream.readlines()]
                 lines += new_lines
-            ontos.add(ontology_type)
+            ontos.add(onto_value)
         ontos = list(ontos)
         ontos.sort()
         ontos_str = "_".join([short_ontology_name(str(onto)) 
