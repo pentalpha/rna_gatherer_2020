@@ -311,7 +311,7 @@ for m,correlation_file_path in correlation_files.items():
             lines += 1
         if lines == 0:
             print("Fatal error, no correlations could be loaded from "
-                    + correlations_file_path + "\n(The file may be "
+                    + correlation_file_path + "\n(The file may be "
                     + "corrupted or just empty)")
             quit()
         else: 
@@ -360,6 +360,12 @@ with open(coding_gene_ontology_path,'r') as stream:
             + " lines without proper number of columns (3 or 4 columns)")
     print(str(associations) + " valid associations loaded.")
 
+def short_ontology_name(onto_type):
+    onto_type = onto_type.replace("biological_process","BP")
+    onto_type = onto_type.replace("molecular_function","MF")
+    onto_type = onto_type.replace("cellular_component","CC")
+    return onto_type
+
 def predict(tempDir,ontology_type="molecular_function",current_method=["MIC","SPR","FSH"],
             conf_arg=None,benchmarking=False,k_min_coexpressions=1,
             pval_threshold=0.05,fdr_threshold=0.05,
@@ -369,6 +375,27 @@ def predict(tempDir,ontology_type="molecular_function",current_method=["MIC","SP
     K = k_min_coexpressions
     confidence = conf_arg
     thresholds = confidence_thresholds[confidence]
+
+    ontology_type_mini = short_ontology_name(ontology_type)
+    
+    out_dir = tempDir+"/"+ontology_type_mini
+    if not os.path.exists(out_dir):
+        os.mkdir(out_dir)
+    longer = []
+    if K != 1 or min_n != 1 or min_M != 1 or min_m != 1:
+        longer = ["K"+str(K),"n"+str(min_n),"M"+str(min_M),"m"+str(min_m)]
+    run_mode = "LNC"
+    if benchmarking:
+        run_mode = "BENCH"
+    output_file = (out_dir + "/" +".".join(["-".join(current_method),"c"+str(confidence),
+            run_mode,"pval"+str(pval_threshold),"fdr"+str(fdr_threshold)]
+            + longer + ["tsv"])).replace(".LNC.",".")
+    output_file = output_file.replace(".thNone.",".")
+
+    if os.path.exists(output_file):
+        print(output_file + " already created, skiping.")
+        return output_file
+
     print("Selecting significant genes for processing")
     valid_coding_genes = {}
     valid_genes_coexpressed_with_ncRNA = {}
@@ -495,56 +522,46 @@ def predict(tempDir,ontology_type="molecular_function",current_method=["MIC","SP
             + str((fdr_passed/len(gene_term_pvalue))*100) + "%)")
     
     print("Writing results")
-    ontology_type_mini = ontology_type.replace("biological_process","BP")
-    ontology_type_mini = ontology_type_mini.replace("molecular_function","MF")
-    ontology_type_mini = ontology_type_mini.replace("cellular_component","CC")
-    
-    out_dir = tempDir+"/"+ontology_type_mini
-    if not os.path.exists(out_dir):
-        os.mkdir(out_dir)
-    longer = []
-    if K != 1 or min_n != 1 or min_M != 1 or min_m != 1:
-        longer = ["K"+str(K),"n"+str(min_n),"M"+str(min_M),"m"+str(min_m)]
-    run_mode = "LNC"
-    if benchmarking:
-        run_mode = "BENCH"
-    output_file = (out_dir + "/" +".".join(["-".join(current_method),"c"+str(confidence),
-            run_mode,"pval"+str(pval_threshold),"fdr"+str(fdr_threshold)]
-            + longer + ["tsv"])).replace(".LNC.",".")
-    output_file = output_file.replace(".thNone.",".")
     print("Output annotation is " + output_file)
     with open(output_file, 'w') as stream:
         for rna, term, pvalue, fdr in relevant_pvals:
             stream.write("\t".join([rna,term,ontology_type,str(pvalue),str(fdr)])+"\n")
     return output_file
 
-output_files = []
-for onto in ontology_type:
-    for meth in method:
-        for conf in confidence_levels:
-            predict(tempDir,ontology_type=onto,current_method=[meth],
-                    conf_arg=conf,
-                    benchmarking=benchmarking,k_min_coexpressions=K,
-                    pval_threshold=pval,fdr_threshold=fdr,
-                    min_n=min_n, min_M=min_M, min_m=min_m)
-    '''else:
-        output_file = predict(tempDir,ontology_type=onto,current_method=method,
-                threshold_arg=None,benchmarking=benchmarking,k_min_coexpressions=K,
+
+
+for conf in confidence_levels:
+    output_files = []
+    for onto in ontology_type:
+        out_file = predict(tempDir,ontology_type=onto,current_method=method,
+                conf_arg=conf,
+                benchmarking=benchmarking,k_min_coexpressions=K,
                 pval_threshold=pval,fdr_threshold=fdr,
                 min_n=min_n, min_M=min_M, min_m=min_m)
-        output_files.append((output_file,onto))'''
+        output_files.append((out_file,onto))
 
-print("Writing annotation file with all ontologies")
-if len(output_files) > 1:
-    lines = []
-    for output_file,ontology_type in output_files:
-        with open(output_file,'r') as stream:
-            new_lines = [line for line in stream.readlines()]
-            lines += new_lines
-    output_file = (tempDir + "/" + ".".join(
-                        ["-".join(method),"bh="+str(benchmarking),
-                        "pval"+str(pval),"fdr"+str(fdr),"tsv"]
-                    ))
-    with open(output_file,'w') as stream:
-        for line in lines:
-            stream.write(line)
+    print("Writing annotation file with all ontologies")
+    if len(output_files) > 1:
+        lines = []
+        ontos = set()
+        for output_file,ontology_type in output_files:
+            with open(output_file,'r') as stream:
+                new_lines = [line for line in stream.readlines()]
+                lines += new_lines
+            ontos.add(ontology_type)
+        ontos = list(ontos)
+        ontos.sort()
+        ontos_str = "_".join([short_ontology_name(str(onto)) 
+                            for onto in ontos])
+        if len(ontos) == 3:
+            ontos_str = "ALL"
+        onto_dir = tempDir + "/" + ontos_str
+        if not os.path.exists(onto_dir):
+            os.mkdir(onto_dir)
+        output_file = (onto_dir + "/" + ".".join(["-".join(method),
+                            "c"+str(conf),"bh="+str(benchmarking),
+                            "pval"+str(pval),"fdr"+str(fdr),"tsv"]
+                        ))
+        with open(output_file,'w') as stream:
+            for line in lines:
+                stream.write(line)

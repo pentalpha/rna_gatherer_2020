@@ -46,7 +46,7 @@ counts_file = "../test_data/counts/mus_musculus_tpm.tsv"
 annotation_file = "../test_data/annotation/mgi_genes_annotation.tsv"
 reference_file = "../test_data/reference/mgi_lncRNA_annotation.tsv"
 #reg_file = "../test_data/lnc_list/mus_musculus_lncRNA.txt"
-reg_file = "../test_data/lnc_list/mus_musculus_lncRNA.600.txt"
+reg_file = "../test_data/lnc_list/mus_musculus_lncRNA.txt"
 
 onto_types = ["molecular_function"]
 mic_thresholds = [0.7435552598651071,
