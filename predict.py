@@ -124,6 +124,14 @@ confidence_thresholds = load_confidence(confs["intervals_file"])
 min_confidence = confidence_levels[0]
 min_thresholds = confidence_thresholds[min_confidence]
 
+metrics_with_minimum_conf = []
+for metric_name in method:
+    if min_thresholds[metric_name] != None:
+        metrics_with_minimum_conf.append(metric_name)
+    else:
+        print(metric_name + " does not have the minimum confidence level.")
+method = metrics_with_minimum_conf
+
 pval = float(cmdArgs["pvalue"])
 fdr = float(cmdArgs["fdr"])
 min_n = int(cmdArgs["min_n"])
@@ -132,7 +140,6 @@ min_m = int(cmdArgs["min_m"])
 K = int(cmdArgs["k_min_coexpressions"])
 
 regulators_max_portion = 0.4
-
 
 if not os.path.exists(tempDir):
     os.mkdir(tempDir)
@@ -370,11 +377,13 @@ def predict(tempDir,ontology_type="molecular_function",current_method=["MIC","SP
             conf_arg=None,benchmarking=False,k_min_coexpressions=1,
             pval_threshold=0.05,fdr_threshold=0.05,
             min_n=5, min_M=5, min_m=1):
-    print("Current method = " + str(current_method) + ", ontology type = " + ontology_type
-            + ", pvalue = " + str(pval_threshold) + ", fdr = " + str(fdr_threshold))
     K = k_min_coexpressions
     confidence = conf_arg
     thresholds = confidence_thresholds[confidence]
+    
+    print("Current method = " + str(current_method) + ", ontology type = " + ontology_type
+            + ", pvalue = " + str(pval_threshold) + ", fdr = " + str(fdr_threshold))
+    
 
     ontology_type_mini = short_ontology_name(ontology_type)
     
@@ -531,37 +540,43 @@ def predict(tempDir,ontology_type="molecular_function",current_method=["MIC","SP
 
 
 for conf in confidence_levels:
-    output_files = []
-    for onto in ontology_types_arg:
-        out_file = predict(tempDir,ontology_type=onto,current_method=method,
-                conf_arg=conf,
-                benchmarking=benchmarking,k_min_coexpressions=K,
-                pval_threshold=pval,fdr_threshold=fdr,
-                min_n=min_n, min_M=min_M, min_m=min_m)
-        output_files.append((out_file,onto))
+    valid_metrics = []
+    current_ths = confidence_thresholds[conf]
+    for metric_name in method:
+        if current_ths[metric_name] != None:
+            valid_metrics.append(metric_name)
+    if len(valid_metrics) > 0:
+        output_files = []
+        for onto in ontology_types_arg:
+            out_file = predict(tempDir,ontology_type=onto,current_method=valid_metrics,
+                    conf_arg=conf,
+                    benchmarking=benchmarking,k_min_coexpressions=K,
+                    pval_threshold=pval,fdr_threshold=fdr,
+                    min_n=min_n, min_M=min_M, min_m=min_m)
+            output_files.append((out_file,onto))
 
-    print("Writing annotation file with all ontologies")
-    if len(output_files) > 1:
-        lines = []
-        ontos = set()
-        for output_file,onto_value in output_files:
-            with open(output_file,'r') as stream:
-                new_lines = [line for line in stream.readlines()]
-                lines += new_lines
-            ontos.add(onto_value)
-        ontos = list(ontos)
-        ontos.sort()
-        ontos_str = "_".join([short_ontology_name(str(onto)) 
-                            for onto in ontos])
-        if len(ontos) == 3:
-            ontos_str = "ALL"
-        onto_dir = tempDir + "/" + ontos_str
-        if not os.path.exists(onto_dir):
-            os.mkdir(onto_dir)
-        output_file = (onto_dir + "/" + ".".join(["-".join(method),
-                            "c"+str(conf),"bh="+str(benchmarking),
-                            "pval"+str(pval),"fdr"+str(fdr),"tsv"]
-                        ))
-        with open(output_file,'w') as stream:
-            for line in lines:
-                stream.write(line)
+        print("Writing annotation file with all ontologies")
+        if len(output_files) > 1:
+            lines = []
+            ontos = set()
+            for output_file,onto_value in output_files:
+                with open(output_file,'r') as stream:
+                    new_lines = [line for line in stream.readlines()]
+                    lines += new_lines
+                ontos.add(onto_value)
+            ontos = list(ontos)
+            ontos.sort()
+            ontos_str = "_".join([short_ontology_name(str(onto)) 
+                                for onto in ontos])
+            if len(ontos) == 3:
+                ontos_str = "ALL"
+            onto_dir = tempDir + "/" + ontos_str
+            if not os.path.exists(onto_dir):
+                os.mkdir(onto_dir)
+            output_file = (onto_dir + "/" + ".".join(["-".join(valid_metrics),
+                                "c"+str(conf),"bh="+str(benchmarking),
+                                "pval"+str(pval),"fdr"+str(fdr),"tsv"]
+                            ))
+            with open(output_file,'w') as stream:
+                for line in lines:
+                    stream.write(line)

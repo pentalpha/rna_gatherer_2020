@@ -4,5 +4,8 @@ __pycache__
 config.py
 .f*
 .Rhistory
-test/th_*
-test/conf_*
+test/*
+!test/run_all_metric_combinations.py
+!test/test_mic.py
+!test/LNCRNA2GOA_MF.tsv
+!test/LNCRNA2GOA_BP.tsv

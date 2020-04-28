@@ -20,8 +20,12 @@ def combs_n(n):
     return list(combs)
 
 comb_n = [combs_n(n) for n in ns]
-
-base_command = ("cd ../ && "
+n_predictions = 0
+for combs in comb_n:
+    n_predictions += len(combs)
+n_predictions = n_predictions*7
+print(str(n_predictions))
+'''base_command = ("cd ../ && "
             +"python predict.py -cr test_data/counts/mus_musculus_tpm.tsv"
             +" -reg test_data/lnc_list/mus_musculus_lncRNA.txt"
             +" -ann test_data/annotation/mgi_genes_annotation.tsv"
@@ -36,4 +40,4 @@ for combs_list in comb_n:
         ms = comb.split(",")
         ms.sort()
         #print("\t"+"-".join(ms))
-        runCommand(base_command.replace("[METRICS]",",".join(ms)))
+        runCommand(base_command.replace("[METRICS]",",".join(ms)))'''

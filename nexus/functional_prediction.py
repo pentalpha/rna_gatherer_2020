@@ -84,11 +84,25 @@ def spr(reads1,reads2):
 def dc(reads1,reads2):
     return dcor.distance_correlation(reads1, reads2)
 
+def filter(val, min_value):
+    if val <= -min_value or val >= min_value:
+        return val
+    else:
+        return None
+
+def metric_with_filter(metric, min_value):
+    return lambda a,b: filter(metric(a,b),min_value)
+
 def leave_one_out(pid, coding_rows, regulators, method_ids, return_dict):
-    print("Turning warnings into errors.")
+    #print("Turning warnings into errors.")
     warnings.filterwarnings('error')
     minimum_coefs = load_confidence(os.path.dirname(os.path.realpath(__file__)) 
                                     + "/../data/confidence_intervals.csv")[0]
+    valid_metrics = []
+    for metric_name in method_ids:
+        if minimum_coefs[metric_name] != None:
+            valid_metrics.append(metric_name)
+    method_ids = valid_metrics
 
     coding_noncoding_pairs = []
     mine = MINE()
@@ -120,18 +134,15 @@ def leave_one_out(pid, coding_rows, regulators, method_ids, return_dict):
     #print(str(len(coding_noncoding_pairs)) + " correlation pairs found.")
     return_dict[pid] = coding_noncoding_pairs
 
-def filter(val, min_value):
-    if val <= -min_value or val >= min_value:
-        return val
-    else:
-        return None
-
-def metric_with_filter(metric, min_value):
-    return lambda a,b: filter(metric(a,b),min_value)
-
 def try_find_coexpression_process(pid, coding_rows, nc_rows, method_ids, return_dict):
     minimum_coefs = load_confidence(os.path.dirname(os.path.realpath(__file__)) 
                                     + "/../data/confidence_intervals.csv")[0]
+
+    valid_metrics = []
+    for metric_name in method_ids:
+        if minimum_coefs[metric_name] != None:
+            valid_metrics.append(metric_name)
+    method_ids = valid_metrics
 
     coding_noncoding_pairs = []
     mine = MINE()

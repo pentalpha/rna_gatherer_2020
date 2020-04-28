@@ -7,7 +7,10 @@ def load_confidence(intervals_file):
         for cells in th_lines:
             metric = cells[0]
             for i in range(1,len(cells)):
-                confidences[i-1][metric] = float(cells[i])
+                if cells[i] == "None":
+                    confidences[i-1][metric] = None
+                else:
+                    confidences[i-1][metric] = float(cells[i])
         '''for i in range(len(confidences)):
             print("Confidence "+ str(i)+": " + str(confidences[i]))'''
         return confidences
