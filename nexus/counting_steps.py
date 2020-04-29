@@ -7,7 +7,7 @@ from nexus.bioinfo import readSeqsFromFasta, filterSeqs, writeFastaSeqs, getFast
 from nexus.bioinfo import cluster_all_ranges
 from nexus.bioinfo import read_plast_extended, best_hit
 from nexus.bioinfo import get_gff_attributes, get_gff_attributes_str
-from nexus.bioinfo import get_rfam_from_rnacentral
+from nexus.bioinfo import get_rfam_from_rnacentral, header_to_id
 from nexus.util import *
 import math
 from scipy.stats.stats import pearsonr
@@ -50,13 +50,13 @@ def write_transcriptome(args, confs, tmpDir, stepDir):
     print("Loading annotation")
     annotation = pd.read_csv(stepDir["remove_redundancies"] + "/annotation.gff", sep="\t", header=None,
                 names = ["seqname", "source", "feature", "start", "end", "score", "strand", "frame", "attribute"])
-    print("Loading genome")
-    genome_dict = seqListToDict(readSeqsFromFasta(args['genome_link']))
+    print("Loading genome: " + args['genome_link'])
+    genome_dict = seqListToDict(readSeqsFromFasta(args['genome_link']), header_to_name = header_to_id)
     transcriptome = []
     print("Creating transcriptome file")
     for index, row in annotation.iterrows():
         #print(fasta_header)
-        s = genome_dict[row["seqname"]] #cant find key PGUA01000001.1 #TODO
+        s = genome_dict[str(row["seqname"])] #cant find key PGUA01000001.1 #TODO
         new_header = get_gff_attributes(row["attribute"])["ID"]
         from_seq = int(row["start"])
         to_seq = int(row["end"])

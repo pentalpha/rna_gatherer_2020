@@ -47,11 +47,7 @@ def header_to_id(seq):
     return name
 
 def seqListToDict(seqs, header_to_name=name_function):
-    x = {}
-    for pair in seqs:
-        key = header_to_name(pair[0])
-        val = pair[1]
-        x[key] = val
+    x = {header_to_name(pair[0]): pair[1] for pair in seqs}
     return x
 
 def writeFastaSeqs(validSeqs, output_fasta, lineWidth = 60):
