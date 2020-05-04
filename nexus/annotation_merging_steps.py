@@ -7,7 +7,7 @@ from nexus.bioinfo import readSeqsFromFasta, filterSeqs, writeFastaSeqs, getFast
 from nexus.bioinfo import cluster_all_ranges
 from nexus.bioinfo import read_plast_extended, best_hit
 from nexus.bioinfo import get_gff_attributes, get_gff_attributes_str
-from nexus.bioinfo import get_rfam_from_rnacentral
+from nexus.bioinfo import get_rfam_from_rnacentral, get_rna_type
 from nexus.util import runCommand, write_file, getFilesWith
 
 def filter_non_transcripts(gff_path, gff_output_path):
@@ -75,6 +75,20 @@ def best_id(ids, hits):
         print("Error: no known source in " + str(id_by_source))
         return None
 
+def update_attrs(attr_str):
+    attrs = get_gff_attributes(row["attribute"])
+    if "family" in attrs:
+        attrs["rfam"] = attrs["family"]
+    tp = "other"
+    if "rfam" in attrs:
+        if "type" in attrs:
+            tp = attrs["type"]
+        
+        if tp == "other" or tp == "misc_rna":
+            new_type = get_rna_type(attrs["rfam"])
+            attrs["type"] = new_type
+    return get_gff_attributes_str(attrs)
+
 def remove_redundancies(args, confs, tmpDir, stepDir):
     print("Reading raw annotation")
     raw_annotation = pd.read_csv(stepDir["run_gffcompare"] + "/all_mappings.gff", sep="\t", header=None)
@@ -84,7 +98,9 @@ def remove_redundancies(args, confs, tmpDir, stepDir):
     for index, row in raw_annotation.iterrows():
         attrs = get_gff_attributes(row["attribute"])
         hits[attrs["ID"]] = row
-
+    raw_annotation["attribute"] = raw_annotation.apply(
+        lambda row: update_attrs(row["attribute"]),axis=1
+    )
     redundant_ids = []
     loci_file = stepDir["run_gffcompare"] + "/gffcmp.loci"
     print("Reading loci file: " + loci_file)

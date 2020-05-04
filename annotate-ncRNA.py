@@ -118,10 +118,6 @@ if __name__ == '__main__':
                 #("analyze", analyze),
                 ("run_gffcompare", run_gffcompare),
                 ("remove_redundancies", remove_redundancies),
-                #("make_complete_annotation", make_complete_annotation),
-                #("make_family_fastas", make_family_fastas),
-                #("search_novel_names", search_novel_names),
-                #("annotate_novel_names", annotate_novel_names),
                 ("review_annotations", review_annotations),
                 ("write_transcriptome", write_transcriptome),
                 ("make_id2go", make_id2go)]

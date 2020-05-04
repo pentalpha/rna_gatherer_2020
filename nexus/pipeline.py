@@ -28,9 +28,9 @@ class Pipeline:
             code = runCommand("mkdir " + self.outputdir)
             if code != 0:
                 print("No permission to create " + self.outputdir + ", cannot procede.")
-                self.ready = True
-            else:
                 self.ready = False
+            else:
+                self.ready = True
         else:
             self.ready = True
 
