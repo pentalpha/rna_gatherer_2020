@@ -62,7 +62,7 @@ def test_coding_potential(args, confs, tmpDir, stepDir):
     long_transcripts_path = stepDir["filter_long_orfs"] + "/no_orfs.fasta"
     if os.path.exists(long_transcripts_path):
         output = tmpDir + "/lgc.csv"
-        cmd = " ".join(["python", confs["lgc"], long_transcripts_path, output])
+        cmd = " ".join(["python2", confs["lgc"], long_transcripts_path, output])
         code = runCommand(cmd)
         if code != 0:
             return False

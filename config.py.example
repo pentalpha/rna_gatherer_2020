@@ -20,6 +20,7 @@ configs = {
         "SOB": 0.999,
         "PRS": 0.999
     },
+    project_dir + "/lib/LGC-1.0.py",
     #"quast" : "quast.py",
     #"non_redundant": "<___>",
     #"rfam_cm": "<___>",
@@ -27,6 +28,5 @@ configs = {
     #"rfam2go": "<___>",
     #"rfam_fastas": "<___>"
     #"rna_central": "<___>",
-    #"diamond": "diamond",
-    #"lgc": "<___>"
+    #"diamond": "diamond"
 }
