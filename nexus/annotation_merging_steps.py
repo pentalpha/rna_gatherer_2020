@@ -5,7 +5,7 @@ import pandas as pd
 from tqdm import tqdm
 from nexus.bioinfo import readSeqsFromFasta, filterSeqs, writeFastaSeqs, getFastaHeaders, seqListToDict
 from nexus.bioinfo import cluster_all_ranges
-from nexus.bioinfo import read_plast_extended, best_hit
+from nexus.bioinfo import read_plast_extended
 from nexus.bioinfo import get_gff_attributes, get_gff_attributes_str
 from nexus.bioinfo import get_rfam_from_rnacentral, get_rna_type
 from nexus.util import runCommand, write_file, getFilesWith
@@ -28,16 +28,24 @@ def run_gffcompare(args, confs, tmpDir, stepDir):
     if os.path.exists(lnc_mappings):
         gffs = gffs + [lnc_mappings]
 
-    if "reference_gff" in args:
-        ref = stepDir["get_rnacentral_info"] + "/reference.gff"
+    ref = stepDir["get_rnacentral_info"] + "/reference.gff"
+    if os.path.exists(ref):
         ref_output = tmpDir + "/reference.gff"
         filter_non_transcripts(ref, ref_output)
         gffs = [os.path.abspath(ref)] + gffs
 
+    all_lines = []
+    for gff in gffs:
+        with open(gff,'r') as stream:
+            all_lines = all_lines + [line.rstrip("\n") 
+                                    for line in stream.readlines()]
+    all_gffs = "\n".join(all_lines)+"\n"
+    all_mappings_path = tmpDir+"/all_mappings.gff"
+    with open(all_mappings_path, 'w') as stream:
+        stream.write(all_gffs)
     cmd = " ".join(["cd ", tmpDir, " && ", confs["gffcompare"], "-o gffcmp"] + gffs)
     ret = runCommand(cmd)
-    ret2 = runCommand(" ".join(["cat"]+gffs+[">", tmpDir+"/all_mappings.gff"]))
-    return ret == 0 and ret2 == 0
+    return ret == 0
 
 def best_id_in_source(ids, hits, source):
     best = ids[0]
@@ -63,20 +71,20 @@ def best_id(ids, hits):
         best_by_source[source] = best_id_in_source(id_by_source[source], hits, source)
     if "RNAcentral" in best_by_source:
         return best_by_source["RNAcentral"]
-    elif "ReferenceMapping" in best_by_source:
-        return best_by_source["ReferenceMapping"]
+    elif "reference_mapping" in best_by_source:
+        return best_by_source["reference_mapping"]
     elif "tRNAscan-SE" in best_by_source:
         return best_by_source["tRNAscan-SE"]
+    elif "rnasamba" in best_by_source:
+        return best_by_source["rnasamba"]
     elif "cmscan" in best_by_source:
         return best_by_source["cmscan"]
-    elif "LGC" in best_by_source:
-        return best_by_source["LGC"]
     else:
         print("Error: no known source in " + str(id_by_source))
         return None
 
 def update_attrs(attr_str):
-    attrs = get_gff_attributes(row["attribute"])
+    attrs = get_gff_attributes(attr_str)
     if "family" in attrs:
         attrs["rfam"] = attrs["family"]
     tp = "other"

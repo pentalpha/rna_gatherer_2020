@@ -5,7 +5,7 @@ import pandas as pd
 from tqdm import tqdm
 from nexus.bioinfo import readSeqsFromFasta, filterSeqs, writeFastaSeqs, getFastaHeaders, seqListToDict
 from nexus.bioinfo import cluster_all_ranges, shortFastaHeader
-from nexus.bioinfo import read_plast_extended, best_hit
+from nexus.bioinfo import read_plast_extended
 from nexus.bioinfo import get_gff_attributes, get_gff_attributes_str
 from nexus.bioinfo import get_rfam_from_rnacentral
 from nexus.util import runCommand, write_file, getFilesWith

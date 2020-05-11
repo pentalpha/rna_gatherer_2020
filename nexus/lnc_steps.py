@@ -43,7 +43,7 @@ def filter_long_orfs(args, confs, tmpDir, stepDir):
             header = entry[0]
             seqLen = len(entry[1])
             name = header.rstrip("\n").lstrip(">").split()[0].split("|")[0].split(".p")[0]
-            if seqLen > 100:
+            if seqLen > int(args["orf_length"]):
                 longOrfs.add(name)
         print("Some longOrfs names: " + str(list(longOrfs)[:6]))
         #filtering out transcripts with long orfs
@@ -61,46 +61,48 @@ def filter_long_orfs(args, confs, tmpDir, stepDir):
 def test_coding_potential(args, confs, tmpDir, stepDir):
     long_transcripts_path = stepDir["filter_long_orfs"] + "/no_orfs.fasta"
     if os.path.exists(long_transcripts_path):
-        output = tmpDir + "/lgc.csv"
-        cmd = " ".join(["python2", confs["lgc"], long_transcripts_path, output])
+        output = tmpDir + "/samba.tsv"
+        cmd = " ".join([confs["rnasamba"], "classify", output, 
+                long_transcripts_path, confs["rnasamba_model"]])
         code = runCommand(cmd)
         if code != 0:
             return False
-        noncoding = set()
-        with open(output, 'r') as in_stream:
-            for raw_line in in_stream.readlines():
-                if not raw_line.startswith("#"):
-                    cells = raw_line.rstrip("\n").split()
-                    if cells[4] == "Non-coding":
-                        noncoding.add(cells[0])
+        non_coding_ids = set()
+        with open(output, 'r') as stream:
+            lines = [raw_line.rstrip("\n").split("\t") for raw_line in stream.readlines()]
+            for cells in lines:
+                if not cells[0].startswith("sequence_name"):
+                    if cells[-1] == "noncoding":
+                        ID = header_to_id(cells[0])
+                        non_coding_ids.add(ID)
         seqs = readSeqsFromFasta(long_transcripts_path)
-        noncoding, coding = filterSeqs(seqs, noncoding)
+        noncoding, coding = filterSeqs(seqs, non_coding_ids)
 
         print(str(len(coding)) + " transcripts with coding potential filtered out")
-        writeFastaSeqs(noncoding, tmpDir + "/non_coding.fasta")
+        writeFastaSeqs(noncoding, tmpDir + "/no_coding_potential.fasta")
     return True
 
 def nr_alignment(args, confs, tmpDir, stepDir):
-    query_fasta = stepDir["test_coding_potential"] + "/non_coding.fasta"
+    query_fasta = stepDir["test_coding_potential"] + "/no_coding_potential.fasta"
     if os.path.exists(query_fasta):
-        db = confs["non_redundant"]
-        print("Starting diamond to blastx transcripts against NR proteins DB")
-        diamond_cmd = [confs["diamond"],"blastx","--db",db,'-q',query_fasta,
-                "--out",tmpDir + "/blast.tsv","--outfmt","6",
-                "--threads",str(confs['threads']),"--evalue","0.0001"]
-        #print(tmpDir)
-        #print(str(diamond_cmd))
-        code = runCommand("cd " + tmpDir + " && " + " ".join(diamond_cmd))
-        return code == 0
+        if "non_redundant" in confs:
+            db = confs["non_redundant"]
+            print("Starting diamond to blastx transcripts against NR proteins DB")
+            diamond_cmd = [confs["diamond"],"blastx","--db",db,'-q',query_fasta,
+                    "--out",tmpDir + "/blast.tsv","--outfmt","6",
+                    "--threads",str(confs['threads']),"--evalue","0.0001"]
+            code = runCommand("cd " + tmpDir + " && " + " ".join(diamond_cmd))
+            return code == 0
+        else:
+            print("No NR database location defined.")
     else:
-        print("Skipping NR alignment")
-        return True
+        print("No coding potential evaluation, not doing lncRNA detection.")
+    return True
 
 def read_nr_alignment(args, confs, tmpDir, stepDir):
     blastFile = stepDir["nr_alignment"] + "/blast.tsv"
     if os.path.exists(blastFile):
-        query_fasta = stepDir["test_coding_potential"] + "/non_coding.fasta"
-
+        query_fasta = stepDir["test_coding_potential"] + "/no_coding_potential.fasta"
         print("Filtering according to blastx results")
 
         seqs = readSeqsFromFasta(query_fasta)
@@ -114,6 +116,47 @@ def read_nr_alignment(args, confs, tmpDir, stepDir):
     else:
         print("Skiping NR alignment parsing")
     return True
+
+def lnc_alignment_minimap(args, confs, tmpDir, stepDir):
+    lnc_fasta = stepDir["read_nr_alignment"] + "/not_protein.fasta"
+    if not os.path.exists(lnc_fasta):
+        lnc_fasta = stepDir["test_coding_potential"] + "/no_coding_potential.fasta"
+    if os.path.exists(lnc_fasta):
+        cmd = " ".join([confs["minimap2"],
+            "-x splice:hq -uf -t", str(confs["threads"]),
+            args["genome_index"], lnc_fasta, 
+            ">", tmpDir + "/genome_mapping.paf"])
+        code = runCommand(cmd)
+        return code == 0 
+    else:
+        return True 
+
+def lnc_alignment_parsing(args, confs, tmpDir, stepDir):
+    genome_alignment = stepDir["lnc_alignment_minimap"] + "/genome_mapping.paf"
+    lnc_fasta = stepDir["read_nr_alignment"] + "/not_protein.fasta"
+    if not os.path.exists(lnc_fasta):
+        lnc_fasta = stepDir["test_coding_potential"] + "/no_coding_potential.fasta"
+    if os.path.exists(lnc_fasta) and os.path.exists(genome_alignment):
+        output_gff = tmpDir + "/lncRNA_annotation.gff"
+        annotated_fasta = tmpDir + "/lncRNA_in_genome.fasta"
+        mapped_fasta = minimap_annotation(genome_alignment, lnc_fasta, output_gff,
+                        annotated_fasta, source="rnasamba", mol_type="lncRNA")
+        return True
+    else:
+        print("Skiping lnc mapping")
+    return True
+
+def lnc_alignment_blast(args, confs, tmpDir, stepDir):
+    lnc_fasta = stepDir["read_nr_alignment"] + "/not_protein.fasta"
+    if not os.path.exists(lnc_fasta):
+        lnc_fasta = stepDir["test_coding_potential"] + "/no_coding_potential.fasta"
+    if os.path.exists(lnc_fasta):
+        blast_success = blast(lnc_fasta, args["genome_link"], 
+            threads=confs["threads"], blast_type=("blastn"),
+            output=tmpDir + "/genome_mapping.tsv")
+        return blast_success 
+    else:
+        return True
 
 def align_to_dbs(args, confs, tmpDir, stepDir):
     fasta_query = stepDir["read_nr_alignment"] + "/not_protein.fasta"
@@ -152,47 +195,3 @@ def align_to_dbs(args, confs, tmpDir, stepDir):
         runCommand("cp " + fasta_query + " " + tmpDir+"/lncRNA_only.fasta")
         return True
     return True
-
-def lnc_alignment(args, confs, tmpDir, stepDir):
-    lnc_fasta = stepDir["align_to_dbs"] + "/lncRNA_only.fasta"
-    if os.path.exists(lnc_fasta):
-        code = blast(lnc_fasta, args["genome_link"], tmpDir, 
-            threads=confs["threads"], blast_type=(confs["plast"] + " -p plastn"),
-            source="LncADeep")
-        return code
-    else:
-        return True
-
-def lnc_alignment_parsing(args, confs, tmpDir, stepDir):
-    lnc_fasta = stepDir["align_to_dbs"] + "/lncRNA_only.fasta"
-    if os.path.exists(lnc_fasta):
-        success, gff_path = blast_annotate(lnc_fasta, args["genome_link"], tmpDir, 
-            threads=confs["threads"], blast_type=(confs["plast"] + " -p plastn"),
-            source="LGC", run_blast=False, alternative_outputdir=stepDir["lnc_alignment"])
-        if success:
-            return False
-        annotation = tmpDir + "/lncRNA_only.to.gigas_genome-short_found.gff"
-        runCommand("mv " + annotation + " " + tmpDir + "/lncRNA_annotation.gff")
-        annotation = tmpDir + "/lncRNA_annotation.gff"
-
-        print("Writing report")
-
-        fastas = ([args["transcriptome"],
-            stepDir["filter_small_sequences"] + "/long_transcripts.fasta",
-            stepDir["filter_long_orfs"] + "/no_orfs.fasta",
-            stepDir["test_coding_potential"] + "/non_coding.fasta",
-            stepDir["read_nr_alignment"] + "/not_protein.fasta"]
-        + sorted(getFilesWith(stepDir["align_to_dbs"], ".fasta"), key = os.path.getsize, reverse=True))
-
-        
-        with open(tmpDir + "/report.txt", 'w') as stream:
-            for i in tqdm(range(len(fastas))):
-                fasta = fastas[i]
-                seqs = readSeqsFromFasta(fasta)
-                stream.write(fasta+": "+str(len(seqs))+" sequences.\n")
-            annotation_file = open(annotation, 'r')
-            stream.write(annotation + ": " + str(len(annotation_file.readlines()))+" mapped to genome.\n")
-            annotation_file.close()
-        return True
-    else:
-        return True

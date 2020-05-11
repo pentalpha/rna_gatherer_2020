@@ -37,7 +37,7 @@ def name_function(header):
     return header.rstrip("\n").lstrip(">")
 
 def shortFastaHeader(seq):
-    name = seq[0].split("|")[0]
+    name = seq[0].lstrip(">").split("|")[0]
     name = name.split(" ")[0]
     return (name,seq[1])
 
@@ -140,22 +140,13 @@ def getFastaHeaders(input_file):
     return headers
 
 def get_best_mapping(df):
-    sorted = df.sort_values(["evalue", "bitscore"],
-            ascending=[True, False])
+    sorted = df.sort_values(["quality","matchs"],
+            ascending=[False,False])
     hits = []
     if len(sorted) > 0:
         for i in range(len(sorted)):
             hits.append(sorted.iloc[i])
-            break
         return hits
-    else:
-        return None
-
-def best_hit(df):
-    sorted = df.sort_values(["evalue","length","pident"], 
-            ascending=[True,False,False])
-    if len(sorted) > 0:
-        return sorted.iloc[0]
     else:
         return None
 
@@ -172,25 +163,155 @@ def get_strand(xstart,xend,ystart,yend):
         return "-"
 
 
-def blast(query, db, output_dir, max_evalue = 0.0000000001, threads=8, blast_type="blastn", 
-        db_id_sep_char=" ", source="db_name", remaining_fasta="auto_name"):
-    import os
-    import pandas as pd
-
+def blast(query, db, max_evalue = 0.001, threads=8, 
+    blast_type="blastn", output = "results.tsv"):
+    if threads > 8:
+        threads = 8
     print("Blasting query to DB")
-    db_name = os.path.basename(db).split(".")[0]
-    if source == "db_name":
-        source = db_name
-    query_name = os.path.basename(query).split(".")[0]
-    search_name = query_name+".to."+db_name
-    output = output_dir + "/"+search_name+"_results.tsv"
-    #cmd = " ".join([blast_type, "-db", db, "-query", query,
-    #    "-out", output, "-outfmt", "'6 qaccver saccver pident length mismatch gapopen qstart qend sstart send evalue bitscore qcovs'", "-num_threads", str(threads), "-evalue", str(max_evalue)])
-    cmd = " ".join([blast_type, "-d", db, "-i", query, "-e", str(max_evalue), "-a", 
-                str(threads), "-outfmt 1", "-o", output])
+    cmd = " ".join([blast_type, "-db", db, "-query", query, "-evalue", str(max_evalue), "-num_threads", 
+                str(threads), "-outfmt", "'6 qaccver saccver pident length mismatch"+
+                " gapopen qstart qend sstart send evalue bitscore qcovs'", "-out", output])
     code = runCommand(cmd)
     return code == 0
 
+def minimap_annotation(alignment_file, query_file, gff_name, 
+        new_fasta, source="blast", mol_type="lncRNA"):
+    print("Parsing blast output")
+    seqs = readSeqsFromFasta(query_file)
+    #seqs = [(header_to_id(header),content) for header,content in seqs]
+    minimap_df = pd.read_csv(alignment_file, sep='\t', header=None, index_col=False,
+            names=["qseqid","qseq_len","qstart","qend","strand",
+                "sseqid","sseq_len","sstart","send","matchs",
+                "block_len","quality","13th","14th","15th","16th","17th","18th"])
+    minimap_df = minimap_df.astype({"qstart": 'int32', "qend": 'int32', "qseq_len": "int32",
+                "sstart": 'int32', "send": 'int32', "sseq_len": "int32",
+                "quality": 'int32', "block_len": "int32", "matchs": "int32"})
+    minimap_df["qcovs"] = minimap_df.apply(lambda row: (row["qend"]-row["qstart"]) / row["qseq_len"], axis=1)
+    print(str(minimap_df.head()))
+    print(str(len(minimap_df)) + " alignments")
+    minimap_df = minimap_df[minimap_df["qcovs"] >= 0.95]
+    print(str(len(minimap_df)) + " alignments after filtering by coverage")
+
+    best_hits = dict()
+    print("Grouping hits")
+    unique = set()
+    for name, hits in minimap_df.groupby(["qseqid"]):
+        hit = get_best_mapping(hits)
+        if hit != None:
+            for i in range(len(hit)):
+                best_hits[name+"."+str(i)] = hit[i]
+            unique.add(name)
+    print(str(len(unique)) + " transcripts with genome mapping.")
+    print(str(len(best_hits.keys())) + " total mappings.")
+
+    validSeqs, invalidSeqs = filterSeqs(seqs, unique)
+    print(str(len(invalidSeqs)) + " transcripts without genome mapping")
+    print(str(len(validSeqs)) + " transcripts mapped")
+    annotated_fasta = new_fasta
+    writeFastaSeqs(validSeqs, annotated_fasta)
+
+    rows = []
+    for name in best_hits:
+        hit = best_hits[name]
+        start = int(hit["sstart"])
+        end = int(hit["send"])
+        row = {"seqname": hit["sseqid"], "source": source,
+            "feature": "transcript", "start": str(start+1),
+            "end":str(end+1), "score": ".",
+            "strand": hit["strand"],
+            "frame": ".",
+            "attribute":"ID="+name+(";type="+mol_type if mol_type != None else "")}
+        rows.append(row)
+    gff = pd.DataFrame(rows, columns = ["seqname", "source",
+        "feature", "start", "end", "score", "strand",
+        "frame", "attribute"])
+    gff.to_csv(gff_name, sep="\t", index=False, header = False)
+    print(str(len(seqs)) + " transcripts analyzed.")
+    print(str(len(gff)) + " mappings detected and annotated on " + gff_name)
+    return True
+
+def blast_annotation(alignment_file, query_file, gff_name, 
+        new_fasta, source="blast", mol_type="lncRNA"):
+    print("Parsing blast output")
+    seqs = readSeqsFromFasta(query_file)
+    seqs = [(header_to_id(header),content) for header,content in seqs]
+    seq_lens = {}
+    for seq in seqs:
+        seq_lens[seq[0]] = len(seq[1])
+    example_sequence_names = list(seq_lens.keys())[:5]
+    print("Some sequence keys: " + str(example_sequence_names))
+    blast_df = pd.read_csv(alignment_file, sep='\t', header=None, index_col=False,
+            names=["qseqid", "sseqid", "pident", "length", "mismatch",
+                "gapopen", "qstart", "qend", "sstart", "send", "evalue", "bitscore", "qcovs"])
+    blast_df = blast_df.astype({"pident": 'float32', "length": 'int32', "mismatch": 'int32',
+                "gapopen": 'int32', "qstart": 'int32', "qend": 'int32',
+                "sstart": 'int32', "send": 'int32', "evalue": 'float64', 
+                "bitscore": 'float64', "qcovs": 'float64'})
+    
+    print("Calculating coverage")
+    blast_df["qseq_len"] = blast_df.apply(lambda row: seq_lens[row['qseqid']], axis=1)
+    blast_df["coverage"] = blast_df.apply(lambda row: row["length"] / seq_lens[row['qseqid']], axis=1)
+    blast_df = blast_df.sort_values(by=['qcovs'])
+    print(str(blast_df.head()))
+    print(str(len(blast_df)) + " alignments")
+    min_coverage = 0.98
+    min_pid = 98.0
+    
+    print("Filtering blast results")
+    blast_df = blast_df[blast_df["pident"] >= min_pid]
+    print(str(len(blast_df)) + " alignments after filtering by pident")
+    blast_df = blast_df[blast_df["qcovs"] >= min_coverage]
+    print(str(len(blast_df)) + " alignments after filtering by coverage")
+    print(str(blast_df.head()))
+
+    best_hits = dict()
+    print("Choosing best hits")
+    unique = set()
+    for name, hits in blast_df.groupby(["qseqid"]):
+        hit = get_best_mapping(hits)
+        if hit != None:
+            for i in range(len(hit)):
+                best_hits[name+"."+str(i)] = hit[i]
+            unique.add(name)
+    print(str(len(unique)) + " transcripts with genome mapping.")
+    print(str(len(best_hits.keys())) + " total mappings.")
+
+    validSeqs, invalidSeqs = filterSeqs(seqs, unique)
+    print(str(len(invalidSeqs)) + " transcripts with protein match filtered")
+    print(str(len(validSeqs)) + " transcripts remaining")
+    annotated_fasta = new_fasta
+    writeFastaSeqs(validSeqs, annotated_fasta)
+
+    rows = []
+    for name in best_hits:
+        hit = best_hits[name]
+        '''print(str(hit))
+        print(type(str(hit)))
+        print(hi)
+        print(type(hit["sstart"]))
+        print(type(hit["sstart"].item()))'''
+        int_sstart = int(hit["sstart"])
+        int_send = int(hit["send"])
+        start = min(int_sstart, int_send)
+        end = max(int_sstart, int_send)
+        #full_name = "."
+        #if hit["sseqid"] in full_names:
+        #    full_name = full_names[hit["sseqid"]]
+        row = {"seqname": hit["sseqid"], "source": source,
+            "feature": "transcript", "start": str(start),
+            "end":str(end), "score": ".",
+            "strand": get_strand(int(hit["qstart"]),int(hit["qend"]),int(hit["sstart"]),int(hit["send"])),
+            "frame": ".",
+            "attribute":"ID="+name+";evalue="+str(hit["evalue"])+"type="+mol_type
+            +";coverage="+str(hit["coverage"])+";pident="+str(hit["pident"])}
+        rows.append(row)
+    gff = pd.DataFrame(rows, columns = ["seqname", "source",
+        "feature", "start", "end", "score", "strand",
+        "frame", "attribute"])
+    gff.to_csv(gff_name, sep="\t", index=False, header = False)
+    print(str(len(seqs)) + " transcripts analyzed.")
+    print(str(len(gff)) + " mappings detected and annotated on " + gff_name)
+    return True
 
 def blast_annotate(query, db, output_dir, max_evalue = 0.0000000001, threads=8, blast_type="blastn", 
         db_id_sep_char=" ", source="db_name", remaining_fasta="auto_name", run_blast=True, alternative_outputdir=None):
@@ -292,12 +413,12 @@ def blast_annotate(query, db, output_dir, max_evalue = 0.0000000001, threads=8, 
         #if hit["sseqid"] in full_names:
         #    full_name = full_names[hit["sseqid"]]
         row = {"seqname": hit["sseqid"], "source": source,
-        "feature": "transcript", "start": str(start),
-        "end":str(end), "score": ".",
-        "strand": get_strand(int(hit["qstart"]),int(hit["qend"]),int(hit["sstart"]),int(hit["send"])),
-        "frame": ".",
-        "attribute":"ID="+name+";evalue="+str(hit["evalue"])
-        +";coverage="+str(hit["coverage"])+";pident="+str(hit["pident"])}
+            "feature": "transcript", "start": str(start),
+            "end":str(end), "score": ".",
+            "strand": get_strand(int(hit["qstart"]),int(hit["qend"]),int(hit["sstart"]),int(hit["send"])),
+            "frame": ".",
+            "attribute":"ID="+name+";evalue="+str(hit["evalue"])
+            +";coverage="+str(hit["coverage"])+";pident="+str(hit["pident"])}
         rows.append(row)
     gff = pd.DataFrame(rows, columns = ["seqname", "source",
         "feature", "start", "end", "score", "strand",

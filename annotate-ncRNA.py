@@ -4,12 +4,7 @@ import argparse
 import pandas as pd
 import numpy as np
 from tqdm import tqdm
-from nexus.bioinfo import readSeqsFromFasta, filterSeqs, writeFastaSeqs, getFastaHeaders, seqListToDict
-from nexus.bioinfo import cluster_all_ranges
-from nexus.bioinfo import read_plast_extended, best_hit
-from nexus.bioinfo import get_gff_attributes, get_gff_attributes_str
-from nexus.bioinfo import get_rfam_from_rnacentral
-from nexus.util import runCommand, write_file, getFilesWith
+from nexus.util import runCommand
 
 from config import configs
 
@@ -47,6 +42,8 @@ def getArgs():
         help="Taxon ID for the species, required to retrieve annotations from QuickGo")
     ap.add_argument("-tr", "--transcriptome", required=False,
         help="Fasta file with transcripts that could be lncRNA molecules.")
+    ap.add_argument("-ol", "--orf-length", required=False, default = 150,
+        help = "Minimum ORF length for a sequence be considered as coding (TransDecoder.LongOrfs).")
     return vars(ap.parse_args())
 
 #parsing arguments
@@ -87,6 +84,16 @@ else:
         print("No path to genome in arguments giver now or previously,"
               +" please specify a genome to use.")
         quit()
+index_path = args["genome_link"] + ".mmi"
+if not os.path.exists(index_path):
+    print("Indexing genome for future mappings...")
+    cmd = " ".join([confs["minimap2"], "-x splice:hq -uf -d", 
+         index_path, args["genome_link"]])
+    code = runCommand(cmd)
+    if code != 0:
+        print("Could not find or create minimap2 index for genome.")
+        quit()
+args["genome_index"] = index_path
 
 global_data = os.path.dirname(os.path.realpath(__file__)) + "/data"
 confs["rfam2go"] = global_data + "/rfam2go"
@@ -105,8 +112,7 @@ if __name__ == '__main__':
                 ("test_coding_potential", test_coding_potential),
                 ("nr_alignment", nr_alignment),
                 ("read_nr_alignment", read_nr_alignment),
-                ("align_to_dbs", align_to_dbs),
-                ("lnc_alignment", lnc_alignment),
+                ("lnc_alignment_minimap", lnc_alignment_minimap),
                 ("lnc_alignment_parsing", lnc_alignment_parsing),
                 ("get_rnacentral_ids", get_rnacentral_ids),
                 ("get_functional_reference", get_functional_reference),
@@ -115,7 +121,6 @@ if __name__ == '__main__':
                 ("get_rnacentral_info", get_rnacentral_info),
                 ("run_trnascan", run_trnascan),
                 ("parse_trna", parse_trna),
-                #("analyze", analyze),
                 ("run_gffcompare", run_gffcompare),
                 ("remove_redundancies", remove_redundancies),
                 ("review_annotations", review_annotations),

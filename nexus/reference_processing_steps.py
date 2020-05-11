@@ -5,16 +5,16 @@ import pandas as pd
 from tqdm import tqdm
 from nexus.bioinfo import readSeqsFromFasta, filterSeqs, writeFastaSeqs, getFastaHeaders, seqListToDict
 from nexus.bioinfo import cluster_all_ranges, header_to_id
-from nexus.bioinfo import read_plast_extended, best_hit
+from nexus.bioinfo import read_plast_extended
 from nexus.bioinfo import get_gff_attributes, get_gff_attributes_str
 from nexus.bioinfo import get_rfam_from_rnacentral
-from nexus.bioinfo import blast_annotate
+from nexus.bioinfo import minimap_annotation
 from nexus.util import runCommand, write_file, getFilesWith, chunks, read_to_list
 import hashlib
 import requests
 import time
 import json
-
+from concurrent.futures import ThreadPoolExecutor, as_completed
 def get_md5(sequence):
     """
     Calculate md5 for an RNA sequence
@@ -35,10 +35,10 @@ def get_rnacentral_id_by(argument, value):
     data = r.json()
     if data['count'] > 0:
         #print("Got response: \n\t" + str(data['results'][0]))
-        print(value + " matchs an ID in RNACentral: " + str(data['results'][0]['rnacentral_id']))
+        #print(value + " matchs an ID in RNACentral: " + str(data['results'][0]['rnacentral_id']))
         return data['results'][0]['rnacentral_id']
     else:
-        print(value + "Does not match an real ID in RNACentral")
+        #print(value + "Does not match an real ID in RNACentral")
         return None
 
 def get_rnacentral_json(value):
@@ -60,7 +60,7 @@ def confirm_rnacentral_id(value):
     #print(str(r.json()))
     data = r.json()
     if 'rnacentral_id' in data:
-        print(value + " matchs an real ID in RNACentral")
+        #print(value + " matchs an real ID in RNACentral")
         return data['rnacentral_id']
     else:
         print(value + " does not match an real ID in RNACentral")
@@ -69,13 +69,16 @@ def confirm_rnacentral_id(value):
 def retrieve_rnacentral_id(seq_id, seq):
     #print("Trying to retrieve " + seq_id)
     result = None
-    if "URS" in seq_id:
-        result = confirm_rnacentral_id(seq_id)
-    if result == None:
-        result = get_rnacentral_id_by("external_id",seq_id)
-    if result == None:
-        result = get_rnacentral_id_by("md5",get_md5(seq))
-    return result
+    try:
+        if "URS" in seq_id:
+            result = confirm_rnacentral_id(seq_id)
+        if result == None:
+            result = get_rnacentral_id_by("external_id",seq_id)
+        if result == None:
+            result = get_rnacentral_id_by("md5",get_md5(seq))
+    except Exception:
+        print("Could not retrieve information for " + seq_id)
+    return result, seq_id, seq
 
 def retrieve_quickgo_annotations(chunk, api_url,taxon_id):
     result = []
@@ -138,10 +141,10 @@ def retrieve_quickgo_annotations(chunk, api_url,taxon_id):
         if valid:
             result += [line[1:]]
             added_line = True
-    if added_line:
-        print(str(len(result)) + " annotations retrieved")
+    '''if added_line:
+        #print(str(len(result)) + " annotations retrieved")
     else:
-        print("No annotations retrieved for " + gene_ids)
+        print("No annotations retrieved for " + gene_ids)'''
     return result
 
 def get_ids_from_annotation(annotation):
@@ -173,14 +176,22 @@ def get_rnacentral_ids(args, confs, tmpDir, stepDir):
         while tries > 0:
             print("Trying to retrieve " + str(len(to_retrieve)) + " ids.")
             failed = 0
-            for seq_id, seq in id_to_seq:
-                if seq_id in to_retrieve:
-                    result = retrieve_rnacentral_id(seq_id, seq)
-                    if result != None:
-                        to_retrieve.remove(seq_id)
-                        rnacentral_to_seq.append((result,seq))
-                    else:
-                        failed += 1
+            to_retrieves = [list(chunk) for chunk in chunks(list(to_retrieve), 100)]
+            for chunk in tqdm(to_retrieves):
+                processes = []
+                with ThreadPoolExecutor(max_workers=20) as executor:
+                    for seq_id, seq in id_to_seq:
+                        if seq_id in chunk:
+                            processes.append(executor.submit(retrieve_rnacentral_id, seq_id, seq))
+                            
+                    for task in as_completed(processes):
+                        if task.result() != None:
+                            result, seq_id, seq = task.result()
+                            #print(result)
+                            to_retrieve.remove(seq_id)
+                            rnacentral_to_seq.append((result,seq))
+                        else:
+                            failed += 1
             print("\t" + str(failed) + " failed.")
             tries -= 1
             if failed == 0:
@@ -231,7 +242,7 @@ def get_functional_reference(args, confs, tmpDir, stepDir):
         if not "taxon_id" in args:
             print("Cannot retrieve functional annotations without taxon id.")
             return True
-        for chunk in id_chunks:
+        for chunk in tqdm(list(id_chunks)):
             annotations = retrieve_quickgo_annotations(chunk,confs["quickgo_api"],args["taxon_id"])
             for id_,go,aspect in annotations:
                 results.add((id_,go,aspect))
@@ -267,16 +278,24 @@ def map_to_genome(args, confs, tmpDir, stepDir):
         print("Found " + str(len(unmaped_seqs)) + " RNAs without genome mapping.")
         unmaped_path = tmpDir+"/unmaped.fasta"
         writeFastaSeqs(unmaped_seqs,unmaped_path)
-
-        success, gff_path = blast_annotate(unmaped_path, args["genome_link"], tmpDir, 
-            max_evalue = 0.0000000001, threads=8, blast_type="blastn", 
-            db_id_sep_char=" ", source="ReferenceMapping", remaining_fasta="auto_name")
-        if success:
-            return True
+        genome_alignment = tmpDir + "/reference_mapped.paf"
+        cmd = " ".join([confs["minimap2"],
+            "-x splice:hq -uf -t", str(confs["threads"]),
+            args["genome_index"], unmaped_path, 
+            ">", genome_alignment])
+        code = runCommand(cmd)
+        if code != 0:
+            return False
+        
+        output_gff = tmpDir + "/reference_mapped.gff"
+        annotated_fasta = tmpDir + "/reference_mapped.fasta"
+        mapped_fasta = minimap_annotation(genome_alignment, unmaped_path, output_gff,
+                        annotated_fasta, source="reference_mapping", mol_type=None)
+        return True
     return True
 
 def get_reference_rfam_ids(args, confs, tmpDir, stepDir):
-    new_mappings_path = stepDir["map_to_genome"] + "/unmaped.to.genome_found.gff"
+    new_mappings_path = stepDir["map_to_genome"] + "/reference_mapped.gff"
     if "reference_gff" in args or os.path.exists(new_mappings_path):
         all_mappings = tmpDir + "/no_rfam.gff"
         if "reference_gff" in args:
