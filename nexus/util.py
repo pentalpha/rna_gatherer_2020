@@ -135,3 +135,18 @@ def read_to_list(file_path):
                         return [line.rstrip("\n") for line in stream.readlines()]
         else:
                 return None
+
+def delete_if_empty(file_path, min_cells = 1, sep = "\t"):
+        if os.path.exists(file_path):
+                empty = True
+                with open(file_path,'r') as stream:
+                        line = stream.readline()
+                        while len(line) > 0:
+                                cells = line.split(sep)
+                                if len(cells) >= min_cells:
+                                        empty = False
+                                        break
+                                line = stream.readline()
+                if empty:
+                        print("Removing " + file_path + " because it's empty.")
+                        os.remove(file_path)

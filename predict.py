@@ -2,7 +2,7 @@ import sys
 from nexus.functional_prediction import *
 from nexus.util import *
 from nexus.confidence_levels import *
-#from bioinfo import *
+from nexus.bioinfo import load_metrics
 import obonet
 import networkx
 import numpy as np
@@ -18,6 +18,8 @@ display_cache = get_cache()
 
 all_methods = ["MIC","DC","PRS","SPR","SOB","FSH"]
 all_ontologies = ["molecular_function","cellular_component","biological_process"]
+default_methods = load_metrics(confs["metrics_table"])
+highest_confidence = str(max([int(conf) for conf in default_methods.keys()]))
 
 def getArgs():
     ap = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -30,17 +32,20 @@ def getArgs():
         help=("Functional annotation file of the genes."))
     ap.add_argument("-o", "--output-dir", required=True, help=("Output directory."))
     ap.add_argument("-conf", "--confidence-level", required=False,
-        default="3", help=("Level of confidence in the correlation metrics. Lower values "
+        default=highest_confidence, help=("Level of confidence in the correlation metrics. Lower values "
         +"result in more results and false positives, higher values result in less "
-        +"results and less false positives. Values: 0, 1, 2, 3(default), 4, 5 or 6."))
+        +"results and less false positives. Values: 0, 1, 2, 3, 4, 5 (default)."))
     ap.add_argument("-ont", "--ontology-type", required=False,
         default="molecular_function", help=("One of the following: molecular_function (default),"
         +" cellular_component or biological_process."))
 
     ap.add_argument("-met", "--method", required=False,
-        default="MIC,SPR,FSH", help=("Correlation coefficient calculation method: MIC (default), "+
-        "DC (Distance Correlation), SPR (Spearman Coefficient), PRS (Pearson Coefficient), "
-        +"FSH (Fisher Information Metric) or SOB (Sobolev Metric)."))
+        default=None, help=("Correlation coefficient calculation method:"
+        +" MIC (Maximal Information Coefficient), "
+        +"DC (Distance Correlation), SPR (Spearman Coefficient), PRS (Pearson Coefficient), "
+        +"FSH (Fisher Information Metric) or SOB (Sobolev Metric)."
+        +"\nRNA Nexus is configured to use the best method combination for each ontology and "
+        +"confidence level, if you set this option the defaults will be overwriten."))
     ap.add_argument("-bh", "--benchmarking", required=False,
         default=False, help=("Enables the (much slower) leave one out strategy: regulators can be regulated too."
         +"Default: False."))
@@ -48,8 +53,8 @@ def getArgs():
     ap.add_argument("-p", "--processes", required=False,
         default=default_threads, help=("CPUs to use. Default: " + str(default_threads)+"."))
 
-    #ap.add_argument("-th", "--threshold", required=False,
-    #    default=None, help=("Sets an unique correlation coefficient threshold for all methods: 0.5 <= x <= 0.99."))
+    ap.add_argument("-th", "--threshold", required=False,
+        default=None, help=("Sets an unique correlation coefficient threshold for all methods: 0.5 <= x <= 0.99."))
     ap.add_argument("-K", "--k-min-coexpressions", required=False,
         default=1, help=("The minimum number of ncRNAs a Coding Gene must be coexpressed with."
                         +" Increasing the value improves accuracy of functional assignments, but"
@@ -90,9 +95,6 @@ ontology_types_arg = cmdArgs["ontology_type"].split(",")
 if ontology_types_arg[0] == "ALL":
     ontology_types_arg = all_ontologies
 
-method = cmdArgs["method"].split(",")
-if method[0] == "ALL":
-    method = all_methods
 benchmarking = cmdArgs["benchmarking"]
 threads = int(cmdArgs["processes"])
 
@@ -114,23 +116,49 @@ if threshold_step != None and thresholds != None:
 
 cache_usage = float(cmdArgs["cache_usage"])
 available_cache = get_cache(usage=cache_usage)
-if "cache" in cmdArgs:
-    available_cache = int(int(args["cache"]) * cache_usage)
+if "cache_size" in cmdArgs:
+    available_cache = int(int(cmdArgs["cache_size"]) * cache_usage)
 print("Available cache memory: " + str(int(available_cache/1024)) + "KB")
 
 confidence_levels = [int(x) for x in cmdArgs["confidence_level"].split(",")]
 confidence_thresholds = load_confidence(confs["intervals_file"])
 
+if cmdArgs["threshold"] != None:
+    universal_th = float(cmdArgs["threshold"])
+    print(str(len(confidence_thresholds)))
+    print(str(confidence_levels))
+    for i in confidence_levels:
+        for metric in confidence_thresholds[i].keys():
+            print(str(i))
+            confidence_thresholds[i][metric] = universal_th
+
 min_confidence = confidence_levels[0]
 min_thresholds = confidence_thresholds[min_confidence]
 
-metrics_with_minimum_conf = []
-for metric_name in method:
-    if min_thresholds[metric_name] != None:
-        metrics_with_minimum_conf.append(metric_name)
-    else:
-        print(metric_name + " does not have the minimum confidence level.")
-method = metrics_with_minimum_conf
+if cmdArgs["method"] != None:
+    new_metrics = {}
+    method = cmdArgs["method"].split(",")
+    if method[0] == "ALL":
+        method = all_methods
+
+    metrics_with_minimum_conf = []
+    for metric_name in method:
+        if min_thresholds[metric_name] != None:
+            metrics_with_minimum_conf.append(metric_name)
+        else:
+            print(metric_name + " does not have the minimum confidence level.")
+    method = metrics_with_minimum_conf
+
+    for conf in default_methods.keys():
+        new_metrics[conf] = {o: method for o in all_ontologies}    
+    default_methods = new_metrics
+
+metrics_used = set()
+for conf, metrics_by_onto in default_methods.items():
+    if int(conf) >= min_confidence:
+        for onto, metrics in metrics_by_onto.items():
+            if onto in ontology_types_arg:
+                metrics_used.update(metrics)
 
 pval = float(cmdArgs["pvalue"])
 fdr = float(cmdArgs["fdr"])
@@ -159,6 +187,7 @@ def find_correlated(reads, regulators, tempDir, methods, method_streams, separat
         func = leave_one_out
     genes_per_process = int(len(reads) / threads)
     limit = len(reads)-1
+    end = 0
     last = -1
     manager = multiprocessing.Manager()
     return_dict = manager.dict()
@@ -205,8 +234,7 @@ def find_correlated(reads, regulators, tempDir, methods, method_streams, separat
     del manager
 
 print("Ontology type is " + str(ontology_types_arg))
-print("Method is " + str(method))
-
+print("Used metrics are: " + str(metrics_used))
 reads = pd.read_csv(count_reads_path, sep='\t')
 print(str(len(reads)))
 reads["constant"] = reads.drop([reads.columns[0]], axis=1).apply(
@@ -218,14 +246,16 @@ del reads["constant"]
 print(reads.head())
 print(str(len(reads)))
 
-
 print("Reading regulators")
 regulators = []
 with open(regulators_path,'r') as stream:
     for line in stream.readlines():
         regulators.append(line.rstrip("\n"))
 
-correlation_files = {method_name:correlations_dir+"/"+method_name+".tsv" for method_name in method}
+correlation_files = {method_name:correlations_dir+"/"+method_name+".tsv" for method_name in metrics_used}
+
+for m,f in correlation_files.items():
+    delete_if_empty(f,min_cells=3,sep="\t")
 
 missing_metrics = []
 for key,val in correlation_files.items():
@@ -272,7 +302,6 @@ if len(missing_metrics) > 0:
 
     i = 1
     for df,regulator_df in tqdm(df_pairs):
-        #print("Processing chunk " + str(i) + "/" + str(len(df_pairs)))
         find_correlated(df, regulators_reads, tempDir, missing_metrics, 
                     method_streams, separate_regulators = benchmarking)
         i += 1
@@ -383,7 +412,7 @@ def predict(tempDir,ontology_type="molecular_function",current_method=["MIC","SP
     
     print("Current method = " + str(current_method) + ", ontology type = " + ontology_type
             + ", pvalue = " + str(pval_threshold) + ", fdr = " + str(fdr_threshold))
-    
+    print("Current thresholds = " + str(thresholds))
 
     ontology_type_mini = short_ontology_name(ontology_type)
     
@@ -540,43 +569,46 @@ def predict(tempDir,ontology_type="molecular_function",current_method=["MIC","SP
 
 
 for conf in confidence_levels:
-    valid_metrics = []
-    current_ths = confidence_thresholds[conf]
-    for metric_name in method:
-        if current_ths[metric_name] != None:
-            valid_metrics.append(metric_name)
-    if len(valid_metrics) > 0:
-        output_files = []
-        for onto in ontology_types_arg:
-            out_file = predict(tempDir,ontology_type=onto,current_method=valid_metrics,
+    output_files = []
+    for onto in ontology_types_arg:
+        metrics_for_params = default_methods[str(conf)][onto]
+
+        valid_metrics = []
+        current_ths = confidence_thresholds[conf]
+        for metric_name in metrics_for_params:
+            if current_ths[metric_name] != None:
+                valid_metrics.append(metric_name)
+        if len(valid_metrics) > 0:
+            metrics_for_params = valid_metrics
+            out_file = predict(tempDir,ontology_type=onto,current_method=metrics_for_params,
                     conf_arg=conf,
                     benchmarking=benchmarking,k_min_coexpressions=K,
                     pval_threshold=pval,fdr_threshold=fdr,
                     min_n=min_n, min_M=min_M, min_m=min_m)
             output_files.append((out_file,onto))
 
-        print("Writing annotation file with all ontologies")
-        if len(output_files) > 1:
-            lines = []
-            ontos = set()
-            for output_file,onto_value in output_files:
-                with open(output_file,'r') as stream:
-                    new_lines = [line for line in stream.readlines()]
-                    lines += new_lines
-                ontos.add(onto_value)
-            ontos = list(ontos)
-            ontos.sort()
-            ontos_str = "_".join([short_ontology_name(str(onto)) 
-                                for onto in ontos])
-            if len(ontos) == 3:
-                ontos_str = "ALL"
-            onto_dir = tempDir + "/" + ontos_str
-            if not os.path.exists(onto_dir):
-                os.mkdir(onto_dir)
-            output_file = (onto_dir + "/" + ".".join(["-".join(valid_metrics),
-                                "c"+str(conf),"bh="+str(benchmarking),
-                                "pval"+str(pval),"fdr"+str(fdr),"tsv"]
-                            ))
-            with open(output_file,'w') as stream:
-                for line in lines:
-                    stream.write(line)
+    print("Writing annotation file with all ontologies")
+    if len(output_files) > 1:
+        lines = []
+        ontos = set()
+        for output_file,onto_value in output_files:
+            with open(output_file,'r') as stream:
+                new_lines = [line for line in stream.readlines()]
+                lines += new_lines
+            ontos.add(onto_value)
+        ontos = list(ontos)
+        ontos.sort()
+        ontos_str = "_".join([short_ontology_name(str(onto)) 
+                            for onto in ontos])
+        if len(ontos) == 3:
+            ontos_str = "ALL"
+        onto_dir = tempDir + "/" + ontos_str
+        if not os.path.exists(onto_dir):
+            os.mkdir(onto_dir)
+        output_file = (onto_dir + "/" + ".".join(["-".join(valid_metrics),
+                            "c"+str(conf),"bh="+str(benchmarking),
+                            "pval"+str(pval),"fdr"+str(fdr),"tsv"]
+                        ))
+        with open(output_file,'w') as stream:
+            for line in lines:
+                stream.write(line)
