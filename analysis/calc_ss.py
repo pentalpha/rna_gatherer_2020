@@ -5,13 +5,13 @@ import multiprocessing
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from tqdm import tqdm
 
-id_chunk_len = 1000
-pair_chunk_len = 300000
-'''ontologies = ["molecular_function",
+id_chunk_len = 2300
+pair_chunk_len = 2000000
+ontologies = ["molecular_function",
     "biological_process",
-    "cellular_component"]'''
-ontologies = ["molecular_function"]
-threads = max(2, multiprocessing.cpu_count()-1)
+    "cellular_component"]
+#ontologies = ["molecular_function"]
+threads = max(2, multiprocessing.cpu_count()-2)
 
 '''
 usage:
