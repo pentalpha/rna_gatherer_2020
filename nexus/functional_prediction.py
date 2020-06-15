@@ -93,14 +93,16 @@ def filter(val, min_value):
 def metric_with_filter(metric, min_value):
     return lambda a,b: filter(metric(a,b),min_value)
 
-method_names = {"MIC": mic, "PRS": prs, "SPR": spr, "DC": dc, 
+def get_mic():
+    mine = MINE()
+    mic = lambda reads1,reads2: calc_mic(reads1,reads2,mine)
+
+method_names = {"MIC": get_mic(), "PRS": prs, "SPR": spr, "DC": dc, 
                 "FSH": calc_fisher_information, "SOB": calc_sobolev}
 
 def calc_all(pid, coding_rows, regulators, return_dict):
     warnings.filterwarnings('error')
     coding_noncoding_pairs = []
-    mine = MINE()
-    mic = lambda reads1,reads2: calc_mic(reads1,reads2,mine)
 
     methods = []
     names = []
@@ -132,8 +134,6 @@ def leave_one_out(pid, coding_rows, regulators, method_ids, return_dict):
     method_ids = valid_metrics
 
     coding_noncoding_pairs = []
-    mine = MINE()
-    mic = lambda reads1,reads2: calc_mic(reads1,reads2,mine)
 
     methods = []
     names = []
@@ -170,10 +170,7 @@ def try_find_coexpression_process(pid, coding_rows, nc_rows, method_ids, return_
     method_ids = valid_metrics
 
     coding_noncoding_pairs = []
-    mine = MINE()
-    mic = lambda reads1,reads2: calc_mic(reads1,reads2,mine)
 
-    
     methods = []
     names = []
     for method_name in method_ids:
