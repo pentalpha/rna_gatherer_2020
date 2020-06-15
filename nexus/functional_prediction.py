@@ -93,6 +93,33 @@ def filter(val, min_value):
 def metric_with_filter(metric, min_value):
     return lambda a,b: filter(metric(a,b),min_value)
 
+method_names = {"MIC": mic, "PRS": prs, "SPR": spr, "DC": dc, 
+                "FSH": calc_fisher_information, "SOB": calc_sobolev}
+
+def calc_all(pid, coding_rows, regulators, return_dict):
+    warnings.filterwarnings('error')
+    coding_noncoding_pairs = []
+    mine = MINE()
+    mic = lambda reads1,reads2: calc_mic(reads1,reads2,mine)
+
+    methods = []
+    names = []
+    for method_name in method_ids:
+        methods.append(method_names[method_name])
+
+    for i in range(len(regulators)):
+        row2 = regulators.iloc[i]
+        reads2 = np.array(row2.values[1:],dtype=np.float32)
+        rows = coding_rows[coding_rows[coding_rows.columns[0]] != row2[coding_rows.columns[0]]]
+        for i in range(len(rows)):
+            row1 = coding_rows.iloc[i]
+            reads1 = np.array(row1.values[1:],dtype=np.float32)
+            for i in range(len(method_ids)):
+                corr = methods[i](reads1,reads2)
+                if corr != None:
+                    coding_noncoding_pairs.append((row1[0], row2[0], corr, method_ids[i]))
+    return_dict[pid] = coding_noncoding_pairs
+
 def leave_one_out(pid, coding_rows, regulators, method_ids, return_dict):
     #print("Turning warnings into errors.")
     warnings.filterwarnings('error')
@@ -108,8 +135,6 @@ def leave_one_out(pid, coding_rows, regulators, method_ids, return_dict):
     mine = MINE()
     mic = lambda reads1,reads2: calc_mic(reads1,reads2,mine)
 
-    method_names = {"MIC": mic, "PRS": prs, "SPR": spr, "DC": dc, 
-                    "FSH": calc_fisher_information, "SOB": calc_sobolev}
     methods = []
     names = []
     for method_name in method_ids:
@@ -148,8 +173,7 @@ def try_find_coexpression_process(pid, coding_rows, nc_rows, method_ids, return_
     mine = MINE()
     mic = lambda reads1,reads2: calc_mic(reads1,reads2,mine)
 
-    method_names = {"MIC": mic, "PRS": prs, "SPR": spr, "DC": dc, 
-                    "FSH": calc_fisher_information, "SOB": calc_sobolev}
+    
     methods = []
     names = []
     for method_name in method_ids:
