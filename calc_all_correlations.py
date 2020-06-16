@@ -51,7 +51,7 @@ if not os.path.exists(correlations_dir):
 def get_metric_file(metric_name):
     return open(correlations_dir + "/" + metric_name + ".tsv", 'a+')
 
-def find_correlated(reads, regulators, tempDir, methods, method_streams, separate_regulators = False):
+def find_correlated(reads, regulators, tempDir, method_streams):
     coding_noncoding_pairs = []
     func = calc_all
     genes_per_process = int(len(reads) / threads)
@@ -98,7 +98,7 @@ def find_correlated(reads, regulators, tempDir, methods, method_streams, separat
     #with open(output,'a+') as stream:
     for coding_name, noncoding_name, corr, method_name in coding_noncoding_pairs:
         method_streams[method_name].write("\t".join([coding_name,noncoding_name,str(corr)]) + "\n")
-
+    manager._process.terminate()
     manager.shutdown()
     del manager
 
@@ -148,8 +148,7 @@ method_streams = {metric_name:get_metric_file(metric_name) for metric_name in me
 
 i = 1
 for df,regulator_df in tqdm(df_pairs):
-    find_correlated(df, regulators_reads, tempDir, metrics_used, 
-                method_streams, separate_regulators = benchmarking)
+    find_correlated(df, regulators_reads, tempDir, method_streams)
     i += 1
 
 for method_name, stream in method_streams.items():

@@ -121,8 +121,11 @@ def calc_sims(pair_lists):
 print("Loading IDs")
 ids = []
 with open(gene_names,'r') as stream:
+    first = False
     for raw_line in stream:
-        ids.append(raw_line.rstrip("\n").split("\t")[0])
+        if not first:
+            ids.append(raw_line.rstrip("\n").split("\t")[0])
+        first = False
 id_chunks = list(chunks(ids, id_chunk_len))
 
 print("Loading previous sims")

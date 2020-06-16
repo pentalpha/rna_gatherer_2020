@@ -96,6 +96,7 @@ def metric_with_filter(metric, min_value):
 def get_mic():
     mine = MINE()
     mic = lambda reads1,reads2: calc_mic(reads1,reads2,mine)
+    return mic
 
 method_names = {"MIC": get_mic(), "PRS": prs, "SPR": spr, "DC": dc, 
                 "FSH": calc_fisher_information, "SOB": calc_sobolev}
@@ -106,6 +107,7 @@ def calc_all(pid, coding_rows, regulators, return_dict):
 
     methods = []
     names = []
+    method_ids = ["MIC","FSH","PRS","SPR","SOB","DC"]
     for method_name in method_ids:
         methods.append(method_names[method_name])
 
