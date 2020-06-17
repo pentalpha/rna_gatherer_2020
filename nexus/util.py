@@ -112,7 +112,10 @@ def splitDataFrameIntoSmaller(df, chunkSize = 10000):
         numberChunks = len(df) // chunkSize + 1
         for i in range(numberChunks):
                 listOfDf.append(df[i*chunkSize:(i+1)*chunkSize])
-        return listOfDf
+        if len(listOfDf[-1]) == 0:
+                return listOfDf[:-1]
+        else:
+                return listOfDf
 
 def split_df_to_max_mem(df, available_size):
         print("Available KB: " + str(available_size/1024))
@@ -148,5 +151,5 @@ def delete_if_empty(file_path, min_cells = 1, sep = "\t"):
                                         break
                                 line = stream.readline()
                 if empty:
-                        print("Removing " + file_path + " because it's empty.")
+                        #print("Removing " + file_path + " because it's empty.")
                         os.remove(file_path)

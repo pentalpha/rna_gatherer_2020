@@ -1,5 +1,6 @@
 import sys
 from nexus.functional_prediction import *
+from nexus.util import getFilesWith
 import argparse
 import multiprocessing
 from config import configs
@@ -36,7 +37,8 @@ cache_usage = float(cmdArgs["cache_usage"])
 available_cache = get_cache(usage=cache_usage)
 if "cache_size" in cmdArgs:
     available_cache = int(int(cmdArgs["cache_size"]) * cache_usage)
-print("Available cache memory: " + str(int(available_cache/1024)) + "KB")
+print("Available cache memory: " + str(int(available_cache)))
+available_cache = int(available_cache/threads)
 metrics_used = all_methods
 
 regulators_max_portion = 0.5
@@ -48,8 +50,11 @@ correlations_dir = tempDir + "/correlations"
 if not os.path.exists(correlations_dir):
     os.mkdir(correlations_dir)
 
+def get_temp_metric_file(base_path, metric_name):
+    return open(base_path + "." + metric_name, 'a+')
+
 def get_metric_file(metric_name):
-    return open(correlations_dir + "/" + metric_name + ".tsv", 'a+')
+    return open(correlations_dir + "/" + metric_name + ".tsv", 'w')
 
 def find_correlated(reads, regulators, tempDir, method_streams):
     coding_noncoding_pairs = []
@@ -86,7 +91,7 @@ def find_correlated(reads, regulators, tempDir, method_streams):
         #print("Spawned process from gene " + str(end) + " to " + str(limit))
         p.start()
 
-    for p in tqdm(processes):
+    for p in processes:
         p.join()
 
     #print("Merging results")
@@ -120,31 +125,95 @@ correlation_files = {method_name:correlations_dir+"/"+method_name+".tsv" for met
 for m,f in correlation_files.items():
     delete_if_empty(f,min_cells=3,sep="\t")
 
-regulators_reads = reads
-non_regulators_reads = reads
-
 available_size = available_cache
 
-max_for_regulators = available_size*regulators_max_portion
+'''max_for_regulators = available_size*regulators_max_portion
 regs_size = getsizeof(regulators_reads)
 regulator_dfs = [regulators_reads]
 if regs_size > max_for_regulators:
     regulator_dfs = split_df_to_max_mem(regulators_reads, max_for_regulators)
     available_size -= max_for_regulators
 else:
-    available_size -= regs_size
+    available_size -= regs_size'''
 
-dfs = split_df_to_max_mem(non_regulators_reads, available_size)
+
+dfs = split_df_to_max_mem(reads, int(available_size/2))
+print("Splitting up dataframe into smaller DFs: " + str(len(dfs)))
+for i in range(len(dfs)):
+    path_to_write = tempDir + "/" + str(i) + "-counts_part.tsv"
+    if not os.path.exists(path_to_write):
+        dfs[i].to_csv(path_to_write, sep="\t", header=True, index=False)
+del dfs
+
+print("Reading smaller DFs")
+def get_corrs_paths(df_path):
+    corrs_paths = [(metric, df_path+"."+metric) for metric in all_methods]
+    for metric,p in corrs_paths:
+        delete_if_empty(p)
+    final_corrs_paths = []
+    for metric, path in corrs_paths:
+        if os.path.exists(path):
+            final_corrs_paths.append((metric, path))
+    if len(final_corrs_paths) != len(corrs_paths):
+        for metric, path in final_corrs_paths:
+            os.remove(path)
+        return []
+    else:
+        return corrs_paths
+
+small_df_paths = getFilesWith(tempDir, "-counts_part.tsv")
+dfs = {p: pd.read_csv(p, sep="\t") for p in small_df_paths}
+mini_corrs_paths = {p: get_corrs_paths(p) 
+                    for p in small_df_paths}
+should_run = {p: True if len(corr_paths) == len(all_methods) else False 
+                    for p, corr_paths in mini_corrs_paths.items()}
+
+print("Processing counts")
+
+pbar = tqdm(total=len(small_df_paths)*len(small_df_paths))
+for i in range(len(small_df_paths)):
+    current_df_path = small_df_paths[i]
+    current_df = dfs[current_df_path]
+    if not should_run[current_df_path]:
+        method_streams = {metric_name:get_temp_metric_file(current_df_path,metric_name) 
+                    for metric_name in metrics_used}
+        for j in range(len(small_df_paths)):
+            find_correlated(current_df, dfs[small_df_paths[j]], 
+                tempDir, method_streams)
+            pbar.update(1)
+        for method_name, stream in method_streams.items():
+            stream.close()
+    else:
+        print("Skiping " + current_df_path)
+pbar.close()
+        
+print("Joining results")
+mini_corrs_paths = {p: get_corrs_paths(p) 
+                    for p in small_df_paths}
+final_method_streams = {metric_name:get_metric_file(metric_name) 
+                    for metric_name in metrics_used}
+
+for p, corrs_paths in tqdm(mini_corrs_paths.items()):
+    if len(corrs_paths) != len(all_methods):
+        print("Not all correlations calculated for " + p)
+        quit()
+    for metric, corr_path in corrs_paths:
+        with open(corr_path, 'r') as corr_stream:
+            lines_read = corr_stream.read()
+            if lines_read[-1] != "\n":
+                lines_read += "\n"
+            final_method_streams[metric].write(lines_read)
 
 '''print("Chunks for regulated: " + str(len(dfs)) 
-+ "\nChunks for regulators: " + str(len(regulator_dfs)))'''
++ "\nChunks for regulators: " + str(len(regulator_dfs)))
 
 df_pairs = []
 for df in dfs:
     for regulator_df in regulator_dfs:
         df_pairs.append((df, regulator_df))
 
-method_streams = {metric_name:get_metric_file(metric_name) for metric_name in metrics_used}
+method_streams = {metric_name:get_metric_file(metric_name) 
+                    for metric_name in metrics_used}
 
 i = 1
 for df,regulator_df in tqdm(df_pairs):
@@ -153,3 +222,4 @@ for df,regulator_df in tqdm(df_pairs):
 
 for method_name, stream in method_streams.items():
     stream.close()
+'''

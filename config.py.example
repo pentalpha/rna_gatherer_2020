@@ -1,7 +1,9 @@
 #Module: config.py
 #Rename this file as "config.py" and customize it
 import multiprocessing
+import os
 
+project_dir = os.path.dirname(os.path.realpath(__file__))
 configs = {
     "max_mem": "4000",
     "long_orfs": "TransDecoder.LongOrfs",
