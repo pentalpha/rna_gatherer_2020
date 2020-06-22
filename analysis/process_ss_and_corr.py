@@ -3,14 +3,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 from tqdm import tqdm
 import os
-
-ss_path = sys.argv[1]
-corr_file_paths = sys.argv[2].split(",")
-gaf_path = sys.argv[3]
-output_dir = sys.argv[4]
-
-if not os.path.exists(output_dir):
-    os.mkdir(output_dir)
+import dask
+import dask.dataframe as dd
 
 ontologies = ["molecular_function",
     "biological_process",
@@ -53,6 +47,7 @@ def read_gaf(gaf_path):
     names_list = list(names)
     for i in range(len(names_list)):
         names_dict[names_list[i]] = i
+    
     return all_anno, mf_anno, bp_anno, cc_anno, names_dict, names_list
 
 def make_histogram(data, title, axe):
@@ -60,9 +55,78 @@ def make_histogram(data, title, axe):
                             alpha=0.7, rwidth=0.85)
     axe.set_title(title)
 
-print("Reading annotation")
-all_anno, mf_anno, bp_anno, cc_anno, names_dict, names = read_gaf(gaf_path)
-print("Allocating space for data")
+def name_to_id(gene_name, n_dict):
+    if gene_name in n_dict:
+        return n_dict[gene_name]
+    else:
+        new_id = len(n_dict)+1
+        n_dict[gene_name] = new_id
+        return new_id
+
+if __name__ == "__main__":
+    ss_path = sys.argv[1]
+    corr_file_paths = sys.argv[2].split(",")
+    gaf_path = sys.argv[3]
+    output_dir = sys.argv[4]
+
+    if len(corr_file_paths) == 1:
+        sys.argv[2] == "None"
+        corr_file_paths = []
+
+    if not os.path.exists(output_dir):
+        os.mkdir(output_dir)
+    
+    print("Reading annotation")
+    all_anno, mf_anno, bp_anno, cc_anno, names_dict, names = read_gaf(gaf_path)
+    max_id = max(names_dict.values())
+    print(str(max_id))
+    next_new_id = max_id + 1
+    print("Reading SS dataframe")
+    dask.config.set(scheduler='single-threaded')
+    ss_df = dd.read_csv(ss_path, sep="\t", header=None, names=["gene_a","gene_b",
+                        "mf", "bp", "cc"])
+
+    print("Creating new ID columns")
+    ss_df["gene_id_a"] = ss_df.apply(lambda row: name_to_id(row["gene_a"], 
+                                    names_dict),
+                                    axis=1, meta=int)
+    ss_df["gene_id_b"] = ss_df.apply(lambda row: name_to_id(row["gene_b"],
+                                    names_dict),
+                                    axis=1, meta=int)
+    print("Removing old ones")
+    del ss_df["gene_a"]
+    del ss_df["gene_b"]
+    print("Writing it to disk")
+    ss_df.compute().to_csv(output_dir+"/ss.new_indexes.tsv", sep="\t")
+    ss_df.compute().to_hdf(output_dir+"/ss.new_indexes.hdf", '/data')
+    
+    del ss_df
+
+    print("Reading correlation dataframes")
+    for corr_file_path in tqdm(corr_file_paths):
+        corr_df = dd.read_csv(corr_file_path, sep="\t", header=None, 
+                    names=["gene_a","gene_b","corr"])
+        print("Creating new ID columns for " + corr_file_path)
+        corr_df["gene_id_a"] = corr_df.apply(lambda row: name_to_id(row["gene_a"], 
+                                        names_dict),
+                                        axis=1, meta=int)
+        corr_df["gene_id_b"] = corr_df.apply(lambda row: name_to_id(row["gene_b"],
+                                        names_dict),
+                                        axis=1, meta=int)
+        print("Removing old ones")
+        del corr_df["gene_a"]
+        del corr_df["gene_b"]
+
+        print("Writing it to disk")
+        corr_df.compute().to_hdf(output_dir+"/"+(corr_file_path.split("/")[-1])+".hdf", 
+                                '/data')
+
+    print("Writing dictonary to disk")
+    with open(output_dir+"/gene_id.tsv", 'w') as stream:
+        for gene_name, gene_id in names_dict.items():
+            stream.write(gene_name + "\t" + str(gene_id) + "\n")
+
+'''print("Allocating space for data")
 max_i = max(names_dict.values())
 all_data = {}
 
@@ -143,4 +207,4 @@ plot_c.plot(a, c, 'o')
 plot_c.set_title("Average semantic similarity by difference in annotation lengths")
 
 fig.tight_layout()
-fig.savefig(out_basename+"ss_values_by_diff.png", bbox_inches='tight')
+fig.savefig(out_basename+"ss_values_by_diff.png", bbox_inches='tight')'''
