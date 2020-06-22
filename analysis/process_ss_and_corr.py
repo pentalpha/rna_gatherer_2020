@@ -104,7 +104,9 @@ if __name__ == "__main__":
     print("Writing it to disk")
     ss_name = get_filename(ss_path)
     #ss_df.compute().to_csv(output_dir+"/"+ss_name+".tsv", sep="\t")
-    ss_df.compute().to_hdf(output_dir+"/"+ss_name+".hdf", '/data')
+    #ss_df.compute().to_hdf(output_dir+"/"+ss_name+".hdf", '/data')
+    ss_df.compute().to_parquet(output_dir+"/"+ss_name+".parquet",
+                                engine = "pyarrow")
     
     del ss_df
 
@@ -124,8 +126,10 @@ if __name__ == "__main__":
         del corr_df["gene_b"]
 
         print("Writing it to disk")
-        corr_df.compute().to_hdf(output_dir+"/"+(corr_file_path.split("/")[-1])+".hdf", 
-                                '/data')
+        corr_df.compute().to_parquet(
+                                output_dir+"/"+(corr_file_path.split("/")[-1])+".parquet", 
+                                engine = "pyarrow"
+                            )
 
     print("Writing dictonary to disk")
     with open(output_dir+"/gene_id.tsv", 'w') as stream:
