@@ -63,6 +63,11 @@ def name_to_id(gene_name, n_dict):
         n_dict[gene_name] = new_id
         return new_id
 
+def get_filename(full_path):
+    last = full_path.split("/")[-1]
+    name = ".".join(last.split(".")[:-1])
+    return name
+
 if __name__ == "__main__":
     ss_path = sys.argv[1]
     corr_file_paths = sys.argv[2].split(",")
@@ -97,8 +102,9 @@ if __name__ == "__main__":
     del ss_df["gene_a"]
     del ss_df["gene_b"]
     print("Writing it to disk")
-    ss_df.compute().to_csv(output_dir+"/ss.new_indexes.tsv", sep="\t")
-    ss_df.compute().to_hdf(output_dir+"/ss.new_indexes.hdf", '/data')
+    ss_name = get_filename(ss_path)
+    #ss_df.compute().to_csv(output_dir+"/"+ss_name+".tsv", sep="\t")
+    ss_df.compute().to_hdf(output_dir+"/"+ss_name+".hdf", '/data')
     
     del ss_df
 
