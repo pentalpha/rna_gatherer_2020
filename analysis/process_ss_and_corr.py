@@ -1,12 +1,74 @@
 import sys
-import matplotlib.pyplot as plt
-import numpy as np
+#import matplotlib.pyplot as plt
+#import numpy as np
 from tqdm import tqdm
 import os
-import dask
-import dask.dataframe as dd
+#import dask
+#import dask.dataframe as dd
 
-ontologies = ["molecular_function",
+def get_filename(full_path):
+    last = full_path.split("/")[-1]
+    #name = ".".join(last.split(".")[:-1])
+    return last
+
+def add_names_to_set(file_path, names_set):
+    with open(file_path, 'r') as stream:
+        for line in stream:
+            cells = line.split("\t")
+            names_set.add(cells[0])
+            names_set.add(cells[1])
+    return names_set
+
+def replace_with_dict(in_file, out_file, names_dict):
+    with open(in_file,'r') as in_stream:
+        with open(out_file,'w') as out_stream:
+            for line in in_stream:
+                cells = line.rstrip("\n").split("\t")
+                cells[0] = names_dict[cells[0]]
+                cells[1] = names_dict[cells[1]]
+                out_stream.write("\t".join(cells)+"\n")
+
+if __name__ == "__main__":
+    files = sys.argv[1].split(",")
+    #gaf_path = sys.argv[2]
+    output_dir = sys.argv[2]
+
+    '''if len(corr_file_paths) == 1:
+        sys.argv[2] == "None"
+        corr_file_paths = []'''
+    if not os.path.exists(output_dir):
+        os.mkdir(output_dir)
+
+    dict_file = output_dir + "/gene_ids.tsv"
+    names_dict = {}
+    if not os.path.exists(dict_file):
+        print("Reading files to creage gene ID dict.")
+        names_set = set()
+        for f in tqdm(files):
+            names_set = add_names_to_set(f, names_set)
+        i = 0
+        for name in names_set:
+            names_dict[name] = str(i + 1)
+            i += 1
+        with open(dict_file,'w') as out_stream:
+            for name, id in names_dict.items():
+                out_stream.write(name+"\t"+str(id)+"\n")
+    else:
+        print("Reading names dict")
+        with open(dict_file,'r') as in_stream:
+            for line in in_stream:
+                cells = line.rstrip("\n").split("\t")
+                names_dict[cells[0]] = names_dict[cells[1]]
+    
+    print("Creating versions without gene names, but IDs instead")
+    for f in tqdm(files):
+        new_path = output_dir + "/" + get_filename(f)
+        if not os.path.exists(new_path):
+            replace_with_dict(f, new_path, names_dict)
+        else:
+            print("Skiping " + f)
+
+'''ontologies = ["molecular_function",
     "biological_process",
     "cellular_component"]
 
@@ -62,25 +124,7 @@ def name_to_id(gene_name, n_dict):
         new_id = len(n_dict)+1
         n_dict[gene_name] = new_id
         return new_id
-
-def get_filename(full_path):
-    last = full_path.split("/")[-1]
-    name = ".".join(last.split(".")[:-1])
-    return name
-
-if __name__ == "__main__":
-    ss_path = sys.argv[1]
-    corr_file_paths = sys.argv[2].split(",")
-    gaf_path = sys.argv[3]
-    output_dir = sys.argv[4]
-
-    if len(corr_file_paths) == 1:
-        sys.argv[2] == "None"
-        corr_file_paths = []
-
-    if not os.path.exists(output_dir):
-        os.mkdir(output_dir)
-    
+        
     print("Reading annotation")
     all_anno, mf_anno, bp_anno, cc_anno, names_dict, names = read_gaf(gaf_path)
     max_id = max(names_dict.values())
@@ -135,7 +179,7 @@ if __name__ == "__main__":
     with open(output_dir+"/gene_id.tsv", 'w') as stream:
         for gene_name, gene_id in names_dict.items():
             stream.write(gene_name + "\t" + str(gene_id) + "\n")
-
+'''
 '''print("Allocating space for data")
 max_i = max(names_dict.values())
 all_data = {}
