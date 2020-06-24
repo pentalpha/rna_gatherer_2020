@@ -1,10 +1,10 @@
 import sys
 #import matplotlib.pyplot as plt
-#import numpy as np
+import numpy as np
 from tqdm import tqdm
 import os
-#import dask
-#import dask.dataframe as dd
+import dask
+import dask.dataframe as dd
 
 def get_filename(full_path):
     last = full_path.split("/")[-1]
@@ -58,15 +58,26 @@ if __name__ == "__main__":
         with open(dict_file,'r') as in_stream:
             for line in in_stream:
                 cells = line.rstrip("\n").split("\t")
-                names_dict[cells[0]] = names_dict[cells[1]]
+                names_dict[cells[0]] = cells[1]
     
     print("Creating versions without gene names, but IDs instead")
+    new_files = []
     for f in tqdm(files):
         new_path = output_dir + "/" + get_filename(f)
         if not os.path.exists(new_path):
             replace_with_dict(f, new_path, names_dict)
         else:
             print("Skiping " + f)
+        new_files.append(new_path)
+    
+    print("Converting new dataframes to parquet format")
+    for f in tqdm(new_files):
+        parquet_file = f.replace(f.split(".")[-1], "parquet")
+        if not os.path.exists(parquet_file):
+            df = dd.read_csv(f, sep="\t", header=None)
+            df.to_parquet(parquet_file,
+                        engine = "pyarrow")
+
 
 '''ontologies = ["molecular_function",
     "biological_process",
