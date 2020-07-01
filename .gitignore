@@ -1,7 +1,7 @@
 output/*
 __pycache__
 .vscode/*
-config.py
+config.json
 .f*
 .Rhistory
 test/*

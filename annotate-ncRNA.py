@@ -6,7 +6,7 @@ import numpy as np
 from tqdm import tqdm
 from nexus.util import runCommand
 
-from config import configs
+from config import *
 
 from nexus.pipeline import Pipeline
 
@@ -17,6 +17,11 @@ from nexus.annotation_merging_steps import *
 from nexus.lnc_steps import *
 from nexus.counting_steps import *
 from nexus.alignment_steps import *
+
+mandatory_files = ["go_obo", "rfam_cm"]
+require_files(mandatory_files)
+optional_files = ["non_redundant", "rna_dbs"]
+require_files(optional_files)
 
 #set configuration values
 confs = {}
