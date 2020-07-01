@@ -30,12 +30,12 @@ def get_info(args, confs, tmpDir, stepDir):
             seqs = readSeqsFromFasta(args["reference_fasta"])
             seqs = {header_to_id(header): seq for header,seq in seqs}
         retrieval_stats = update_with_info(all_gff_path, 
-                                        tmpDir + "annotation_with_meta.gff",
+                                        tmpDir + "/annotation_with_meta.gff",
                                         confs, seqs_dict = seqs)
         print("Information retrieval results: " + "\n\t".join([stat_name+": "+str(value)
                                     for stat_name, value in retrieval_stats.items()]))
         
-        retrieve_func_annotation(all_gff_path, tmpDir + "retrieved_functions.id2go",
+        retrieve_func_annotation(all_gff_path, tmpDir + "/retrieved_functions.id2go",
                                 confs, args['taxon_id'])
     return True
 
@@ -169,71 +169,5 @@ def remove_redundancies(args, confs, tmpDir, stepDir):
     raw_annotation = raw_annotation.drop('filtered', axis=1)
     print("Writing final annotation")
     raw_annotation.to_csv(tmpDir + "/annotation.gff", sep="\t", index=False, header=False)
-
-    return True
-
-def has_rfam_alignment(df):
-    count = 0
-    for index, row in df.iterrows():
-        attrs = get_gff_attributes(row["attribute"])
-        if "genbank" in attrs:
-            if attrs["genbank"] != "None":
-                count += 1
-    return count
-
-def has_rfam_id(df):
-    count = 0
-    for index, row in df.iterrows():
-        attrs = get_gff_attributes(row["attribute"])
-        if "rfam" in attrs:
-            if attrs["rfam"] != "None":
-                count += 1
-    return count
-
-def number_of_genbank_ids(df):
-    count = set()
-    for index, row in df.iterrows():
-        attrs = get_gff_attributes(row["attribute"])
-        if "genbank" in attrs:
-            if attrs["genbank"] != "None":
-                count.add(attrs["genbank"])
-    return len(count)
-
-def number_of_rfam_ids(df):
-    count = set()
-    for index, row in df.iterrows():
-        attrs = get_gff_attributes(row["attribute"])
-        if "rfam" in attrs:
-            if attrs["rfam"] != "None":
-                count.add(attrs["rfam"])
-    return len(count)
-
-def review_annotations(args, confs, tmpDir, stepDir):
-    annotation = pd.read_csv(stepDir["remove_redundancies"] + "/annotation.gff", sep="\t", header=None,
-        names = ["seqname", "source", "feature", "start", "end", "score", "strand", "frame", "attribute"])
-    print("Reviewing annotation sources")
-
-    lines = []
-    for name, hits in annotation.groupby(["source"]):
-        line = {
-            "source": name,
-            "total": hits.shape[0],
-            #"with_rfam_alignment": has_rfam_alignment(hits),
-            #"genbank_ids": number_of_genbank_ids(hits),
-            "with_rfam_id": has_rfam_id(hits),
-            "rfam_ids": number_of_rfam_ids(hits)
-        }
-        lines.append(line)
-    lines.append({
-        "source": "ALL",
-        "total": annotation.shape[0],
-        #"with_rfam_alignment": has_rfam_alignment(annotation),
-        #"genbank_ids": number_of_genbank_ids(annotation),
-        "with_rfam_id": has_rfam_id(annotation),
-        "rfam_ids": number_of_rfam_ids(annotation)
-    })
-
-    review = pd.DataFrame(lines, columns=["source", "total", "with_rfam_id","rfam_ids"])
-    review.to_csv(tmpDir + "/review.tsv", sep="\t", index=False)
 
     return True

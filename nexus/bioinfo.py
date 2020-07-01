@@ -230,7 +230,7 @@ def minimap_annotation(alignment_file, query_file, gff_name,
             "frame": ".",
             "attribute":("ID="+name
                 +(";type="+mol_type if mol_type != None else "")
-                +(";db="+db_name if db_name != None else ""))}
+                +(";aligned_from="+db_name if db_name != None else ""))}
         rows.append(row)
     gff = pd.DataFrame(rows, columns = ["seqname", "source",
         "feature", "start", "end", "score", "strand",

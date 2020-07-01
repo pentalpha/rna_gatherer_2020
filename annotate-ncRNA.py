@@ -15,13 +15,13 @@ from nexus.tRNA_scan_se import *
 from nexus.reference_processing_steps import *
 from nexus.annotation_merging_steps import *
 from nexus.lnc_steps import *
-from nexus.counting_steps import *
+from nexus.final_steps import *
 from nexus.alignment_steps import *
 
 mandatory_files = ["go_obo", "rfam_cm"]
 require_files(mandatory_files)
 optional_files = ["non_redundant", "rna_dbs"]
-require_files(optional_files)
+require_files(optional_files, mandatory=False)
 
 #set configuration values
 confs = {}
@@ -107,6 +107,8 @@ if __name__ == '__main__':
                 ("run_infernal", run_infernal),
                 ("merge_infernal_outs", merge_infernal_outs),
                 ("parse_infernal", parse_infernal),
+                ("run_trnascan", run_trnascan),
+                ("parse_trna", parse_trna),
                 ("filter_small_sequences", filter_small_sequences),
                 ("filter_long_orfs", filter_long_orfs),
                 ("test_coding_potential", test_coding_potential),
@@ -118,8 +120,6 @@ if __name__ == '__main__':
                 ("ncrna_alignment_parsing", ncrna_alignment_parsing),
                 ("prepare_ref_annotation", prepare_ref_annotation),
                 ("map_to_genome", map_to_genome),
-                ("run_trnascan", run_trnascan),
-                ("parse_trna", parse_trna),
                 ("get_info", get_info),
                 ("run_gffcompare", run_gffcompare),
                 ("remove_redundancies", remove_redundancies),
