@@ -4,6 +4,7 @@ import time
 import json
 from nexus.util import *
 from nexus.bioinfo import *
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 def get_md5(sequence):
     """
@@ -137,7 +138,7 @@ def retrieve_quickgo_annotations(chunk, api_url, taxon_id):
         print("No annotations retrieved for " + gene_ids)'''
     return result
 
-def get_info(gene_name, confs, sequence):
+def get_gene_info(gene_name, confs, sequence):
     new_id, old_id, seq = retrieve_rnacentral_id(gene_name, sequence,
                                     confs["rna_central_api"])
     retrieval_id = new_id if new_id != None else gene_name
@@ -145,7 +146,7 @@ def get_info(gene_name, confs, sequence):
     rna_type = None
     if "URS" in retrieval_id:
         short_id = retrieval_id.split("_")[0]
-        rnacentral_json = get_rnacentral_json(short_id)
+        rnacentral_json = get_rnacentral_json(short_id, confs["rna_central_api"])
         if "description" in rnacentral_json:
             description = rnacentral_json["description"]
         if "rna_type" in rnacentral_json:
@@ -162,14 +163,14 @@ def parallel_rnacentral_requester(to_retrieve, seqs_dict, confs, tries = 3):
         for chunk in tqdm(to_retrieves):
             processes = []
             with ThreadPoolExecutor(max_workers=20) as executor:
-                for seq_id, seq in id_to_seq:
+                for seq_id in to_retrieve:
                     if seq_id in chunk:
                         if seq_id in seqs_dict:
                             processes.append(
-                                executor.submit(get_info, seq_id, confs, seqs_dict[seq_id]))
+                                executor.submit(get_gene_info, seq_id, confs, seqs_dict[seq_id]))
                         else:
                             processes.append(
-                                executor.submit(get_info, seq_id, confs, ""))
+                                executor.submit(get_gene_info, seq_id, confs, ""))
 
                 for task in as_completed(processes):
                     if task.result() != None:
@@ -191,20 +192,19 @@ def update_with_info(annotation_path, output_path, confs,
                 "source", "feature", "start", "end", "score", "strand", "frame", "attribute"])
     raw_ids = [get_gff_attributes(attr_str)["ID"] 
     for attr_str in annotation["attribute"].tolist()]
-    to_retrieve = [".".join(_id.sep(".")[:-1]) for _id in raw_ids] if sep_id_by_dot else raw_ids
+    to_retrieve = [".".join(_id.split(".")[:-1]) for _id in raw_ids] if sep_id_by_dot else raw_ids
 
     if seqs_dict == None:
         seqs_dict = {}
 
     info_by_id = parallel_rnacentral_requester(to_retrieve, seqs_dict, confs)
 
-    total = 0
-    rfams_attributed = 0
-    descriptions_attributed = 0
-    types_attributed = 0
-    IDs_attributed = 0
-
-    def update_attribute(row):
+    retrieval_stats = {"total": 0, "rfams_attributed": 0,
+            "descriptions_attributed": 0,
+            "types_attributed": 0,
+            "IDs_attributed": 0}
+    
+    def update_attribute(row, retrieval_stats):
         attr_str = row["attribute"]
         attributes = None
         try:
@@ -212,32 +212,31 @@ def update_with_info(annotation_path, output_path, confs,
         except:
             print("Row could not have attributes parsed:\n\t"+str(row))
         if attributes != None:
-            short_id = ".".join(attributes["ID"].sep(".")[:-1])
+            short_id = ".".join(attributes["ID"].split(".")[:-1])
             rfam_id = get_rfam_from_rnacentral(short_id.split("_")[0])
             if not "rfam" in attributes and rfam_id != None:
                 if len(rfam_id) == 7:
                     attributes["rfam"] = rfam_id
-                    rfams_attributed += 1
+                    retrieval_stats["rfams_attributed"] += 1
             if short_id in info_by_id:
                 new_name, description, rna_type = info_by_id[short_id]
                 if not "description" in attributes and description != None:
                     attributes["description"] = description
-                    descriptions_attributed += 1
+                    retrieval_stats["descriptions_attributed"] += 1
                 if not "type" in attributes and rna_type != None:
                     attributes["type"] = rna_type
-                    types_attributed += 1
+                    retrieval_stats["types_attributed"] += 1
                 if new_name != None:
                     attributes["ID"] = attributes["ID"].replace(short_id, new_name)
-                    IDs_attributed += 1
-        total += 1
+                    retrieval_stats["IDs_attributed"] += 1
+        retrieval_stats["total"] += 1
         return get_gff_attributes_str(attributes)
-    annotation["attribute"] = annotation.apply(lambda row: update_attribute(row),axis=1)
+    annotation["attribute"] = annotation.apply(lambda row: update_attribute(row,
+                                                                    retrieval_stats),
+                                            axis=1)
     annotation.to_csv(output_path, sep="\t", index=False, header=False)
 
-    return {"Total": total, "rfams_attributed": rfams_attributed/total,
-            "descriptions_attributed": descriptions_attributed/total,
-            "types_attributed": types_attributed/total,
-            "IDs_attributed": IDs_attributed/total}
+    return retrieval_stats
 
 def retrieve_func_annotation(annotation_path, output, confs, taxon_id):
     annotation = pd.read_csv(annotation_path, sep="\t", header=None, 
