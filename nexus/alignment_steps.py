@@ -33,10 +33,10 @@ def ncrna_alignment_parsing(args, confs, tmpDir, stepDir):
     gffs = []
     fastas = []
     for paf_file in tqdm(paf_files):
-        print("\tParsing " + db_name)
         db_name = paf_file.split("/")[-1].split("-")[0]
+        print("\tParsing " + db_name)
         genome_alignment = paf_file
-        query_fasta = confs["rna_dbs"][db_name]
+        query_fasta = os.path.abspath(confs["rna_dbs"][db_name])
         
         output_gff = tmpDir + "/"+db_name+"-annotation.gff"
         annotated_fasta = tmpDir + "/"+db_name+"-in_genome.fasta"
@@ -46,7 +46,7 @@ def ncrna_alignment_parsing(args, confs, tmpDir, stepDir):
         gffs.append(output_gff)
         fastas.append(annotated_fasta)
     
-    if len(all_gff) > 0:
+    if len(gffs) > 0:
         all_gff = tmpDir + "/alignment_annotation.gff"
         all_fasta = tmpDir + "/alignment_sequences.fasta"
         join_files_in_one(gffs, all_gff)

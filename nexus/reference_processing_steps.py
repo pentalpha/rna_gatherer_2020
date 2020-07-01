@@ -42,6 +42,6 @@ def map_to_genome(args, confs, tmpDir, stepDir):
             return False
         output_gff = tmpDir + "/reference_mapped.gff"
         annotated_fasta = tmpDir + "/reference_mapped.fasta"
-        mapped_fasta = minimap_annotation(genome_alignment, unmaped_path, output_gff,
+        mapped_fasta = minimap_annotation(genome_alignment, to_map_path, output_gff,
                         annotated_fasta, source="reference_mapping", mol_type=None)
     return True
