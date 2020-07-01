@@ -1,5 +1,4 @@
 {
-    "max_mem": "4000",
     "cmscan": "cmscan",
     "tRNAscan-SE": "tRNAscan-SE",
     "intervals_file": "PROJECT_DIR/data/confidence_intervals.csv",

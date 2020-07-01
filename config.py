@@ -3,6 +3,7 @@
 import multiprocessing
 import os
 import json
+import psutil
 from nexus.util import runCommand
 
 project_dir = os.path.dirname(os.path.realpath(__file__))
@@ -16,6 +17,11 @@ config_str = config_str.replace("PROJECT_DIR", project_dir)
 configs = json.loads(config_str)
 if not "threads" in configs:
     configs["threads"] = str(max(2, multiprocessing.cpu_count()-1))
+if not "max_mem" in configs:
+    configs["max_mem"] = str(int((psutil.virtual_memory().total/1024/1024)*0.8))
+
+print("Using " + configs["threads"] + " threads and " 
+    + configs["max_mem"] + " MB of RAM.")
 
 def missing_from_config(possibly_missing):
     missing = []
