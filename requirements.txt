@@ -17,3 +17,5 @@ bokeh=2.0.0=py_0
 minimap2=2.17=h8b12597_1
 rnasamba=0.2.0=py37hc1659b7_1
 transdecoder=5.5.0=pl526_2
+dask
+fastsemsim
