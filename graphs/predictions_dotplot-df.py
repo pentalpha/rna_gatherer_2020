@@ -282,32 +282,7 @@ def analyze_annotation(p):
         unrelated_perc = (float(unrelated) / total) * 100
         related_perc = 100.0 - unrelated_perc
         size = float(total)/float(reference_total)
-        '''in_reference_perc       = (float(in_reference) / total) * 100
-        part_of_reference_perc  = (float(part_of_reference) / total) * 100
-        upper_to_reference_perc = (float(upper_to_reference) / total) * 100
         
-        print("Total associations: " + str(total)
-                +"\n\tIn ref: "+str(in_reference_perc)
-                +"\n\tPart of: "+str(part_of_reference_perc)
-                +"\n\tUpper to: "+str(upper_to_reference_perc)
-                +"\n\tNot in: "+str(unrelated_perc)
-                +"\n\tAssociation found: "+str(association_found)
-                +"\n\tAssociation children found: "+str(association_children_found)
-                +"\n\tAssociation parent found: "+str(association_parent_found)
-        )'''
-        
-        #association_missing_w = 1-(association_missing/reference_total)
-        '''association_children_w = 1-(association_children_found/reference_total)
-        association_parent_w = 1-(association_parent_found/reference_total)
-        completion = ((association_found 
-                    + association_children_found*association_children_w 
-                    + association_parent_found*pow(association_parent_w,2)) 
-                        / reference_total)
-        
-        unrelated_w = 1-(unrelated/total)
-        prediction_power = ((in_reference + part_of_reference*0.5) 
-                        / reference_total)'''
-        #prediction_quality = np.sum(association_values)
         missing_coef = ((association_missing)/ reference_total)
         completion = ((association_found)/ reference_total)
         
@@ -320,11 +295,6 @@ def analyze_annotation(p):
     return None
 
 overview(reference, reference_name)
-
-'''labels = []
-conf_levels = []
-prediction_powers = []
-completions = []'''
 
 results = []
 if external_anno != None:

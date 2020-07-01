@@ -16,6 +16,7 @@ from nexus.reference_processing_steps import *
 from nexus.annotation_merging_steps import *
 from nexus.lnc_steps import *
 from nexus.counting_steps import *
+from nexus.alignment_steps import *
 
 #set configuration values
 confs = {}
@@ -98,10 +99,6 @@ args["genome_index"] = index_path
 global_data = os.path.dirname(os.path.realpath(__file__)) + "/data"
 confs["rfam2go"] = global_data + "/rfam2go"
 
-#plast_cmd = [args['plast'], "-p plastx", "-d", NR, 
-#        '-i', query_fasta, "-e", "0.0001", "-a", str(threads), 
-#        "-outfmt 1", "-bargraph", "-o", tmpDir + "/plast.tsv"]
-
 if __name__ == '__main__':
     stepFuncs = [("split_genome", split_genome),
                 ("run_infernal", run_infernal),
@@ -114,13 +111,13 @@ if __name__ == '__main__':
                 ("read_nr_alignment", read_nr_alignment),
                 ("lnc_alignment_minimap", lnc_alignment_minimap),
                 ("lnc_alignment_parsing", lnc_alignment_parsing),
-                ("get_rnacentral_ids", get_rnacentral_ids),
-                ("get_functional_reference", get_functional_reference),
+                ("ncrna_alignment_minimap", ncrna_alignment_minimap),
+                ("ncrna_alignment_parsing", ncrna_alignment_parsing),
+                ("prepare_ref_annotation", prepare_ref_annotation),
                 ("map_to_genome", map_to_genome),
-                ("get_reference_rfam_ids", get_reference_rfam_ids),
-                ("get_rnacentral_info", get_rnacentral_info),
                 ("run_trnascan", run_trnascan),
                 ("parse_trna", parse_trna),
+                ("get_info", get_info),
                 ("run_gffcompare", run_gffcompare),
                 ("remove_redundancies", remove_redundancies),
                 ("review_annotations", review_annotations),

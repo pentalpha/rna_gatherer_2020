@@ -153,3 +153,17 @@ def delete_if_empty(file_path, min_cells = 1, sep = "\t"):
                 if empty:
                         #print("Removing " + file_path + " because it's empty.")
                         os.remove(file_path)
+
+def join_files_in_one(inputs, output):
+        wrote = False
+        with open(output, 'w') as out_stream:
+                for input_file in inputs:
+                        if os.path.exists(input_file):
+                                wrote = True
+                                with open(input_file, 'r') as in_stream:
+                                        for line in in_stream:
+                                                out_stream.write(line)
+        if not wrote and os.path.exists(output):
+                os.remove(output)
+                return False
+        return wrote

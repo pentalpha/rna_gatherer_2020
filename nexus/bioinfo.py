@@ -175,8 +175,8 @@ def blast(query, db, max_evalue = 0.001, threads=8,
     return code == 0
 
 def minimap_annotation(alignment_file, query_file, gff_name, 
-        new_fasta, source="blast", mol_type="lncRNA"):
-    print("Parsing blast output")
+        new_fasta, source, mol_type=None, min_cov = 0.95, min_id = 0.95, db_name = None):
+    print("Parsing minimap2 output")
     seqs = readSeqsFromFasta(query_file)
     #seqs = [(header_to_id(header),content) for header,content in seqs]
     minimap_df = pd.read_csv(alignment_file, sep='\t', header=None, index_col=False,
@@ -186,10 +186,15 @@ def minimap_annotation(alignment_file, query_file, gff_name,
     minimap_df = minimap_df.astype({"qstart": 'int32', "qend": 'int32', "qseq_len": "int32",
                 "sstart": 'int32', "send": 'int32', "sseq_len": "int32",
                 "quality": 'int32', "block_len": "int32", "matchs": "int32"})
-    minimap_df["qcovs"] = minimap_df.apply(lambda row: (row["qend"]-row["qstart"]) / row["qseq_len"], axis=1)
+    minimap_df["qcovs"] = minimap_df.apply(
+        lambda row: (row["qend"]-row["qstart"]) / row["qseq_len"], axis=1)
+    minimap_df["identity"] = minimap_df.apply(
+        lambda row: row["matchs"] / row["block_len"], axis=1)
     print(str(minimap_df.head()))
     print(str(len(minimap_df)) + " alignments")
-    minimap_df = minimap_df[minimap_df["qcovs"] >= 0.95]
+    minimap_df = minimap_df[minimap_df["identity"] >= min_id]
+    print(str(len(minimap_df)) + " alignments after filtering by identity")
+    minimap_df = minimap_df[minimap_df["qcovs"] >= min_cov]
     print(str(len(minimap_df)) + " alignments after filtering by coverage")
 
     best_hits = dict()
@@ -220,7 +225,9 @@ def minimap_annotation(alignment_file, query_file, gff_name,
             "end":str(end+1), "score": ".",
             "strand": hit["strand"],
             "frame": ".",
-            "attribute":"ID="+name+(";type="+mol_type if mol_type != None else "")}
+            "attribute":("ID="+name
+                +(";type="+mol_type if mol_type != None else "")
+                +(";db="+db_name if db_name != None else ""))}
         rows.append(row)
     gff = pd.DataFrame(rows, columns = ["seqname", "source",
         "feature", "start", "end", "score", "strand",
@@ -518,14 +525,8 @@ def cluster_ranges(ranges):
 
 def cluster_all_ranges(aligned):
     print("\nClustering " + str(len(aligned)) + " alignments:")
-    #lens1 = [len(x) for x in aligned.values()]
     for key in aligned.keys():
         aligned[key] = cluster_ranges(aligned[key])
-    #lens2 = [len(x) for x in aligned.values()]
-    #diff_lens = [lens1[i] - lens2[i] for i in range(len(lens1))]
-    #diff_lens.sort()
-    #lens2.sort()
-    #print(str(lens2))
 
 def get_gff_attributes(attrs):
     try:
@@ -601,3 +602,22 @@ def load_metrics(table_path):
                 "cellular_component": cells[3].split("-")
             }
     return metric_combinations
+
+def get_ids_from_annotation(annotation):
+    ids = []
+    def update_attribute(row):
+        attr_str = row["attribute"]
+        attributes = None
+        try:
+            attributes = get_gff_attributes(attr_str)
+        except:
+            print("Row could not have attributes parsed:\n\t"+str(row))
+        if attributes != None:
+            if "ID" in attributes:
+                short_id = attributes["ID"]
+                if "URS" in short_id:
+                    short_id = attributes["ID"].split("_")[0]
+                ids.append(short_id)
+        return 0
+    annotation.apply(lambda row: update_attribute(row),axis=1)
+    return ids

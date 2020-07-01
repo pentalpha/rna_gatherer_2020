@@ -278,11 +278,8 @@ labels = []
 counts = []
 ref_founds = []
 ref_association_search = []
-#part_labels = ["Na referência", "Parte da referência", "Referência é parte de", "Desconhecidos"]
-#part_labels_b = ["% of reference genes entirelly annotated", 
-#                "% of reference genes annotated", "% of reference genes partially annotated"]
-part_labels_c = ["Recuperada", "Termo descendente recuperado", "Termo antepassado recuperado", "Não recuperada"]
-#part_labels_c = ["a", "b", "c", "d"]
+part_labels_c = ["Recuperada", "Termo descendente recuperado", 
+                "Termo antepassado recuperado", "Não recuperada"]
 
 results = []
 for annotation_path in tqdm(annotation_paths):

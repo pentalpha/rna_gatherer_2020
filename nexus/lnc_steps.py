@@ -5,7 +5,6 @@ import os
 from tqdm import tqdm
 
 def filter_small_sequences(args, confs, tmpDir, stepDir):
-    #tmpDir = tempDir[0]
     if "transcriptome" in args:
         seqs = readSeqsFromFasta(args["transcriptome"])
         longSeqs = list()
@@ -129,7 +128,7 @@ def lnc_alignment_minimap(args, confs, tmpDir, stepDir):
         code = runCommand(cmd)
         return code == 0 
     else:
-        return True 
+        return True
 
 def lnc_alignment_parsing(args, confs, tmpDir, stepDir):
     genome_alignment = stepDir["lnc_alignment_minimap"] + "/genome_mapping.paf"

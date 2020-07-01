@@ -129,12 +129,6 @@ def get_method_color(method):
 for method, thresholds, lower_quantiles,middle_quantiles,upper_quantiles,avgs in data_points:
     print("Plotting " + method)
     method_color = get_method_color(method)
-    '''ax.plot(thresholds, middle_quantiles, 
-        label=method+", median",color=method_color)
-    ax.plot(thresholds, lower_quantiles, 
-        label=method+", 0.25 quantile",marker='v',color=method_color)
-    ax.plot(thresholds, upper_quantiles, 
-        label=method+", 0.75 quantile",marker='^',color=method_color)'''
     ax.plot(thresholds, avgs, 
         label=method+", average",color=method_color)
     #color_i += 1

@@ -78,10 +78,6 @@ def getArgs():
         default=0.6, help=("Portion of the cache memory to use for storing the counts table."))
     ap.add_argument("-ch", "--cache-size", required=False,
         default=display_cache, help=("Sets the size of the cache memory. Default: auto-detection of CPU cache size."))
-    #ap.add_argument("-st", "--threshold-step", required=False,
-    #    default=None, help=("Run the prediction for many thresold values, up to a maximum. Example: "+
-    #                        "step=0.01,maximum=0.95: 0.01,0.95"))
-
     return vars(ap.parse_args())
 
 cmdArgs = getArgs()
@@ -97,22 +93,6 @@ if ontology_types_arg[0] == "ALL":
 
 benchmarking = cmdArgs["benchmarking"]
 threads = int(cmdArgs["processes"])
-
-'''thresholds = None
-if cmdArgs["threshold"] != None:
-    thresholds = [float(th_str) for th_str in cmdArgs["threshold"].split(",")]
-    min_threshold = thresholds[0]
-    for th in thresholds:
-        if th < min_threshold:
-            min_threshold = th
-
-threshold_step = cmdArgs["threshold_step"]
-if threshold_step != None and thresholds != None:
-    parts = threshold_step.split(",")
-    step = float(parts[0])
-    maximum = float(parts[1])
-    thresholds = [float(x) for x in list(np.arange(min_threshold,maximum,step).round(3))]
-    print("Correlation coefficient thresholds: " + str(thresholds))'''
 
 cache_usage = float(cmdArgs["cache_usage"])
 available_cache = get_cache(usage=cache_usage)
@@ -226,7 +206,6 @@ def find_correlated(reads, regulators, tempDir, methods, method_streams, separat
 
     #print(str(len(coding_noncoding_pairs)) + " correlation pairs found.")
     output = tempDir+"/correlated.tsv"
-    #with open(output,'a+') as stream:
     for coding_name, noncoding_name, corr, method_name in coding_noncoding_pairs:
         method_streams[method_name].write("\t".join([coding_name,noncoding_name,str(corr)]) + "\n")
 
@@ -265,7 +244,6 @@ for key,val in correlation_files.items():
 if len(missing_metrics) > 0:
     print("Calculating correlation coefficients for the following metrics: "
         + str(missing_metrics))
-#if not os.path.exists(correlations_file_path):
     #print("Separating regulators from regulated.")
     mask = reads[reads.columns[0]].isin(regulators)
     regulators_reads = reads.loc[mask]
@@ -309,14 +287,9 @@ if len(missing_metrics) > 0:
     for method_name, stream in method_streams.items():
         stream.close()
 
-#print("Loading correlations from " + correlations_file_path + ".")
 coding_genes = {}
-    #keys = rnas, values = sets of genes
 genes_coexpressed_with_ncRNA = {}
-#keys = (rna,gene), values = (correlation,method)
 correlation_values = {}
-#correlation_lines = []
-#getFilesWith(tempDir+"/correlations/", ".tsv")
 
 for m,correlation_file_path in correlation_files.items():
     print("Loading correlations from " + correlation_file_path + ".")
@@ -326,7 +299,6 @@ for m,correlation_file_path in correlation_files.items():
         for raw_line in stream.readlines():
             cells = raw_line.rstrip("\n").split("\t")
             if len(cells) == 3:
-                #correlation_lines.append([cells[0].upper(),cells[1].upper(),float(cells[2]),cells[3]])
                 gene = cells[0]
                 rna = cells[1]
                 corr = cells[2]
@@ -524,7 +496,6 @@ def predict(tempDir,ontology_type="molecular_function",current_method=["MIC","SP
                                             min_n=min_n, min_M=min_M, min_m=min_m)
 
     print("Calculating p-values")
-    #N = len(coding_genes) #population size
     gene_term_pvalue = parallel_pvalues(N, possible_gene_term, 
                                         valid_gene_term, n_lens, M_lens, m_lens, 
                                         threads, available_cache)

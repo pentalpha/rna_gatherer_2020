@@ -59,23 +59,6 @@ for i in tqdm(range(len(locations))):
 
 #print(str(results))
 
-'''data_points = []
-
-for method in ["PRS","SPR","MIC","DC"]:
-    x = []
-    lower_quantiles = []
-    middle_quantiles = []
-    upper_quantiles = []
-    avgs = []
-    for m,threshold,n,lower_quantile,middle_quantile,upper_quantile,avg in results:
-        if m == method:
-            x.append(threshold)
-            lower_quantiles.append(lower_quantile)
-            middle_quantiles.append(middle_quantile)
-            upper_quantiles.append(upper_quantile)
-            avgs.append(avg)
-    data_points.append([method,x,lower_quantiles,middle_quantiles,upper_quantiles,avgs])'''
-
 corr_points = []
 for method in methods:
     x = []

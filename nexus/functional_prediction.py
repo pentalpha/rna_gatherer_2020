@@ -218,28 +218,6 @@ def pvalue(m, N, M, n):
     return hypergeom.sf(m, N, M, n)
 
 def pvalue_process(N, params, pid, return_dict):
-    '''gene_term_pvalue = []
-    n_lens = [len(genes_coexpressed_with_ncRNA[possible_gene_term[i][0]]) for i in range(len(possible_gene_term))]
-    M_lens = [len(genes_annotated_with_term[possible_gene_term[i][1]]) for i in range(len(possible_gene_term))]
-    m_lens = [len(genes_annotated_with_term[possible_gene_term[i][1]]
-                .intersection(genes_coexpressed_with_ncRNA[possible_gene_term[i][0]]))
-                for i in range(len(possible_gene_term))]'''
-    '''if print_progress:
-        print("Printing progress for thread " + str(pid))
-    for i in get_iterator(possible_gene_term,show=False):
-        #gene_term, n, M, m = possible_gene_term[i]
-        #n = n_lens[i] # number of genes in test set
-        n = possible_gene_term[i][1]
-        #if n >= 5:
-        #M = M_lens[i] # number of genes with annotation
-        M = possible_gene_term[i][2]
-        #    if M >= 5:
-        #m = m_lens[i] # number of genes in test set with annotation
-        m = possible_gene_term[i][3]
-        #if n_lens[i] >= 5 and M_lens[i] >= 5 and m_lens[i] >= 1:
-        pval = pvalue(m, N, M, n)
-        gene_term_pvalue.append((possible_gene_term[i][0][0],
-                            possible_gene_term[i][0][1],pval))'''
     return_dict[pid] = [(i,pvalue(m, N, M, n)) for i, n, M, m in params]
 
 def get_valid_associations(genes_coexpressed_with_ncRNA, genes_annotated_with_term, possible_gene_term,
@@ -256,16 +234,12 @@ def get_valid_associations(genes_coexpressed_with_ncRNA, genes_annotated_with_te
 def parallel_pvalues(N, possible_gene_term, valid_gene_term, 
                     n_lens, M_lens, m_lens, 
                     threads, available_memory):
-    #basic_process_mem_usage = (getsizeof(N)*2 + getsizeof(genes_coexpressed_with_ncRNA)
-    #    + getsizeof(genes_annotated_with_term))
-    #available_memory -= (basic_process_mem_usage * threads)
     min_for_chunks = threads * 24 * 1024
     if available_memory < min_for_chunks:
         print("Setting available memory to minimum")
         available_memory = min_for_chunks
     print("Memory available for pvalue calculation: " + str(available_memory/1024))
     print("Dividing chunks for parallel p-value calculation")
-    #gene_terms = []
     print("Possible associations: " + str(len(possible_gene_term)))
     params = []
     for i in range(len(possible_gene_term)):
@@ -281,8 +255,6 @@ def parallel_pvalues(N, possible_gene_term, valid_gene_term,
     index_pvalue = []
     print("Pvalues per chunk: " + str(len(run_chunks[0])))
     for run_chunk in tqdm(run_chunks):
-        #
-        #run_chunk = list(filter(lambda x: x == True))
         calcs_per_thread = int(len(run_chunk) / threads)+1
         calc_chunks = list(chunks(run_chunk, calcs_per_thread))
         #print("Calculating p-values")

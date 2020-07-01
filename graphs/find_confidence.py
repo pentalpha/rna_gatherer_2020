@@ -73,15 +73,6 @@ print(str(float((corrs_with_sim)/float(total_corrs))*100.0)
 for metric, vec in sim_correlations.items():
     print("Sorting " + str(len(vec)) + " items")
     vec.sort(key=lambda x: x[0])
-'''current_threshold = 0
-locations = []
-for i in tqdm(range(len(sim_correlations))):
-    method, corr, sim = sim_correlations[i]
-    if corr >= thresholds[current_threshold]:
-        locations.append(i)
-        current_threshold += 1
-        if current_threshold >= len(thresholds):
-            break'''
 
 #print(str(locations))
 
@@ -97,40 +88,14 @@ while total < max_coefs:
             avg = top_sims.mean()
             results.append((metric,total,avg,th))
     #print(str(total) + "/" + str(max_coefs))
-'''    loc = locations[i]
-    threshold = thresholds[i]
-    #print("Threshold " + str(threshold))
-    sub_vec = sim_correlations[loc:]
-    method_vecs = {"PRS":[],"SPR":[],"MIC":[],"DC":[],"SOB":[],"FSH":[]}
-    for m,corr,sim in sub_vec:
-        method_vecs[m].append(sim)
-    for method in methods:
-        method_vec = np.array(method_vecs[method])
-        n = len(method_vec)
-        if n > 0:
-            if method != "SOB" or threshold >= 0.9:
-                lower_quantile = np.quantile(method_vec,0.25)
-                middle_quantile = np.quantile(method_vec,0.50)
-                upper_quantile = np.quantile(method_vec,0.75)
-                avg = np.mean(method_vec)
-                results.append((method,threshold,n,lower_quantile,middle_quantile,upper_quantile,avg))'''
-
 #print(str(results))
 
 data_points = []
 
 for method in methods:
-    #x = []
-    #lower_quantiles = []
-    #middle_quantiles = []
-    #upper_quantiles = []
-    #avgs = []
     dots = []
     for m,n,avg,th in results:
         if m == method:
-            #lower_quantiles.append(lower_quantile)
-            #middle_quantiles.append(middle_quantile)
-            #upper_quantiles.append(upper_quantile)
             dots.append((n,avg,th))
     dots.sort(key=lambda x: x[0],reverse=True) 
     data_points.append([method,[a for a,b,c in dots],[b for a,b,c in dots],

@@ -128,15 +128,6 @@ for method, vec in sim_correlations.items():
     print("\t\tNumber of correlations: " + str(len(avg_set)))
     if len(avg_set) > 0:
         result_sets[method] = avg_set
-    '''median_threshold = find_threshold(corrs_vec, median_similarity)
-    print("\tMedian threshold: " + str(median_threshold))
-    median_set = set(count_corrs(median_threshold, vec))
-    print("\t\tNumber of correlations: " + str(len(median_set)))
-    high_threshold = find_threshold(corrs_vec, high_similarity,
-                        initial_threshold=median_threshold)
-    print("\tHigh threshold: " + str(high_threshold))
-    high_set = set(count_corrs(high_threshold, vec))
-    print("\t\tNumber of correlations: " + str(len(high_set)))'''
     
 
 print("\t"+"\t".join([method for method in result_sets.keys()]))
