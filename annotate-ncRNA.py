@@ -71,8 +71,6 @@ if not "best_hits" in args:
 
 #if not os.path.isfile(inputFasta):
 #    sys.exit("Input does not exist!")
-if not("max_mem" in confs):
-    confs["max_mem"] = 2000
 maxMem = confs["max_mem"]
 if not("threads" in confs):
     confs["threads"] = 1
