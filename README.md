@@ -1,4 +1,4 @@
-Want to annotate ncRNA in a genome, but is having trouble navigating the dozens of different tools and databases out there? Trying to find functions for lncRNAs, but finding almost nothing? 
+Wants to annotate ncRNA in a genome, but is having trouble navigating the dozens of different tools and databases out there? Trying to find functions for lncRNAs, but finding almost nothing? 
 
 This software may help you solve those problems.
 
@@ -7,7 +7,7 @@ This software may help you solve those problems.
 RNA Nexus is a software with ready to use pipelines for:
 
 - annotate-ncRNA.py: Annotation and prediction of ncRNA in genomes, taking into account transcriptome data, covariance models, reference sequences, reference annotations and data from public APIs;
-- predict.py: Computational prediction of lncRNA function using gene coexpression;
+- predict.py: Computational prediction of lncRNA functions using gene coexpression;
 
 ## Installation
 
@@ -125,7 +125,7 @@ python predict.py -cr test_data/counts/mus_musculus_tpm.tsv \
 
 -reg: The lncRNA list specifies which ones of the genes in the count reads table are lncRNA. It's a simple .TXT file where every line is a lncRNA name ([example](test_data/lnc_list/mus_musculus_lncRNA.txt)).
 
--ann: The functional annotation for the coding genes, nother .TSV table. Each line contain a gene name, a GO term and the respective ontology - molecular_function, biological_process or cellular_component ([example](test_data/annotation/mgi_genes_annotation.tsv)).
+-ann: The functional annotation for the coding genes, another .TSV table. Each line contains a gene name, a GO term and the respective ontology - molecular_function, biological_process or cellular_component ([example](test_data/annotation/mgi_genes_annotation.tsv)).
 
 For more detailed description of the command line arguments, use --help:
 ```sh
