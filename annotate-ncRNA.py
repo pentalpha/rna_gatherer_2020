@@ -18,10 +18,10 @@ from nexus.lnc_steps import *
 from nexus.final_steps import *
 from nexus.alignment_steps import *
 
-mandatory_files = ["go_obo", "rfam_cm"]
-require_files(mandatory_files)
 optional_files = ["non_redundant", "rna_dbs"]
 require_files(optional_files, mandatory=False)
+mandatory_files = ["go_obo", "rfam_cm"]
+require_files(mandatory_files)
 
 #set configuration values
 confs = {}
@@ -55,6 +55,8 @@ def getArgs():
 #parsing arguments
 cmdArgs = getArgs()
 outputdir = os.path.abspath(cmdArgs["output"])
+if not os.path.exists(outputdir):
+    runCommand("mkdir " + outputdir)
 argsfile = outputdir + "/args.json"
 args = {}
 if os.path.exists(argsfile):
