@@ -23,10 +23,10 @@ cd rna_nexus
 
 |File|Is it mandatory?|Download Link|
 |:-|:-:|-:|
-|Gene Ontology Graph | Yes | [go.obo](http://purl.obolibrary.org/obo/go.obo) |
-|RFAM Covariance Models | Yes | [Rfam.cm.gz](ftp://ftp.ebi.ac.uk/pub/databases/Rfam/CURRENT/Rfam.cm.gz)|
-|Non-Redundant Proteins | Only if you want to remove known protein's mRNA from lncRNA data | [nr.gz](ftp://ftp.ncbi.nlm.nih.gov/blast/db/FASTA/nr.gz)|
-|ncRNA Database FASTAs | Only if you want to look for known ncRNA through alignment | It can be ANY .fasta file. We suggest using RNA Central's database: [rnacentral_active.fasta.gz](ftp://ftp.ebi.ac.uk/pub/databases/RNAcentral/current_release/sequences/rnacentral_active.fasta.gz)
+|Gene Ontology Graph | Yes | [http://purl.obolibrary.org/obo/go.obo](http://purl.obolibrary.org/obo/go.obo) |
+|RFAM Covariance Models | Yes | [ftp://ftp.ebi.ac.uk/pub/databases/Rfam/CURRENT/Rfam.cm.gz](ftp://ftp.ebi.ac.uk/pub/databases/Rfam/CURRENT/Rfam.cm.gz) |
+|Non-Redundant Proteins | Only if you want to remove known protein's mRNA from lncRNA data | [ftp://ftp.ncbi.nlm.nih.gov/blast/db/FASTA/nr.gz](ftp://ftp.ncbi.nlm.nih.gov/blast/db/FASTA/nr.gz) |
+|ncRNA Database FASTAs | Only if you want to look for known ncRNA through alignment | It can be ANY .fasta file. We suggest using RNA Central's database: [ftp://ftp.ebi.ac.uk/pub/databases/RNAcentral/current_release/sequences/rnacentral_active.fasta.gz](ftp://ftp.ebi.ac.uk/pub/databases/RNAcentral/current_release/sequences/rnacentral_active.fasta.gz) |
 
 After downloading them, edit the config.json file to include the full paths. If the file does not already exist, create it:
 
