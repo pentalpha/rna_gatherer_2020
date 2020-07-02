@@ -1,3 +1,27 @@
+"""Function predictor for lncRNA that uses gene coexpression.
+
+This script is used to apply statistics in order to figure out
+possible Gene Ontology terms for lncRNAs, based on gene 
+expression counts and an annotation for coding genes. The gene
+expression is read from a counts table (see test_data/counts)
+and the expression of lncRNA and coding genes is compared
+by calculating correlation coefficients through several
+differente metrics. The pairs of (lncRNA,gene) with 
+coefficients passing the required minimum value to be 
+considered inside the confidence level are taken as
+coexpressed.
+The associations between coding genes and GO terms in the 
+functional annotation (see test_data/annotation) of the
+coding genes are passed as possible associations for their
+lncRNA coexpressed pairs. Statistical tests are used to filter
+which of these possible associations are statistically
+relevant, calculating P-Values and FDRs.
+The associations passing the filtering are grouped together in
+a output file, the functional prediction.
+
+Author: Pitágoras Alves (github.com/pentalpha)
+"""
+
 import sys
 from nexus.functional_prediction import *
 from nexus.util import *
@@ -8,7 +32,14 @@ import networkx
 import numpy as np
 import argparse
 import multiprocessing
+
+'''
+Loading configurations and command line arguments
+'''
 from config import configs
+mandatory_files = ["go_obo"]
+require_files(mandatory_files)
+
 #set configuration values
 confs = {}
 for conf in configs:
@@ -149,6 +180,10 @@ K = int(cmdArgs["k_min_coexpressions"])
 
 regulators_max_portion = 0.4
 
+'''
+Creating output directory
+'''
+
 if not os.path.exists(tempDir):
     os.mkdir(tempDir)
 
@@ -160,6 +195,8 @@ def get_metric_file(metric_name):
     return open(correlations_dir + "/" + metric_name + ".tsv", 'a+')
 
 def find_correlated(reads, regulators, tempDir, methods, method_streams, separate_regulators = False):
+    """Find coexpressed pairs using a set of metrics."""
+
     coding_noncoding_pairs = []
     func = try_find_coexpression_process
     if separate_regulators:
@@ -212,6 +249,10 @@ def find_correlated(reads, regulators, tempDir, methods, method_streams, separat
     manager.shutdown()
     del manager
 
+'''
+Pre-processing of the count-reads table
+'''
+
 print("Ontology type is " + str(ontology_types_arg))
 print("Used metrics are: " + str(metrics_used))
 reads = pd.read_csv(count_reads_path, sep='\t')
@@ -231,6 +272,10 @@ with open(regulators_path,'r') as stream:
     for line in stream.readlines():
         regulators.append(line.rstrip("\n"))
 
+'''
+Looking for metrics not calculated yet.
+'''
+
 correlation_files = {method_name:correlations_dir+"/"+method_name+".tsv" for method_name in metrics_used}
 
 for m,f in correlation_files.items():
@@ -242,6 +287,9 @@ for key,val in correlation_files.items():
         missing_metrics.append(key)
 
 if len(missing_metrics) > 0:
+    '''
+    Calculate any missing metrics
+    '''
     print("Calculating correlation coefficients for the following metrics: "
         + str(missing_metrics))
     #print("Separating regulators from regulated.")
@@ -257,6 +305,9 @@ if len(missing_metrics) > 0:
     
     available_size = available_cache
 
+    '''
+    Split the table into cache-sized smaller parts.
+    '''
     max_for_regulators = available_size*regulators_max_portion
     regs_size = getsizeof(regulators_reads)
     regulator_dfs = [regulators_reads]
@@ -278,6 +329,9 @@ if len(missing_metrics) > 0:
 
     method_streams = {metric_name:get_metric_file(metric_name) for metric_name in missing_metrics}
 
+    '''
+    Calculate the correlations for each part of the table
+    '''
     i = 1
     for df,regulator_df in tqdm(df_pairs):
         find_correlated(df, regulators_reads, tempDir, missing_metrics, 
@@ -291,6 +345,9 @@ coding_genes = {}
 genes_coexpressed_with_ncRNA = {}
 correlation_values = {}
 
+'''
+Load correlation coefficients from the files where they are stored.
+'''
 for m,correlation_file_path in correlation_files.items():
     print("Loading correlations from " + correlation_file_path + ".")
     with open(correlation_file_path,'r') as stream:
@@ -378,6 +435,8 @@ def predict(tempDir,ontology_type="molecular_function",current_method=["MIC","SP
             conf_arg=None,benchmarking=False,k_min_coexpressions=1,
             pval_threshold=0.05,fdr_threshold=0.05,
             min_n=5, min_M=5, min_m=1):
+    """Predict functions based on the loaded correlation coefficients."""
+    
     K = k_min_coexpressions
     confidence = conf_arg
     thresholds = confidence_thresholds[confidence]
@@ -536,8 +595,6 @@ def predict(tempDir,ontology_type="molecular_function",current_method=["MIC","SP
         for rna, term, pvalue, fdr in relevant_pvals:
             stream.write("\t".join([rna,term,ontology_type,str(pvalue),str(fdr)])+"\n")
     return output_file
-
-
 
 for conf in confidence_levels:
     output_files = []

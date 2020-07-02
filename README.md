@@ -132,6 +132,10 @@ For more detailed description of the command line arguments, use --help:
 python predict.py --help
 ```
 
+## Project structure
+
+
+
 ## To-do list
 
 - Create an utility to download the databases for the user;

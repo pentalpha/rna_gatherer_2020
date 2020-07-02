@@ -203,23 +203,3 @@ for p, corrs_paths in tqdm(mini_corrs_paths.items()):
             if lines_read[-1] != "\n":
                 lines_read += "\n"
             final_method_streams[metric].write(lines_read)
-
-'''print("Chunks for regulated: " + str(len(dfs)) 
-+ "\nChunks for regulators: " + str(len(regulator_dfs)))
-
-df_pairs = []
-for df in dfs:
-    for regulator_df in regulator_dfs:
-        df_pairs.append((df, regulator_df))
-
-method_streams = {metric_name:get_metric_file(metric_name) 
-                    for metric_name in metrics_used}
-
-i = 1
-for df,regulator_df in tqdm(df_pairs):
-    find_correlated(df, regulators_reads, tempDir, method_streams)
-    i += 1
-
-for method_name, stream in method_streams.items():
-    stream.close()
-'''
