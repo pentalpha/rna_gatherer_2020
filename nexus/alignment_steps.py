@@ -36,11 +36,10 @@ def ncrna_alignment_parsing(args, confs, tmpDir, stepDir):
         db_name = paf_file.split("/")[-1].split("-")[0]
         print("\tParsing " + db_name)
         genome_alignment = paf_file
-        query_fasta = os.path.abspath(confs["rna_dbs"][db_name])
         
         output_gff = tmpDir + "/"+db_name+"-annotation.gff"
         annotated_fasta = tmpDir + "/"+db_name+"-in_genome.fasta"
-        mapped_fasta = minimap_annotation(genome_alignment, query_fasta, output_gff,
+        mapped_fasta = minimap_annotation(genome_alignment, output_gff,
                         annotated_fasta, source="db_alignment", mol_type=None, 
                         db_name=db_name)
         gffs.append(output_gff)

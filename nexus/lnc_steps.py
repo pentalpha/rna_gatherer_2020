@@ -143,8 +143,9 @@ def lnc_alignment_parsing(args, confs, tmpDir, stepDir):
     if os.path.exists(lnc_fasta) and os.path.exists(genome_alignment):
         output_gff = tmpDir + "/lncRNA_annotation.gff"
         annotated_fasta = tmpDir + "/lncRNA_in_genome.fasta"
-        mapped_fasta = minimap_annotation(genome_alignment, lnc_fasta, output_gff,
-                        annotated_fasta, source="rnasamba", mol_type="lncRNA")
+        mapped_fasta = minimap_annotation(genome_alignment, output_gff,
+                        annotated_fasta, source="rnasamba", mol_type="lncRNA",
+                        query_file=lnc_fasta)
         return True
     else:
         print("Skiping lnc mapping")
