@@ -174,8 +174,9 @@ def blast(query, db, max_evalue = 0.001, threads=8,
     code = runCommand(cmd)
     return code == 0
 
-def minimap_annotation(alignment_file, query_file, gff_name, 
-        new_fasta, source, mol_type=None, min_cov = 0.95, min_id = 0.95, db_name = None):
+def minimap_annotation(alignment_file, gff_name, 
+        new_fasta, source, mol_type=None, min_cov = 0.95, min_id = 0.95,
+        db_name = None, query_file = None):
     print("Parsing " + alignment_file)
     #seqs = [(header_to_id(header),content) for header,content in seqs]
     minimap_df = pd.read_csv(alignment_file, sep='\t', header=None, index_col=False,
@@ -208,14 +209,15 @@ def minimap_annotation(alignment_file, query_file, gff_name,
     print(str(len(unique)) + " transcripts with genome mapping.")
     print(str(len(best_hits.keys())) + " total mappings.")
 
-    print("\tLoading query file.")
-    seqs = readSeqsFromFasta(query_file)
-    validSeqs, invalidSeqs = filterSeqs(seqs, unique)
-    print(str(len(invalidSeqs)) + " transcripts without genome mapping")
-    print(str(len(validSeqs)) + " transcripts mapped")
-    annotated_fasta = new_fasta
-    print("\tCreating transcriptome file.")
-    writeFastaSeqs(validSeqs, annotated_fasta)
+    if query_file != None:
+        print("\tLoading query file.")
+        seqs = readSeqsFromFasta(query_file)
+        validSeqs, invalidSeqs = filterSeqs(seqs, unique)
+        print(str(len(invalidSeqs)) + " transcripts without genome mapping")
+        print(str(len(validSeqs)) + " transcripts mapped")
+        annotated_fasta = new_fasta
+        print("\tCreating transcriptome file.")
+        writeFastaSeqs(validSeqs, annotated_fasta)
 
     print("Creating gff annotation file.")
     rows = []
@@ -236,7 +238,6 @@ def minimap_annotation(alignment_file, query_file, gff_name,
         "feature", "start", "end", "score", "strand",
         "frame", "attribute"])
     gff.to_csv(gff_name, sep="\t", index=False, header = False)
-    print(str(len(seqs)) + " transcripts analyzed.")
     print(str(len(gff)) + " mappings detected and annotated on " + gff_name)
     return True
 
