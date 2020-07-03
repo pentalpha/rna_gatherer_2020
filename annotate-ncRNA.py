@@ -87,7 +87,7 @@ if "genome" in args:
     runCommand("ln -s " + args["genome"] + " " + args["genome_link"])
 else:
     if not os.path.exists(args["genome_link"]):
-        print("No path to genome in arguments giver now or previously,"
+        print("No path to genome in arguments given now or previously,"
               +" please specify a genome to use.")
         quit()
 index_path = args["genome_link"] + ".mmi"
@@ -114,6 +114,7 @@ if __name__ == '__main__':
                 ("filter_small_sequences", filter_small_sequences),
                 ("filter_long_orfs", filter_long_orfs),
                 ("test_coding_potential", test_coding_potential),
+                ("parse_coding_potential", parse_coding_potential),
                 ("nr_alignment", nr_alignment),
                 ("read_nr_alignment", read_nr_alignment),
                 ("lnc_alignment_minimap", lnc_alignment_minimap),

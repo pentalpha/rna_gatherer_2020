@@ -66,6 +66,12 @@ def test_coding_potential(args, confs, tmpDir, stepDir):
         code = runCommand(cmd)
         if code != 0:
             return False
+    return True
+
+def parse_coding_potential(args, confs, tmpDir, stepDir):
+    long_transcripts_path = stepDir["filter_long_orfs"] + "/no_orfs.fasta"
+    output = stepDir["test_coding_potential"] + "/samba.tsv"
+    if os.path.exists(output):
         non_coding_ids = set()
         with open(output, 'r') as stream:
             lines = [raw_line.rstrip("\n").split("\t") for raw_line in stream.readlines()]
@@ -76,13 +82,12 @@ def test_coding_potential(args, confs, tmpDir, stepDir):
                         non_coding_ids.add(ID)
         seqs = readSeqsFromFasta(long_transcripts_path)
         noncoding, coding = filterSeqs(seqs, non_coding_ids)
-
         print(str(len(coding)) + " transcripts with coding potential filtered out")
         writeFastaSeqs(noncoding, tmpDir + "/no_coding_potential.fasta")
     return True
 
 def nr_alignment(args, confs, tmpDir, stepDir):
-    query_fasta = stepDir["test_coding_potential"] + "/no_coding_potential.fasta"
+    query_fasta = stepDir["parse_coding_potential"] + "/no_coding_potential.fasta"
     if os.path.exists(query_fasta):
         if "non_redundant" in confs:
             db = confs["non_redundant"]
@@ -101,7 +106,7 @@ def nr_alignment(args, confs, tmpDir, stepDir):
 def read_nr_alignment(args, confs, tmpDir, stepDir):
     blastFile = stepDir["nr_alignment"] + "/blast.tsv"
     if os.path.exists(blastFile):
-        query_fasta = stepDir["test_coding_potential"] + "/no_coding_potential.fasta"
+        query_fasta = stepDir["parse_coding_potential"] + "/no_coding_potential.fasta"
         print("Filtering according to blastx results")
 
         seqs = readSeqsFromFasta(query_fasta)
@@ -119,7 +124,7 @@ def read_nr_alignment(args, confs, tmpDir, stepDir):
 def lnc_alignment_minimap(args, confs, tmpDir, stepDir):
     lnc_fasta = stepDir["read_nr_alignment"] + "/not_protein.fasta"
     if not os.path.exists(lnc_fasta):
-        lnc_fasta = stepDir["test_coding_potential"] + "/no_coding_potential.fasta"
+        lnc_fasta = stepDir["parse_coding_potential"] + "/no_coding_potential.fasta"
     if os.path.exists(lnc_fasta):
         cmd = " ".join([confs["minimap2"],
             "-x splice:hq -uf -t", str(confs["threads"]),
@@ -134,7 +139,7 @@ def lnc_alignment_parsing(args, confs, tmpDir, stepDir):
     genome_alignment = stepDir["lnc_alignment_minimap"] + "/genome_mapping.paf"
     lnc_fasta = stepDir["read_nr_alignment"] + "/not_protein.fasta"
     if not os.path.exists(lnc_fasta):
-        lnc_fasta = stepDir["test_coding_potential"] + "/no_coding_potential.fasta"
+        lnc_fasta = stepDir["parse_coding_potential"] + "/no_coding_potential.fasta"
     if os.path.exists(lnc_fasta) and os.path.exists(genome_alignment):
         output_gff = tmpDir + "/lncRNA_annotation.gff"
         annotated_fasta = tmpDir + "/lncRNA_in_genome.fasta"
