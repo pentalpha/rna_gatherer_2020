@@ -98,7 +98,6 @@ def review_annotations(args, confs, tmpDir, stepDir):
 
     annotation["rna_type"] = annotation.apply(lambda row: get_rna_type(row["attribute"]),
                                                 axis = 1)
-
     def make_row(type_name, type_annotation):
         new_row = [type_name]
         new_row.append(len(type_annotation))
@@ -109,7 +108,7 @@ def review_annotations(args, confs, tmpDir, stepDir):
     review_rows.append(make_row("All", annotation))
     for rna_type, type_annotation in annotation.groupby(["rna_type"]):
         review_rows.append(make_row(rna_type, type_annotation))
-
+    review_rows.sort(key=lambda row: row[1], reverse=True)
     type_review_df = pd.DataFrame(review_rows, 
                             columns=["ncRNA Type", "Total"] + source_list)
     type_review_df.to_csv(tmpDir+"/type_review.tsv", sep="\t", index = False)
