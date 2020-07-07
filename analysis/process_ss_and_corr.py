@@ -8,7 +8,6 @@ import dask.dataframe as dd
 
 def get_filename(full_path):
     last = full_path.split("/")[-1]
-    #name = ".".join(last.split(".")[:-1])
     return last
 
 def add_names_to_set(file_path, names_set):
@@ -33,7 +32,6 @@ if __name__ == "__main__":
     files_ss = sys.argv[1].split(",")
     files_corr = sys.argv[2].split(",")
     all_files = files_ss + files_corr
-    #gaf_path = sys.argv[2]
     output_dir = sys.argv[3]
 
     '''if len(corr_file_paths) == 1:

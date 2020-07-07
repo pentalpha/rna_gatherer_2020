@@ -93,12 +93,12 @@ def best_id(ids, hits):
         return best_by_source["reference"]
     elif "reference_mapping" in best_by_source:
         return best_by_source["reference_mapping"]
+    elif "db_alignment" in best_by_source:
+        return best_by_source["db_alignment"]
     elif "tRNAscan-SE" in best_by_source:
         return best_by_source["tRNAscan-SE"]
     elif "rnasamba" in best_by_source:
         return best_by_source["rnasamba"]
-    elif "db_alignment" in best_by_source:
-        return best_by_source["db_alignment"]
     elif "cmscan" in best_by_source:
         return best_by_source["cmscan"]
     else:
