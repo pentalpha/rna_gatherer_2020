@@ -82,12 +82,39 @@ def number_of_rfam_ids(df):
                 count.add(attrs["rfam"])
     return len(count)
 
+def get_rna_type(attrs_str):
+    attrs = get_gff_attributes(attrs_str)
+    if "type" in attrs:
+        return attrs["type"]
+    else:
+        return "Undefined"
+
 def review_annotations(args, confs, tmpDir, stepDir):
     annotation = pd.read_csv(stepDir["remove_redundancies"] + "/annotation.gff", sep="\t", header=None,
         names = ["seqname", "source", "feature", "start", "end", "score", "strand", "frame", "attribute"])
     print("Reviewing annotation sources")
+    source_list = annotation["source"].unique().tolist()
+    review_rows = []
 
-    lines = []
+    annotation["rna_type"] = annotation.apply(lambda row: get_rna_type(row["attribute"]),
+                                                axis = 1)
+
+    def make_row(type_name, type_annotation):
+        new_row = [type_name]
+        new_row.append(len(type_annotation))
+        for source in source_list:
+            new_row.append(len(type_annotation[type_annotation["source"] == source]))
+        return new_row
+
+    review_rows.append(make_row("All", annotation))
+    for rna_type, type_annotation in annotation.groupby(["rna_type"]):
+        review_rows.append(make_row(rna_type, type_annotation))
+
+    type_review_df = pd.DataFrame(review_rows, 
+                            columns=["ncRNA Type", "Total"] + source_list)
+    type_review_df.to_csv(tmpDir+"/type_review.tsv", sep="\t", index = False)
+
+    rfam_lines = []
     for name, hits in annotation.groupby(["source"]):
         line = {
             "source": name,
@@ -95,16 +122,17 @@ def review_annotations(args, confs, tmpDir, stepDir):
             "with_rfam_id": has_rfam_id(hits),
             "rfam_ids": number_of_rfam_ids(hits)
         }
-        lines.append(line)
-    lines.append({
+        rfam_lines.append(line)
+    rfam_lines.append({
         "source": "ALL",
         "total": annotation.shape[0],
         "with_rfam_id": has_rfam_id(annotation),
         "rfam_ids": number_of_rfam_ids(annotation)
     })
 
-    review = pd.DataFrame(lines, columns=["source", "total", "with_rfam_id","rfam_ids"])
-    review.to_csv(tmpDir + "/review.tsv", sep="\t", index=False)
+    rfam_review = pd.DataFrame(rfam_lines, 
+                        columns=["source", "total", "with_rfam_id","rfam_ids"])
+    rfam_review.to_csv(tmpDir + "/rfam_review.tsv", sep="\t", index=False)
 
     return True
 

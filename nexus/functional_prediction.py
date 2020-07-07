@@ -44,7 +44,11 @@ def calc_sobolev(reads1,reads2):
     weighted_fourier = w_plus_one*squared_fourier
     fourier_sum = np.sum(weighted_fourier)
     sum_power = np.power(fourier_sum,0.5)
-    reduced_sum = sum_power / 20.0
+    return sum_power
+
+def calc_sobolev_norm(reads1, reads2):
+    sob = calc_sobolev(reads1,reads2)
+    reduced_sum = sob / 20.0
     corrected_corr = 1.0 - reduced_sum
     if corrected_corr < 0.0:
             corrected_corr = 0
@@ -61,13 +65,17 @@ def calc_fisher_information(reads1,reads2):
         t = div1 * div2
         total = np.sum(np.sqrt(t))
         raw_corr = np.arccos(total)
-        corrected_corr = 1.0 - raw_corr
-        if corrected_corr < 0.0:
-            corrected_corr = 0
-        return corrected_corr
+        return raw_corr
     except Warning:
         #print("Numpy invalid division1:\n\t"+str(square1)+"\n\t"+str(square2))
         return 0.0
+
+def calc_fisher_information_norm(reads1,reads2):
+    fisher = calc_fisher_information(reads1,reads2)
+    corrected_corr = 1.0 - fisher
+    if corrected_corr < 0.0:
+        corrected_corr = 0
+    return corrected_corr
 
 def calc_mic(reads1,reads2,mine):
     mine.compute_score(reads1, reads2)
@@ -99,7 +107,7 @@ def get_mic():
     return mic
 
 method_names = {"MIC": get_mic(), "PRS": prs, "SPR": spr, "DC": dc, 
-                "FSH": calc_fisher_information, "SOB": calc_sobolev}
+                "FSH": calc_fisher_information_norm, "SOB": calc_sobolev_norm}
 
 def calc_all(pid, coding_rows, regulators, return_dict):
     warnings.filterwarnings('error')
@@ -108,6 +116,9 @@ def calc_all(pid, coding_rows, regulators, return_dict):
     methods = []
     names = []
     method_ids = ["MIC","FSH","PRS","SPR","SOB","DC"]
+    method_names["SOB"] = calc_sobolev
+    method_names["FSH"] = calc_fisher_information
+
     for method_name in method_ids:
         methods.append(method_names[method_name])
 
