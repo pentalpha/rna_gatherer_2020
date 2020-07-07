@@ -105,6 +105,8 @@ def best_id(ids, hits):
         print("Error: no known source in " + str(id_by_source))
         return None
 
+unkown_rna = ["other", "misc_rna", "misc_RNA"]
+
 def update_attrs(attr_str):
     attrs = get_gff_attributes(attr_str)
     if "family" in attrs:
@@ -114,9 +116,13 @@ def update_attrs(attr_str):
         if "type" in attrs:
             tp = attrs["type"]
         
-        if tp == "other" or tp == "misc_rna":
+        if tp in unkown_rna:
             new_type = get_rna_type(attrs["rfam"])
             attrs["type"] = new_type
+    
+    #Replace 'misc_rna' with 'other'
+    if attrs["type"] in unkown_rna:
+        attrs["type"] = "other"
     return get_gff_attributes_str(attrs)
 
 def remove_redundancies(args, confs, tmpDir, stepDir):
