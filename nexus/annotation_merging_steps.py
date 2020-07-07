@@ -97,10 +97,10 @@ def best_id(ids, hits):
         return best_by_source["db_alignment"]
     elif "tRNAscan-SE" in best_by_source:
         return best_by_source["tRNAscan-SE"]
-    elif "rnasamba" in best_by_source:
-        return best_by_source["rnasamba"]
     elif "cmscan" in best_by_source:
         return best_by_source["cmscan"]
+    elif "rnasamba" in best_by_source:
+        return best_by_source["rnasamba"]
     else:
         print("Error: no known source in " + str(id_by_source))
         return None

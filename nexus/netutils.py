@@ -162,7 +162,7 @@ def parallel_rnacentral_requester(to_retrieve, seqs_dict, confs, tries = 3):
         to_retrieves = [list(chunk) for chunk in chunks(list(to_retrieve), 100)]
         for chunk in tqdm(to_retrieves):
             processes = []
-            with ThreadPoolExecutor(max_workers=20) as executor:
+            with ThreadPoolExecutor(max_workers=40) as executor:
                 for seq_id in to_retrieve:
                     if seq_id in chunk:
                         if seq_id in seqs_dict:
@@ -244,7 +244,7 @@ def retrieve_func_annotation(annotation_path, output, confs, taxon_id):
                         "score", "strand", "frame", "attribute"])
 
     to_retrieve = get_ids_from_annotation(annotation)
-    id_chunks = chunks(list(to_retrieve), 50)
+    id_chunks = chunks(list(to_retrieve), 75)
     results = set()
     annotations_retrieved = False
 
