@@ -82,12 +82,12 @@ def number_of_rfam_ids(df):
                 count.add(attrs["rfam"])
     return len(count)
 
-def get_rna_type(attrs_str):
+def get_ncrna_type(attrs_str):
     attrs = get_gff_attributes(attrs_str)
     if "type" in attrs:
         return attrs["type"]
     else:
-        return "Undefined"
+        return "other"
 
 def review_annotations(args, confs, tmpDir, stepDir):
     annotation = pd.read_csv(stepDir["remove_redundancies"] + "/annotation.gff", sep="\t", header=None,
@@ -96,7 +96,7 @@ def review_annotations(args, confs, tmpDir, stepDir):
     source_list = annotation["source"].unique().tolist()
     review_rows = []
 
-    annotation["rna_type"] = annotation.apply(lambda row: get_rna_type(row["attribute"]),
+    annotation["rna_type"] = annotation.apply(lambda row: get_ncrna_type(row["attribute"]),
                                                 axis = 1)
     def make_row(type_name, type_annotation):
         new_row = [type_name]

@@ -109,17 +109,16 @@ unkown_rna = ["other", "misc_rna", "misc_RNA"]
 
 def update_attrs(attr_str):
     attrs = get_gff_attributes(attr_str)
+
     if "family" in attrs:
         attrs["rfam"] = attrs["family"]
-    tp = "other"
     if "rfam" in attrs:
-        if "type" in attrs:
-            tp = attrs["type"]
-        
-        if tp in unkown_rna:
-            new_type = get_rna_type(attrs["rfam"])
+        new_type = get_rna_type(attrs["rfam"])
+        if new_type != "other":
             attrs["type"] = new_type
     
+    if not "type" in attrs:
+        attrs["type"] = "other"
     #Replace 'misc_rna' with 'other'
     if attrs["type"] in unkown_rna:
         attrs["type"] = "other"
