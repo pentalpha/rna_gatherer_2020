@@ -109,13 +109,13 @@ def get_mic():
 method_names = {"MIC": get_mic(), "PRS": prs, "SPR": spr, "DC": dc, 
                 "FSH": calc_fisher_information_norm, "SOB": calc_sobolev_norm}
 
-def calc_all(pid, coding_rows, regulators, return_dict):
+def calc_all(pid, coding_rows, regulators, metrics_used, return_dict):
     warnings.filterwarnings('error')
     coding_noncoding_pairs = []
 
     methods = []
     names = []
-    method_ids = ["MIC","FSH","PRS","SPR","SOB","DC"]
+    method_ids = metrics_used
     method_names["SOB"] = calc_sobolev
     method_names["FSH"] = calc_fisher_information
 

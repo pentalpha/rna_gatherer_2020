@@ -12,6 +12,7 @@ for conf in configs:
 
 display_cache = get_cache()
 
+all_methods = ["MIC","DC","PRS","SPR","SOB","FSH"]
 def getArgs():
     ap = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("-cr", "--count-reads", required=True,
@@ -76,7 +77,7 @@ def find_correlated(reads, regulators, tempDir, method_streams):
             end = limit
         parcial_df = reads.iloc[start:end]
         p = multiprocessing.Process(target=func, 
-            args=(i, parcial_df, regulators, return_dict, ))
+            args=(i, parcial_df, regulators, metrics_used, return_dict, ))
         processes.append(p)
         #print("Spawned process from gene " + str(start) + " to " + str(end))
         p.start()
@@ -88,7 +89,7 @@ def find_correlated(reads, regulators, tempDir, method_streams):
     if end < limit:
         parcial_df = reads.iloc[end:limit]
         p = multiprocessing.Process(target=func, 
-            args=(last_pid+1, parcial_df, regulators, return_dict, ))
+            args=(last_pid+1, parcial_df, regulators, metrics_used, return_dict, ))
         processes.append(p)
         #print("Spawned process from gene " + str(end) + " to " + str(limit))
         p.start()
