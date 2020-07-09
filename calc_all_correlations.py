@@ -12,7 +12,6 @@ for conf in configs:
 
 display_cache = get_cache()
 
-all_methods = ["MIC","DC","PRS","SPR","SOB","FSH"]
 def getArgs():
     ap = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("-cr", "--count-reads", required=True,
@@ -22,10 +21,13 @@ def getArgs():
     default_threads = max(2, multiprocessing.cpu_count()-1)
     ap.add_argument("-p", "--processes", required=False,
         default=default_threads, help=("CPUs to use. Default: " + str(default_threads)+"."))
+    ap.add_argument("-m", "--metrics", required=False, default=",".join(all_methods),
+        help="Metrics to calculate. Options are FSH, SOB, MIC, DC, PRS, SPR. Default: All.")   
     ap.add_argument("-chu", "--cache-usage", required=False,
         default=0.6, help=("Portion of the cache memory to use for storing the counts table."))
     ap.add_argument("-ch", "--cache-size", required=False,
-        default=display_cache, help=("Sets the size of the cache memory. Default: auto-detection of CPU cache size."))
+        default=display_cache, help=("Sets the size of the cache memory."
+        +" Default: auto-detection of CPU cache size."))
 
     return vars(ap.parse_args())
 
@@ -39,7 +41,7 @@ if "cache_size" in cmdArgs:
     available_cache = int(int(cmdArgs["cache_size"]) * cache_usage)
 print("Available cache memory: " + str(int(available_cache)))
 available_cache = int(available_cache/threads)
-metrics_used = all_methods
+metrics_used = cmdArgs["metrics"].split(",")
 
 regulators_max_portion = 0.5
 
@@ -147,7 +149,7 @@ del dfs
 
 print("Reading smaller DFs")
 def get_corrs_paths(df_path):
-    corrs_paths = [(metric, df_path+"."+metric) for metric in all_methods]
+    corrs_paths = [(metric, df_path+"."+metric) for metric in metrics_used]
     for metric,p in corrs_paths:
         delete_if_empty(p)
     final_corrs_paths = []
@@ -165,7 +167,7 @@ small_df_paths = getFilesWith(tempDir, "-counts_part.tsv")
 dfs = {p: pd.read_csv(p, sep="\t") for p in small_df_paths}
 mini_corrs_paths = {p: get_corrs_paths(p) 
                     for p in small_df_paths}
-should_run = {p: True if len(corr_paths) == len(all_methods) else False 
+should_run = {p: True if len(corr_paths) == len(metrics_used) else False 
                     for p, corr_paths in mini_corrs_paths.items()}
 
 print("Processing counts")
@@ -194,7 +196,7 @@ final_method_streams = {metric_name:get_metric_file(metric_name)
                     for metric_name in metrics_used}
 
 for p, corrs_paths in tqdm(mini_corrs_paths.items()):
-    if len(corrs_paths) != len(all_methods):
+    if len(corrs_paths) != len(metrics_used):
         print("Not all correlations calculated for " + p)
         quit()
     for metric, corr_path in corrs_paths:
