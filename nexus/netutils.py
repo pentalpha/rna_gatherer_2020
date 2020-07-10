@@ -5,6 +5,7 @@ import json
 from nexus.util import *
 from nexus.bioinfo import *
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from nexus.rna_type import *
 
 def get_md5(sequence):
     """

@@ -7,8 +7,6 @@ import pandas as pd
 import requests
 import os
 
-rnacentral2rfam = {}
-rfam2type = {}
 
 def readSeqsFromFasta(input_fasta):
     seqs = list()
@@ -555,45 +553,6 @@ def get_gff_attributes_str(attrs):
         x += key+"="+value+";"
     x = x.rstrip(";")
     return x
-
-def load_rnacentral2rfam():
-    global_data = os.path.dirname(os.path.realpath(__file__)) + "/../data"
-    with open(global_data+"/rnacentral2rfam.tsv",'r') as input_stream:
-        for line in input_stream.readlines():
-            cells = line.rstrip("\n").split()
-            rnacentral = "URS"+cells[0]
-            rfam = "RF"+cells[1]
-            rnacentral2rfam[rnacentral] = rfam
-
-def get_rfam_from_rnacentral(id_, print_response=False):
-    if len(rnacentral2rfam.keys()) == 0:
-        load_rnacentral2rfam()
-
-    if id_ in rnacentral2rfam:
-        return rnacentral2rfam[id_]
-    elif id_.split("_")[0] in rnacentral2rfam:
-        return rnacentral2rfam[id_.split("_"[0])]
-    else:
-        return None
-
-def load_rfam2type():
-    print("Loading rfam2type")
-    global_data = os.path.dirname(os.path.realpath(__file__)) + "/../data"
-    with open(global_data+"/rfam2type.tsv",'r') as input_stream:
-        for line in input_stream.readlines():
-            cells = line.rstrip("\n").split()
-            rfam = cells[0]
-            tp = cells[1]
-            rfam2type[rfam] = tp
-
-def get_rna_type(id_):
-    if len(rfam2type.keys()) == 0:
-        load_rfam2type()
-
-    if id_ in rfam2type:
-        return rfam2type[id_]
-    else:
-        return None
 
 def load_metrics(table_path):
     metric_combinations = {}

@@ -6,6 +6,7 @@ from tqdm import tqdm
 from nexus.bioinfo import *
 from nexus.util import *
 from nexus.netutils import *
+from nexus.rna_type import *
 
 def filter_non_transcripts(gff_path, gff_output_path):
     ref_annotation = pd.read_csv(gff_path, sep="\t", header=None, names=["seqname", 
@@ -109,19 +110,20 @@ unkown_rna = ["other", "misc_rna", "misc_RNA"]
 
 def update_attrs(attr_str):
     attrs = get_gff_attributes(attr_str)
-
     if "family" in attrs:
         attrs["rfam"] = attrs["family"]
+    
     if "rfam" in attrs:
         new_type = get_rna_type(attrs["rfam"])
-        if new_type != "other":
-            attrs["type"] = new_type
-    
-    if not "type" in attrs:
-        attrs["type"] = "other"
-    #Replace 'misc_rna' with 'other'
-    if attrs["type"] in unkown_rna:
-        attrs["type"] = "other"
+        attrs["type"] = new_type
+    else:
+        if not "type" in attrs:
+            attrs["type"] = "other"
+        #Replace 'misc_rna' with 'other'
+        if attrs["type"] in unkown_rna:
+            attrs["type"] = "other"
+        attrs["type"] = get_full_type(attrs["type"])
+
     return get_gff_attributes_str(attrs)
 
 def remove_redundancies(args, confs, tmpDir, stepDir):

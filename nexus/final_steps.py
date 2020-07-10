@@ -7,7 +7,7 @@ from nexus.bioinfo import readSeqsFromFasta, filterSeqs, writeFastaSeqs, getFast
 from nexus.bioinfo import cluster_all_ranges
 from nexus.bioinfo import read_plast_extended
 from nexus.bioinfo import get_gff_attributes, get_gff_attributes_str
-from nexus.bioinfo import get_rfam_from_rnacentral, header_to_id
+from nexus.bioinfo import header_to_id
 from nexus.util import *
 import math
 from scipy.stats.stats import pearsonr
@@ -85,7 +85,7 @@ def number_of_rfam_ids(df):
 def get_ncrna_type(attrs_str):
     attrs = get_gff_attributes(attrs_str)
     if "type" in attrs:
-        return attrs["type"]
+        return ";".join(attrs["type"].split(";")[0:2])
     else:
         return "other"
 
