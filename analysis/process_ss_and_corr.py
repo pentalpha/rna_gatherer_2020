@@ -73,7 +73,7 @@ if __name__ == "__main__":
         for gene_name, term_set in terms_by_gene.items():
             n_terms[gene_name] = len(term_set)
     
-    useful_genes = set()
+    useful_genes = []
     for gene_name, n_terms in n_terms.items():
         if n_terms >= 3:
             useful_genes.append(gene_name)
@@ -83,13 +83,13 @@ if __name__ == "__main__":
     print("Creating ID dictionaries")
     pair_to_id = {}
     id_ = 0
-    for i in tqdm(range(len(useful_genes))):
+    '''for i in tqdm(range(len(useful_genes))):
         for j in range(len(useful_genes)):
             pair_name_a = useful_genes[i]+useful_genes[j]
             pair_name_b = useful_genes[j]+useful_genes[i]
             if not(pair_name_a in pair_to_id) and not(pair_name_b in pair_to_id):
                 pair_to_id[pair_name_a] = id_
-                id_ += 1
+                id_ += 1'''
     
     print(str(list(pair_to_id.items())[0:10]))
 
@@ -114,7 +114,7 @@ if __name__ == "__main__":
     print("\tFor ss files...")
     new_files_ss = replace_in_files(files_ss, 
                                 ["pair_id", "mf", "bp", "cc"])
-    
+    '''
     print("Converting new dataframes to parquet format")
     def to_parquet(files, types = None):
         created = []
@@ -147,4 +147,48 @@ if __name__ == "__main__":
             ss_parquet = ss_parquet.merge(corr_parquet, 
                                         left_index=True, right_index=True)
         ss_parquet.to_parquet(temp_ss)
-        
+    '''
+    print("Loading all correlations into memory")
+    correlations = {}
+    metric_names = []
+    expected_size = 0
+    for corr_file in tqdm(new_files_corr):
+        with open(corr_file, 'r') as stream:
+            metric_name = stream.readline().rstrip("\n").split("\t")[-1]
+            metric_names.append(metric_name)
+            line = stream.readline()
+            while line:
+                cells = line.rstrip("\n").split("\t")
+                id_ = int(cells[0])
+                if not id_ in correlations:
+                    correlations[id_] = []
+                if cells[1] != "NaN":
+                    nan_to_add = expected_size - len(correlations[id_])
+                    for i in range(nan_to_add):
+                        correlations[id_].append(np.nan)
+                    correlations[id_].append(float(cells[1]))
+                line = stream.readline()
+        expected_size += 1
+
+    print("Making one big tsv")
+    for ss_file in new_files_ss:
+        big_path = ss_file.replace(".tsv", "-with_correlations.tsv")
+        with open(ss_file, 'r') as in_stream:
+            with open(big_path, 'w') as out_stream:
+                expected_size = 4 + len(metric_names)
+                line = in_stream.readline()
+                base_header = line.rstrip("\n")
+                header = base_header + "\t" + "\t".join(metric_names)
+                out_stream.write(header+"\n")
+                line = in_stream.readline()
+                progress_bar = tqdm(total=len(useful_genes)*len(useful_genes))
+                while line:
+                    cells = line.rstrip("\n").split("\t")
+                    id_ = int(cells[0])
+                    if id_ in correlations:
+                        cells += [str(x) for x in correlations[id_]]
+                        nan_to_add = "\nan"*(expected_size - len(cells))
+                        out_stream.write("\t".join(cells) + nan_to_add + "\n")
+                    line = in_stream.readline()
+                    progress_bar.update(1)
+
