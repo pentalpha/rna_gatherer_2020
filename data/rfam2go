@@ -773,7 +773,6 @@ Rfam:RF00493 snoU2-30 > GO:RNA processing ; GO:0006396
 Rfam:RF00494 snoU2_19 > GO:nucleolus ; GO:0005730
 Rfam:RF00494 snoU2_19 > GO:RNA processing ; GO:0006396
 Rfam:RF00495 IRES_Hsp70 > GO:ribosome binding ; GO:0043022
-Rfam:RF00496 Corona_SL-III > GO:RNA replication ; GO:0039703
 Rfam:RF00498 EAV_LTH > GO:regulation of viral transcription ; GO:0046782
 Rfam:RF00499 Parecho_CRE > GO:viral genome replication ; GO:0019079
 Rfam:RF00500 TCV_H5 > GO:negative regulation of RNA biosynthetic process ; GO:1902679
@@ -3666,8 +3665,17 @@ Rfam:RF02906 sRNA154 > GO:nitrogen fixation ; GO:0009399
 Rfam:RF02906 sRNA154 > GO:regulation of mRNA stability ; GO:0043488
 Rfam:RF02906 sRNA154 > GO:negative regulation of translational initiation ; GO:0045947
 Rfam:RF02907 patAB > GO:regulation of gene expression ; GO:0010468
-Rfam:RF02910 Coronavirus_5p_sl_1_2 > GO:viral RNA genome replication ; GO:0039694
 Rfam:RF02911 Baculoviridae_NAE > GO:viral capsid assembly ; GO:0019069
 Rfam:RF02912 AAC_AAD_leader > GO:drug binding ; GO:0008144
 Rfam:RF02912 AAC_AAD_leader > GO:regulation of gene expression ; GO:0010468
 Rfam:RF02912 AAC_AAD_leader > GO:aminoglycoside antibiotic metabolic process ; GO:0030647
+Rfam:RF03116 aCoV-5UTR > GO:viral RNA genome replication ; GO:0039694
+Rfam:RF03117 bCoV-5UTR > GO:viral RNA genome replication ; GO:0039694
+Rfam:RF03118 gCoV-5UTR > GO:viral RNA genome replication ; GO:0039694
+Rfam:RF03119 dCoV-5UTR > GO:viral RNA genome replication ; GO:0039694
+Rfam:RF03120 Sarbecovirus-5UTR > GO:viral RNA genome replication ; GO:0039694
+Rfam:RF03121 aCoV-3UTR > GO:viral RNA genome replication ; GO:0039694
+Rfam:RF03122 bCoV-3UTR > GO:viral RNA genome replication ; GO:0039694
+Rfam:RF03123 gCoV-3UTR > GO:viral RNA genome replication ; GO:0039694
+Rfam:RF03124 dCoV-3UTR > GO:viral RNA genome replication ; GO:0039694
+Rfam:RF03125 Sarbecovirus-3UTR > GO:viral RNA genome replication ; GO:0039694
