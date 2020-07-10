@@ -50,6 +50,9 @@ def getArgs():
         help="Fasta file with transcripts that could be lncRNA molecules.")
     ap.add_argument("-ol", "--orf-length", required=False, default = 150,
         help = "Minimum ORF length for a sequence be considered as coding (TransDecoder.LongOrfs).")
+    ap.add_argument("-db", "--use-dbs", required=False, default="True",
+        help = ("Map transcripts from ncRNA databases, when available, to genome."
+            +" True (default) / False."))  
     return vars(ap.parse_args())
 
 #parsing arguments
@@ -103,6 +106,8 @@ args["genome_index"] = index_path
 
 global_data = os.path.dirname(os.path.realpath(__file__)) + "/data"
 confs["rfam2go"] = global_data + "/rfam2go"
+if cmdArgs["use_dbs"] == "False":
+    confs["rna_dbs"] = {}
 
 if __name__ == '__main__':
     stepFuncs = [("split_genome", split_genome),

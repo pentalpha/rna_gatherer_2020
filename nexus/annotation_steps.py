@@ -7,7 +7,6 @@ from nexus.bioinfo import readSeqsFromFasta, filterSeqs, writeFastaSeqs, getFast
 from nexus.bioinfo import cluster_all_ranges, shortFastaHeader
 from nexus.bioinfo import read_plast_extended
 from nexus.bioinfo import get_gff_attributes, get_gff_attributes_str
-from nexus.bioinfo import get_rfam_from_rnacentral
 from nexus.util import runCommand, write_file, getFilesWith
 
 def infernal(fasta, cmscan, rfam, threads):
