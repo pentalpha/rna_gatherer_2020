@@ -3,14 +3,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 from tqdm import tqdm
 import os
-import dask
-import dask.dataframe as dd
 import pandas as pd
-from multiprocessing import Pool, TimeoutError
-import multiprocessing
-from dask.diagnostics import ProgressBar
-
-processes = max(2, multiprocessing.cpu_count()-1)
+import math
+import matplotlib.colors as colors
 
 translate_dict_en = {"cc": "Cellular Component", "CC": "Cellular Component",
                 "mf": "Molecular Function", "MF": "Molecular Function",
@@ -199,93 +194,201 @@ def plot_df_corr(plot_ax, df_paths):
         add_col(plot_ax, df, 'corr', name,
                 my_bins, pallete[names[i]])
 
+def get_min_max(df_path):
+    current_line = 1
+    invalid_values = 0
+    with open(df_path, 'r') as stream:
+        header_line = stream.readline().rstrip("\n").split("\t")
+        current_line += 1
+        mins = []
+        maxes = []
+        for i in range(len(header_line)):
+            mins.append(100.)
+            maxes.append(0.0)
+        raw_line = stream.readline()
+        while raw_line:
+            cells = raw_line.rstrip("\n").split("\t")
+            current_line += 1
+            for i in range(len(cells)):
+                if cells[i] != "nan" and cells[i] != "NaN":
+                    try:
+                        value = float(cells[i])
+                    except Exception:
+                        invalid_values += 1
+                    if value > maxes[i]:
+                        maxes[i] = value
+                    if value < mins[i]:
+                        mins[i] = value
+            raw_line = stream.readline()
+    print(str(invalid_values/current_line) + " invalid lines.")
+    return mins, maxes, header_line
+
+def get_lines(stream, limit = 100000, min_len=1):
+    lines = []
+    raw_line = stream.readline()
+    while raw_line:
+        cells = raw_line.rstrip("\n").split("\t")
+        if len(cells) >= min_len:
+            lines.append(cells)
+            if len(lines) >= limit:
+                return lines, True
+        raw_line = stream.readline()
+    return lines, False
+
+def get_frequencies(file_ss, index, converter, my_bins):
+    frequencies = np.array([])
+    line_limit = 10000
+    failed_lines = 0
+    with open(file_ss, 'r') as stream:
+        header_line = stream.readline().rstrip("\n").split("\t")
+        line_chunk, more_lines = get_lines(stream, min_len=index+1)
+        while more_lines:
+            values = []
+            for value_str in [cells[index] for cells in line_chunk]:
+                try:
+                    value = converter(value_str)
+                    values.append(value)
+                except ValueError:
+                    failed_lines += 1
+            new_frequencies, bins = np.histogram(values, bins=my_bins)
+            if len(frequencies) == 0:
+                frequencies = new_frequencies
+            else:
+                frequencies = frequencies + new_frequencies
+            line_chunk, more_lines = get_lines(stream, min_len=index+1)
+    return frequencies
+
+def get_frequencies_2d(file_ss, index_x, index_y, converter, my_bins):
+    min_cells = max(index_x+1, index_y+1)
+    #frequencies = np.array([])
+    line_limit = 10000
+    failed_lines = 0
+    with open(file_ss, 'r') as stream:
+        values_x = []
+        values_y = []
+        header_line = stream.readline().rstrip("\n").split("\t")
+        line_chunk, more_lines = get_lines(stream, min_len=min_cells)
+        while more_lines:
+            for x_str, y_str in [(cells[index_x], cells[index_y]) 
+                                for cells in line_chunk]:
+                try:
+                    value_x, value_y = (converter(x_str), converter(y_str))
+                    if np.isfinite(value_x) and np.isfinite(value_y):
+                        values_x.append(value_x)
+                        values_y.append(value_y)
+                except ValueError:
+                    failed_lines += 1
+            line_chunk, more_lines = get_lines(stream, min_len=min_cells)
+        frequencies, bins_x, bins_y = np.histogram2d(values_x, values_y,
+                                bins=[my_bins[index_x], my_bins[index_y]])
+        coefficients = np.polyfit(values_y, values_x, 5)
+        poly = np.poly1d(coefficients)
+        y_subset = np.sort(np.random.choice(values_y, 50000, replace=False))
+        new_x = poly(y_subset)
+        return frequencies, new_x, y_subset
+    return None
+
 def legend_without_duplicate_labels(fig, ax):
     handles, labels = ax.get_legend_handles_labels()
     unique = [(h, l) for i, (h, l) in enumerate(zip(handles, labels)) if l not in labels[:i]]
     fig.legend(*zip(*unique), loc='center left', bbox_to_anchor=(1, 0.5))
 
 if __name__ == "__main__":
-    files_ss = sys.argv[1].split(",")
-    files_corr = sys.argv[2].split(",")
-    dict_file = sys.argv[3]
-    annotation = sys.argv[4]
-    output_dir = sys.argv[5]
+    output_dir = sys.argv[1]
+    file_ss = sys.argv[2]
+    
     if not os.path.exists(output_dir):
         os.mkdir(output_dir)
     
+    name = get_filename(file_ss).split(".")[0]
     ss_col_names = ["mf", "bp", "cc"]
+    mins, maxes, header = get_min_max(file_ss)
+    min_max_path = output_dir+"/"+name+"min_max.tsv"
+    with open(min_max_path, 'w') as stream:
+        stream.write("\t".join(["Column Name","Min","Max"])+"\n")
+        for i in range(len(mins)):
+            stream.write("\t".join([str(x) for x in [header[i], mins[i],maxes[i]]]) + "\n")
     
-    names_dict = {}
-    print("Reading names dict")
-    with open(dict_file,'r') as in_stream:
-        for line in in_stream:
-            cells = line.rstrip("\n").split("\t")
-            names_dict[cells[0]] = cells[1]
-    
-    n_terms = {}
-    print("Reading gene annotation")
-    with open(annotation,'r') as in_stream:
-        terms_by_gene = {}
-        for line in in_stream:
-            if not(line.startswith("!") or line.startswith("#")):
-                cells = line.rstrip("\n").split("\t")
-                if len(cells) >= 5:
-                    gene_name = cells[1]
-                    go_term = cells[4]
-                    if not gene_name in terms_by_gene:
-                        terms_by_gene[gene_name] = set()
-                    terms_by_gene[gene_name].add(go_term)
-                else:
-                    print("Invalid line:" + str(cells))
-        for gene_name, term_set in terms_by_gene.items():
-            if gene_name in names_dict:
-                n_terms[names_dict[gene_name]] = len(term_set)
-        for gene_name, _id in names_dict.items():
-            if not _id in n_terms:
-                n_terms[_id] = 0
-        print(str(list(n_terms.items())[0:30]))
-
-    '''print("Plot semantic similarities NaN frequency")
-    fig, ax = plt.subplots(len(files_ss), 
-                        figsize=(5, len(files_ss)*4))
-    if len(files_ss) == 1:
-        ax = [ax]
-    for i in range(len(files_ss)):
-        sub_plt = ax[i]
-        ss_file = files_ss[i]
-        df = dd.read_parquet(ss_file)
-        name = get_filename(ss_file).split(".")[0]
-        print("\tPlotting " + name)
-        plot_df_ss_nan(sub_plt, df, name, n_terms)
-        sub_plt.set_xlabel("Diferença entre número de termos nas anotações")
-        sub_plt.set_ylabel("Porcentagem (%) de similaridades semânticas nulas.")
-    legend_without_duplicate_labels(fig, ax[0])
-    fig.tight_layout()
-    fig.savefig(output_dir+"/semantic_similarity_nan_hist.png", bbox_inches='tight')'''
+    print(open(min_max_path, 'r').read())
+    mins = [math.floor(x) for x in mins]
+    maxes = [math.ceil(x) for x in maxes]
+    bins = [np.linspace(mins[i], maxes[i], 100) for i in range(len(mins))]
 
     print("Plot semantic similarities")
-    fig, ax = plt.subplots(len(files_ss), 
-                        figsize=(5, len(files_ss)*4))
-    if len(files_ss) == 1:
-        ax = [ax]
-    for i in range(len(files_ss)):
-        sub_plt = ax[i]
-        ss_file = files_ss[i]
-        df = dd.read_parquet(ss_file, columns=ss_col_names)
-        name = get_filename(ss_file).split(".")[0]
-        print("\tPlotting " + name)
-        plot_df_ss(sub_plt, df, name, ss_col_names)
-        sub_plt.set_yscale('symlog')
-    legend_without_duplicate_labels(fig, ax[0])
+    fig, ax = plt.subplots(1, 
+                        figsize=(5, 7))
+    print("\tCalculating frequencies")
+    freqs = [get_frequencies(file_ss, i, float, bins[i])
+            for i in tqdm([1,2,3])]
+    x_values = [((bin_edges[:-1] + bin_edges[1:]) / 2) 
+                for bin_edges in [bins[1], bins[2], bins[3]]]
+    print("Plotting lines")
+    pallete = make_pallete(ss_col_names)
+    for i in tqdm(range(len(ss_col_names))):
+        col = ss_col_names[i]
+        freq = freqs[i]
+        x = x_values[i]
+        ax.plot(x, freq, label=translator(col), color=pallete[col])
+    ax.set_yscale('symlog')
+    ax.set_title("Distribuição dos Valores de Similaridade Semântica")
+    legend_without_duplicate_labels(fig, ax)
     fig.tight_layout()
     fig.savefig(output_dir+"/semantic_similarity_hist.png", bbox_inches='tight')
 
+    bins = [np.linspace(mins[i], maxes[i], 300) for i in range(len(mins))]
+
     print("Plotting correlations")
-    fig, ax = plt.subplots(figsize=(6, 4))
-    plot_df_corr(ax, files_corr)
-    ax.set_yscale('symlog')
+    fig, ax = plt.subplots(figsize=(6, 5))
+    print("\tCalculating frequencies")
+    cols = header[4:]
+    print("\t\tGetting frequencies for columns:")
+    print("\t\t\t"+str(cols))
+    col_indexes = list(range(4,4+len(cols)))
+    print("\t\t\t"+str(col_indexes))
+    freqs = [get_frequencies(file_ss, i, float, bins[i])
+            for i in tqdm(col_indexes)]
+    x_values = [((bin_edges[:-1] + bin_edges[1:]) / 2) 
+                for bin_edges in [bins[i] for i in col_indexes]]
+    
+    print("\tPlotting")
+    pallete = make_pallete(cols)
+    for i in tqdm(range(len(cols))):
+        col = cols[i]
+        freq = freqs[i]
+        x = x_values[i]
+        ax.plot(x, freq, label=translator(col), color=pallete[col])
     legend_without_duplicate_labels(fig, ax)
-    ax.set_title("Distribution of Correlation Coefficient Values")
+    ax.set_title("Distribuição dos Valores de Coeficientes de Correlação")
     fig.tight_layout()
     fig.savefig(output_dir+"/correlations_hist.png", bbox_inches='tight')
+
+    bins = [np.linspace(mins[i], maxes[i], 50) for i in range(len(mins))]
+    progress_bar = tqdm(total=len(cols)*3)
+    fig, ax = plt.subplots(len(cols), 3, figsize=(12, 4*len(cols)))
+    for i in range(len(cols)):
+        metric_plots = ax[i]
+        col = cols[i]
+        for j in range(len(ss_col_names)):
+            freqs_2d, predicted_ss, corr_values = get_frequencies_2d(
+                                        file_ss, j+1, col_indexes[i],
+                                        float, bins)
+            #print(str(freqs_2d))
+            edges_x = bins[j+1]
+            edges_y = bins[col_indexes[i]]
+            metric_plots[j].pcolormesh(edges_x, edges_y, freqs_2d,
+                            norm=colors.SymLogNorm(linthresh = 0.03,
+                                                    vmin=freqs_2d.min(), 
+                                                    vmax=freqs_2d.max()))
+            metric_plots[j].plot(predicted_ss, corr_values, 
+                                color='white', linewidth=4)
+            progress_bar.update(1)
+            if i == 0:
+                metric_plots[j].set_xlabel("Similaridade Semântica ("
+                                +translator(ss_col_names[j])+")")
+                metric_plots[j].xaxis.set_label_position('top') 
+        metric_plots[0].set_ylabel(translator(cols[i]))
+    #fig.suptitle("Heatmaps das Métricas de Correlação Para Cada Ontologia")
+    fig.tight_layout()
+    fig.savefig(output_dir+"/corr_vs_ss.png", bbox_inches='tight')
+
 
