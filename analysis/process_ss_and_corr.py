@@ -1,10 +1,8 @@
 import sys
-#import matplotlib.pyplot as plt
 import numpy as np
 from tqdm import tqdm
 import os
-import dask
-import dask.dataframe as dd
+import numpy as np
 
 def get_filename(full_path):
     last = full_path.split("/")[-1]
@@ -114,40 +112,6 @@ if __name__ == "__main__":
     print("\tFor ss files...")
     new_files_ss = replace_in_files(files_ss, 
                                 ["pair_id", "mf", "bp", "cc"])
-    '''
-    print("Converting new dataframes to parquet format")
-    def to_parquet(files, types = None):
-        created = []
-        for f in tqdm(files):
-            dtypes = {"pair_id": int, get_name(f): float}
-            if types != None:
-                dtypes = types
-            parquet_file = f.replace(f.split(".")[-1], "parquet")
-            if not os.path.exists(parquet_file):
-                df = dd.read_csv(f, sep="\t", dtype=dtypes).set_index("pair_id")
-                print(str(df.head()))
-                df.to_parquet(parquet_file,
-                            engine = "pyarrow")
-            created.append(parquet_file)
-        return created
-    
-    print("\tFor correlations files...")
-    corr_parquets = to_parquet(new_files_corr)
-    print("\tFor ss files...")
-    ss_parquets = to_parquet(new_files_ss, types = {"pair_id": int, 
-                            "mf": float, "bp": float, "cc": float})
-
-    print("Joining parquets")
-    for ss_file in ss_parquets:
-        ss_parquet = dd.read_parquet(ss_file, engine="pyarrow")
-        temp_ss = ss_file.replace(".parquet", "-with_correlations.parquet")
-        for corr_file in tqdm(corr_parquets):
-            print("Adding correlations from " + corr_file)
-            corr_parquet = dd.read_parquet(corr_file, engine="pyarrow")
-            ss_parquet = ss_parquet.merge(corr_parquet, 
-                                        left_index=True, right_index=True)
-        ss_parquet.to_parquet(temp_ss)
-    '''
     print("Loading all correlations into memory")
     correlations = {}
     metric_names = []
@@ -177,10 +141,10 @@ if __name__ == "__main__":
         big_path = ss_file.replace(".tsv", "-with_correlations.tsv")
         with open(ss_file, 'r') as in_stream:
             with open(big_path, 'w') as out_stream:
-                expected_size = 4 + len(metric_names)
+                expected_size = 6 + len(metric_names)
                 line = in_stream.readline()
                 base_header = line.rstrip("\n")
-                header = base_header + "\t" + "\t".join(metric_names)
+                header = base_header + "\tavg\tmax\t" + "\t".join(metric_names)
                 out_stream.write(header+"\n")
                 line = in_stream.readline()
                 progress_bar = tqdm(total=len(useful_genes)*len(useful_genes))
@@ -188,8 +152,13 @@ if __name__ == "__main__":
                     cells = line.rstrip("\n").split("\t")
                     id_ = int(cells[0])
                     if id_ in correlations:
+                        float_ss_values = np.fromstring("\t".join(cells[1:]),
+                                                        sep="\t")
+                        max_ss = np.nanmax(float_ss_values)
+                        avg_ss = np.nanmean(float_ss_values)
+                        cells += [str(avg_ss), str(max_ss)] 
                         cells += [str(x) for x in correlations[id_]]
-                        nan_to_add = "\nan"*(expected_size - len(cells))
+                        nan_to_add = "\tnan"*(expected_size - len(cells))
                         out_stream.write("\t".join(cells) + nan_to_add + "\n")
                     line = in_stream.readline()
                     progress_bar.update(1)
