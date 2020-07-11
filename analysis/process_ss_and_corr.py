@@ -83,13 +83,13 @@ if __name__ == "__main__":
     print("Creating ID dictionaries")
     pair_to_id = {}
     id_ = 0
-    '''for i in tqdm(range(len(useful_genes))):
+    for i in tqdm(range(len(useful_genes))):
         for j in range(len(useful_genes)):
             pair_name_a = useful_genes[i]+useful_genes[j]
             pair_name_b = useful_genes[j]+useful_genes[i]
             if not(pair_name_a in pair_to_id) and not(pair_name_b in pair_to_id):
                 pair_to_id[pair_name_a] = id_
-                id_ += 1'''
+                id_ += 1
     
     print(str(list(pair_to_id.items())[0:10]))
 
@@ -157,6 +157,7 @@ if __name__ == "__main__":
             metric_name = stream.readline().rstrip("\n").split("\t")[-1]
             metric_names.append(metric_name)
             line = stream.readline()
+            progress_bar = tqdm(total=len(useful_genes)*len(useful_genes))
             while line:
                 cells = line.rstrip("\n").split("\t")
                 id_ = int(cells[0])
@@ -168,6 +169,7 @@ if __name__ == "__main__":
                         correlations[id_].append(np.nan)
                     correlations[id_].append(float(cells[1]))
                 line = stream.readline()
+                progress_bar.update(1)
         expected_size += 1
 
     print("Making one big tsv")
