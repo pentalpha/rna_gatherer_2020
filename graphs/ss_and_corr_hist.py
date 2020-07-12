@@ -21,6 +21,8 @@ translate_dict_en = {"cc": "Cellular Component", "CC": "Cellular Component",
 translate_dict = {"cc": "Componente Celular", "CC": "Componente Celular",
                 "mf": "Função Molecular", "MF": "Função Molecular",
                 "bp": "Processo Biologico", "BP": "Processo Biologico",
+                "max": "Similaridade Semântica Máxima", 
+                "avg": "Similaridade Semântiac Média",
                 "fsh": "Fisher", "FSH": "Fisher",
                 "sob": "Sobolev", "SOB": "Sobolev",
                 "mic": "Maximal Information\nCoefficient", 
@@ -31,7 +33,6 @@ translate_dict = {"cc": "Componente Celular", "CC": "Componente Celular",
 
 full_pallete = ['#ff0000', '#dd0074', '#006600',
                 '#000099', '#000000', '#00ff00']
-
 
 def get_filename(full_path):
     last = full_path.split("/")[-1]
@@ -56,143 +57,6 @@ def translator(name):
                     for word in words]
     new_name = " ".join(new_words)
     return new_name
-
-def get_plotcoordinates(number_of_files, max_cols):
-    print("For " + str((number_of_files, max_cols)) + ": ")
-    coords = []
-    x, y = (0, 0)
-    for i in range(number_of_files*max_cols):
-        coords.append((x,y))
-        if x == (max_cols-1):
-            x = 0
-            y += 1
-        else:
-            x += 1
-    print(str(coords))
-    return coords, coords[-1][1]+1
-
-def add_col(plot_ax, df, col_name, label_name, my_bins, color):
-    df_col = df[col_name].dropna()
-    counts, bin_edges = np.histogram(df_col, bins=my_bins)
-    center = (bin_edges[:-1] + bin_edges[1:]) / 2
-    plot_ax.plot(center, counts, label=label_name, color=color)
-
-def plot_df_ss_nan(plot_ax, df, name, n_termos, col_names= ['mf','bp','cc']):
-    pallete = make_pallete(col_names)
-    #bottom_val = min([df[np.isfinite(df[col])][col].min() for col in col_names])
-    #top_val = max([df[np.isfinite(df[col])][col].max() for col in col_names])
-    onto_results = {'mf': {"y": [], "x": [], "total": 0},
-        'bp': {"y": [], "x": [], "total": 0},
-        'cc': {"y": [], "x": [], "total": 0}}
-    
-    total_rows = len(df)
-    print("\tTotal rows:" + str(total_rows))
-    print("\tGrouping by the difference in number of terms")
-    #df = df[df['mf'].isna() or df['cc'].isna() or df['bp'].isna()]
-    def annotation_len(gene, termos):
-        gene_int = int(gene)
-        if not (gene_int in n_terms):
-            termos[gene_int] = 0
-        return termos[gene_int]
-
-    df["terms_diff"] = df.apply(
-        lambda row: abs(annotation_len(row["gene_a"], n_termos) 
-                        - annotation_len(row["gene_b"], n_termos)),
-        axis=1, meta=int)
-
-    def stats(df_group, col_names= ['mf','bp','cc']):
-        l = len(df_group)
-        stat = {}
-        for col in col_names:
-            stat[col] = {}
-            y = len(df[df[col].isna()])
-            stat[col]["y_abs"] = y
-            stat[col]["y"] = (y/l)*100.0
-        return stat
-
-    diff_res = df.groupby("terms_diff").apply(stats, meta=object).compute()
-    print(str(diff_res))
-
-    print("\tComputing stats for groups")
-    for diff, res in diff_res.iteritems():
-        for col, stats in res.items():
-            onto_results[col]['x'].append(diff)
-            onto_results[col]['y'].append(stats['y'])
-            onto_results[col]['total'] += stats['y_abs']
-    
-    print(str(onto_results))
-    '''for diff, entries in tqdm(diff_groups):
-        l = len(entries)
-        for col in col_names:
-            y = len(nan_df = entries[entries[col].isna()])
-            onto_results[col]["total"] += y
-            onto_results[col]["y"].append((y/l)*100.0)
-            onto_results[col]["x"].append(l)'''
-
-    print("\tPlotting")
-    for onto_name, results in tqdm(onto_results.items()):
-        print("plotting " + str(len(results['x'])))
-        plot_ax.plot(results["x"], results["y"], 
-                    label=translator(onto_name),
-                    color=pallete[onto_name])
-        print("\tNaN rate for " + onto_name + ": "
-                + str(results["total"]/total_rows))
-    plot_ax.set_title("Métrica " + translator(name))
-    df.head()
-
-def plot_df_ss(plot_ax, df, name, col_names):
-    pallete = make_pallete(col_names)
-    #bottom_val = min([df[np.isfinite(df[col])][col].min() for col in col_names])
-    #top_val = max([df[np.isfinite(df[col])][col].max() for col in col_names])
-
-    print("\tCalculating bins")
-    mins = []
-    maxes = []
-    for col in col_names:
-        print("\t\tFor col " + col)
-        finite_col = df[col].dropna()
-        local_min, local_max = dd.compute(finite_col.min(),
-                                        finite_col.max())
-        mins.append(local_min)
-        maxes.append(local_max)
-    bottom_val = min(mins)
-    top_val = max(maxes)
-    my_bins = np.linspace(bottom_val, top_val, 200)
-
-    print("\tPlotting lines")
-    for col in col_names:
-        print("\t\tPlotting " + col)
-        add_col(plot_ax, df, col, translator(col), my_bins, pallete[col])
-    plot_ax.set_title("Histograma da métrica " + translator(name))
-
-def plot_df_corr(plot_ax, df_paths):
-    names = [translator(get_filename(corr_file).split(".")[0]) for corr_file in df_paths]
-    pallete = make_pallete(names)
-
-    print("Calculating bins")
-    mins = []
-    maxes = []
-    for df_path in df_paths:
-        df = dd.read_parquet(df_path)
-        print("\tFor df " + df_path)
-        finite_col = df['corr'].dropna()
-        local_min, local_max = dd.compute(finite_col.min(),
-                                        finite_col.max())
-        mins.append(local_min)
-        maxes.append(local_max)
-    bottom_val = min(mins)
-    top_val = max(maxes)
-    my_bins = np.linspace(bottom_val, top_val, 200)
-
-    print("Calculating histogram for metrics")
-    for i in range(len(df_paths)):
-        name = translator(names[i])
-        print("\tPlotting " + name)
-        df_path = df_paths[i]
-        df = dd.read_parquet(df_path)
-        
-        add_col(plot_ax, df, 'corr', name,
-                my_bins, pallete[names[i]])
 
 def get_min_max(df_path):
     current_line = 1
@@ -258,36 +122,6 @@ def get_frequencies(file_ss, index, converter, my_bins):
             line_chunk, more_lines = get_lines(stream, min_len=index+1)
     return frequencies
 
-def get_frequencies_2d(file_ss, index_x, index_y, converter, my_bins):
-    min_cells = max(index_x+1, index_y+1)
-    #frequencies = np.array([])
-    line_limit = 10000
-    failed_lines = 0
-    with open(file_ss, 'r') as stream:
-        values_x = []
-        values_y = []
-        header_line = stream.readline().rstrip("\n").split("\t")
-        line_chunk, more_lines = get_lines(stream, min_len=min_cells)
-        while more_lines:
-            for x_str, y_str in [(cells[index_x], cells[index_y]) 
-                                for cells in line_chunk]:
-                try:
-                    value_x, value_y = (converter(x_str), converter(y_str))
-                    if np.isfinite(value_x) and np.isfinite(value_y):
-                        values_x.append(value_x)
-                        values_y.append(value_y)
-                except ValueError:
-                    failed_lines += 1
-            line_chunk, more_lines = get_lines(stream, min_len=min_cells)
-        frequencies, bins_x, bins_y = np.histogram2d(values_x, values_y,
-                                bins=[my_bins[index_x], my_bins[index_y]])
-        coefficients = np.polyfit(values_y, values_x, 5)
-        poly = np.poly1d(coefficients)
-        y_subset = np.sort(np.random.choice(values_y, 50000, replace=False))
-        new_x = poly(y_subset)
-        return frequencies, new_x, y_subset
-    return None
-
 def legend_without_duplicate_labels(fig, ax):
     handles, labels = ax.get_legend_handles_labels()
     unique = [(h, l) for i, (h, l) in enumerate(zip(handles, labels)) if l not in labels[:i]]
@@ -301,7 +135,7 @@ if __name__ == "__main__":
         os.mkdir(output_dir)
     
     name = get_filename(file_ss).split(".")[0]
-    ss_col_names = ["mf", "bp", "cc"]
+    ss_col_names = ["mf", "bp", "cc", "avg", "max"]
     mins, maxes, header = get_min_max(file_ss)
     min_max_path = output_dir+"/"+name+"min_max.tsv"
     with open(min_max_path, 'w') as stream:
@@ -319,9 +153,9 @@ if __name__ == "__main__":
                         figsize=(5, 7))
     print("\tCalculating frequencies")
     freqs = [get_frequencies(file_ss, i, float, bins[i])
-            for i in tqdm([1,2,3])]
+            for i in tqdm([1,2,3,4,5])]
     x_values = [((bin_edges[:-1] + bin_edges[1:]) / 2) 
-                for bin_edges in [bins[1], bins[2], bins[3]]]
+                for bin_edges in [bins[1],bins[2],bins[3],bins[4],bins[5]]]
     print("Plotting lines")
     pallete = make_pallete(ss_col_names)
     for i in tqdm(range(len(ss_col_names))):
@@ -340,10 +174,10 @@ if __name__ == "__main__":
     print("Plotting correlations")
     fig, ax = plt.subplots(figsize=(6, 5))
     print("\tCalculating frequencies")
-    cols = header[4:]
+    cols = header[6:]
     print("\t\tGetting frequencies for columns:")
     print("\t\t\t"+str(cols))
-    col_indexes = list(range(4,4+len(cols)))
+    col_indexes = list(range(4,6+len(cols)))
     print("\t\t\t"+str(col_indexes))
     freqs = [get_frequencies(file_ss, i, float, bins[i])
             for i in tqdm(col_indexes)]
@@ -362,33 +196,6 @@ if __name__ == "__main__":
     fig.tight_layout()
     fig.savefig(output_dir+"/correlations_hist.png", bbox_inches='tight')
 
-    bins = [np.linspace(mins[i], maxes[i], 50) for i in range(len(mins))]
-    progress_bar = tqdm(total=len(cols)*3)
-    fig, ax = plt.subplots(len(cols), 3, figsize=(12, 4*len(cols)))
-    for i in range(len(cols)):
-        metric_plots = ax[i]
-        col = cols[i]
-        for j in range(len(ss_col_names)):
-            freqs_2d, predicted_ss, corr_values = get_frequencies_2d(
-                                        file_ss, j+1, col_indexes[i],
-                                        float, bins)
-            #print(str(freqs_2d))
-            edges_x = bins[j+1]
-            edges_y = bins[col_indexes[i]]
-            metric_plots[j].pcolormesh(edges_x, edges_y, freqs_2d,
-                            norm=colors.SymLogNorm(linthresh = 0.03,
-                                                    vmin=freqs_2d.min(), 
-                                                    vmax=freqs_2d.max()))
-            metric_plots[j].plot(predicted_ss, corr_values, 
-                                color='white', linewidth=4)
-            progress_bar.update(1)
-            if i == 0:
-                metric_plots[j].set_xlabel("Similaridade Semântica ("
-                                +translator(ss_col_names[j])+")")
-                metric_plots[j].xaxis.set_label_position('top') 
-        metric_plots[0].set_ylabel(translator(cols[i]))
-    #fig.suptitle("Heatmaps das Métricas de Correlação Para Cada Ontologia")
-    fig.tight_layout()
-    fig.savefig(output_dir+"/corr_vs_ss.png", bbox_inches='tight')
+    
 
 

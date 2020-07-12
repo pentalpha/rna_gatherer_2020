@@ -152,7 +152,7 @@ if __name__ == "__main__":
                     cells = line.rstrip("\n").split("\t")
                     id_ = int(cells[0])
                     if id_ in correlations:
-                        float_ss_values = np.fromstring("\t".join(cells[1:]),
+                        float_ss_values = np.fromstring("\t".join(cells[1:4]),
                                                         sep="\t")
                         max_ss = np.nanmax(float_ss_values)
                         avg_ss = np.nanmean(float_ss_values)
