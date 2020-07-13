@@ -23,7 +23,6 @@ translate_dict = {"cc": "Componente Celular", "CC": "Componente Celular",
 full_pallete = ['#ff0000', '#dd0074', '#006600',
                 '#000099', '#000000', '#00ff00']
 
-
 def get_filename(full_path):
     last = full_path.split("/")[-1]
     #name = ".".join(last.split(".")[:-1])
@@ -43,46 +42,13 @@ def translator(name):
     new_name = " ".join(new_words)
     return new_name
 
-def get_min_max(df_path):
-    current_line = 1
-    invalid_values = 0
-    with open(df_path, 'r') as stream:
-        header_line = stream.readline().rstrip("\n").split("\t")
-        current_line += 1
-        mins = []
-        maxes = []
-        for i in range(len(header_line)):
-            mins.append(100.)
-            maxes.append(0.0)
-        raw_line = stream.readline()
-        while raw_line:
-            cells = raw_line.rstrip("\n").split("\t")
-            current_line += 1
-            for i in range(len(cells)):
-                if cells[i] != "nan" and cells[i] != "NaN":
-                    try:
-                        value = float(cells[i])
-                    except Exception:
-                        invalid_values += 1
-                    if value > maxes[i]:
-                        maxes[i] = value
-                    if value < mins[i]:
-                        mins[i] = value
-            raw_line = stream.readline()
-    print(str(invalid_values/current_line) + " invalid lines.")
-    return mins, maxes, header_line
-
-def get_lines(stream, limit = 100000, min_len=1):
-    lines = []
-    raw_line = stream.readline()
-    while raw_line:
-        cells = raw_line.rstrip("\n").split("\t")
-        if len(cells) >= min_len:
-            lines.append(cells)
-            if len(lines) >= limit:
-                return lines, True
-        raw_line = stream.readline()
-    return lines, False
+def calc_min_max(column_values):
+    mins = []
+    maxes = []
+    for column in column_values:
+        mins.append(np.nanmin(column))
+        maxes.append(np.nanmax(column))
+    return mins, maxes
 
 def polyfiter_factory(train_x, train_y, degree):
     coefficients = np.polyfit(train_x, train_y, degree)
@@ -98,64 +64,84 @@ def regression_test(test_x, test_y, func):
     rmse = np.sqrt(mean_squared_error(test_y, new_y))
     return rmse
 
-def get_frequencies_2d(file_ss, index_x, index_y, converter, my_bins, regressors):
-    min_cells = max(index_x+1, index_y+1)
-    #frequencies = np.array([])
-    line_limit = 10000
+def load_df_values(file_ss):
+    min_cells = 1+5+6
+    columns = []
+    for n_cell in range(min_cells-1):
+        columns.append([])
     failed_lines = 0
-    with open(file_ss, 'r') as stream:
-        values = []
-        header_line = stream.readline().rstrip("\n").split("\t")
-        line_chunk, more_lines = get_lines(stream, min_len=min_cells)
-        while more_lines:
-            for x_str, y_str in [(cells[index_x], cells[index_y]) 
-                                for cells in line_chunk]:
-                try:
-                    new_values = (converter(x_str), converter(y_str))
-                    if np.isfinite(new_values[0]) and np.isfinite(new_values[1]):
-                        values.append(new_values)
-                except ValueError:
-                    failed_lines += 1
-            line_chunk, more_lines = get_lines(stream, min_len=min_cells)
-        frequencies, bins_x, bins_y = np.histogram2d([y for x,y in values], 
-                                [x for x,y in values],
-                                bins=[my_bins[index_y], my_bins[index_x]])
-        subset_indexes = set(np.random.choice(list(range(len(values))), 
-                                            int(len(values)*0.6), replace=False))
-        x_train = []
-        x_test = []
-        y_train = []
-        y_test = []
-        for i in range(len(values)):
-            if i in subset_indexes:
-                x_train.append(values[i][0])
-                y_train.append(values[i][1])
+    aprox_lines_to_read = int((25*1024*1024*1024)/195)
+    stream = open(file_ss, 'r')
+    progress_bar = tqdm(total=aprox_lines_to_read)
+    header_line = stream.readline().rstrip("\n").split("\t")
+    raw_line = stream.readline()
+    progress_bar.update(2)
+    while raw_line:
+        try:
+            np_values = np.fromstring(raw_line.rstrip("\n"),
+                                    sep='\t',dtype=float)
+            if len(np_values) >= min_cells:
+                for i in range(1,len(np_values)):
+                    columns[i-1].append(np_values[i])
             else:
-                x_test.append(values[i][0])
-                y_test.append(values[i][1])
-        to_plot = np.random.choice(list(range(len(x_test))), 
-                                        2000, replace=False)
-        points_to_plot = [(x_test[index],y_test[index])
-                            for index in to_plot]
-        predictions = []
-        for reg_name, regressor_maker in regressors.items():
-            regressor = regressor_maker(x_train, y_train)
-            rmse = regression_test(x_test, y_test, regressor)
-            predictions.append((reg_name, rmse, regressor))
+                failed_lines += 1
+        except ValueError:
+            failed_lines += 1
+        raw_line = stream.readline()
+        progress_bar.update(1)
+    print("Failed lines: " + str(failed_lines))
+    stream.close()
+    return columns, header_line[1:]
 
-        return frequencies, points_to_plot, predictions
-    return None
+def calc_frequencies(column_x, column_y, bin_x, bin_y):
+    frequencies, bins_x, bins_y = np.histogram2d(column_y, 
+                            column_x, bins=[bin_y, bin_x])
+    return frequencies
+
+def make_regression(column_x, column_y, regressors):
+    subset_indexes = set(np.random.choice(list(range(len(column_x))), 
+                                        int(len(column_x)*0.6), 
+                                        replace=False))
+    x_train = []
+    x_test = []
+    y_train = []
+    y_test = []
+    for i in range(len(column_x)):
+        if np.isfinite(column_x[i]) and np.isfinite(column_y[i]):
+            if i in subset_indexes:
+                x_train.append(column_x[i])
+                y_train.append(column_y[i])
+            else:
+                x_test.append(column_x[i])
+                y_test.append(column_y[i])
+    to_plot = np.random.choice(list(range(len(x_test))), 
+                                    2000, replace=False)
+    points_to_plot = [(x_test[index],y_test[index])
+                        for index in to_plot]
+    predictions = []
+    for reg_name, regressor_maker in regressors.items():
+        regressor = regressor_maker(x_train, y_train)
+        rmse = regression_test(x_test, y_test, regressor)
+        predictions.append((reg_name, rmse, regressor))
+    return points_to_plot, predictions
 
 if __name__ == "__main__":
     output_dir = sys.argv[1]
     file_ss = sys.argv[2]
-    
+
+    print("Loading data...")
+    column_values, header = load_df_values(file_ss)
+
+    print("Calculating min and max values for columns...")
+    mins, maxes = calc_min_max(column_values)
+
+    print("Preparing to plot...")
     if not os.path.exists(output_dir):
         os.mkdir(output_dir)
     
     name = get_filename(file_ss).split(".")[0]
     ss_col_names = ["mf", "bp", "cc", "avg", "max"]
-    mins, maxes, header = get_min_max(file_ss)
+    
     min_max_path = output_dir+"/"+name+"min_max.tsv"
     with open(min_max_path, 'w') as stream:
         stream.write("\t".join(["Column Name","Min","Max"])+"\n")
@@ -166,11 +152,10 @@ if __name__ == "__main__":
     mins = [round(x,1) for x in mins]
     maxes = [round(x,1) for x in maxes]
     
-    cols = header[6:]
-    col_indexes = list(range(6,6+len(cols)))
+    cols = header[5:]
 
     bins = [np.linspace(mins[i], maxes[i], 75) for i in range(len(mins))]
-    progress_bar = tqdm(total=len(cols)*5)
+    
     fig, freq_ax = plt.subplots(len(ss_col_names), len(cols),
                                 figsize=(3*len(cols), 3*len(ss_col_names)))
     regress_fig, regress_ax = plt.subplots(len(ss_col_names), len(cols),
@@ -179,23 +164,28 @@ if __name__ == "__main__":
     print(str(len(regress_ax[0])) + " rows of plots")
     pallete = make_pallete(list(polyfits.keys())+["input"])
     
+    print("Creating individual plots...")
+    progress_bar = tqdm(total=len(cols)*len(ss_col_names))
     for i in range(len(cols)):
-
         col = cols[i]
         #print("Comparing " + col + " ("+str(col_indexes[i])+") to..")
         for j in range(len(ss_col_names)):
             #print("\t" + ss_col_names[j] + " ("+str(j+1)+").")
-            freqs_2d, points_to_plot, regressions = get_frequencies_2d(
-                                        file_ss, col_indexes[i], j+1,
-                                        float, bins, polyfits)
-            #print(str(freqs_2d))
-            edges_x = bins[col_indexes[i]]
-            edges_y = bins[j+1]
+            edges_x = bins[len(ss_col_names)+i]
+            edges_y = bins[j]
+            freqs_2d = calc_frequencies(column_values[len(ss_col_names)+i], 
+                                        column_values[j],
+                                        edges_x, edges_y)
             
             freq_ax[j][i].pcolormesh(edges_x, edges_y, freqs_2d,
                             norm=colors.SymLogNorm(linthresh = 0.03,
                                                     vmin=freqs_2d.min(), 
                                                     vmax=freqs_2d.max()))
+
+            points_to_plot, predictions = make_regression(
+                                            column_values[len(ss_col_names)+i],
+                                            column_values[j], 
+                                            polyfits)
 
             regress_ax[j][i].plot([x for x,y in points_to_plot], 
                                     [y for x,y in points_to_plot], 
@@ -204,7 +194,7 @@ if __name__ == "__main__":
                                     label="Test Points",
                                     markersize=0.4)
             example_x = np.linspace(edges_x[0], edges_x[-1], 1000)
-            for regression_name, rmse, regressor in regressions:
+            for regression_name, rmse, regressor in predictions:
                 predicted_y = [regressor(x) for x in example_x]
                 regress_ax[j][i].plot(example_x, predicted_y,
                                     color=pallete[regression_name],
