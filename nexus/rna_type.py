@@ -44,8 +44,8 @@ def get_type_list(rna_type):
 def get_full_type(rna_type):
     if rna_type in aliases:
         rna_type = aliases[rna_type]
-    #if len(type_tree.keys()) == 0:
-        #load_rna_types()
+    if len(type_tree.keys()) == 0:
+        load_rna_types()
 
     if rna_type in type_tree:
         return ";".join(get_type_list(rna_type) + [rna_type])
