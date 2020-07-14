@@ -48,7 +48,11 @@ def calc_min_max(column_values):
     for column in column_values:
         mins.append(np.nanmin(column))
         maxes.append(np.nanmax(column))
-    return mins, maxes
+    norm_mins = [round(x,5) for x in mins]
+    norm_maxes = [round(x,5) for x in maxes]
+    #norm_mins = [math.floor(x) for x in norm_mins]
+    #norm_maxes = [math.ceil(x) for x in norm_maxes]
+    return mins, maxes, norm_mins, norm_maxes
 
 def polyfiter_factory(train_x, train_y, degree):
     coefficients = np.polyfit(train_x, train_y, degree)
@@ -128,14 +132,14 @@ def make_regression(column_x, column_y, regressors):
 if __name__ == "__main__":
     output_dir = sys.argv[1]
     file_ss = sys.argv[2]
+    min_cor = float(sys.argv[3])
 
     print("Loading data...")
     column_values, header = load_df_values(file_ss)
 
     print("Calculating min and max values for columns...")
-    mins, maxes = calc_min_max(column_values)
-
-    print("Preparing to plot...")
+    unorm_mins, unorm_maxes, mins, maxes = calc_min_max(column_values)
+    
     if not os.path.exists(output_dir):
         os.mkdir(output_dir)
     
@@ -144,17 +148,31 @@ if __name__ == "__main__":
     
     min_max_path = output_dir+"/"+name+"min_max.tsv"
     with open(min_max_path, 'w') as stream:
+        stream.write("\t".join(["Column Name","Not-Normalized Min","Not-Normalized Max"])+"\n")
+        for i in range(len(mins)):
+            stream.write("\t".join([str(x) 
+                        for x in [header[i], unorm_mins[i], unorm_maxes[i]]]) + "\n")
         stream.write("\t".join(["Column Name","Min","Max"])+"\n")
         for i in range(len(mins)):
-            stream.write("\t".join([str(x) for x in [header[i], mins[i],maxes[i]]]) + "\n")
+            stream.write("\t".join([str(x) 
+                        for x in [header[i], mins[i],maxes[i]]]) + "\n")
     
     print(open(min_max_path, 'r').read())
-    mins = [round(x,1) for x in mins]
-    maxes = [round(x,1) for x in maxes]
     
+    norm_negatives = [mins[i] < 0 for i in range(len(mins))]
+    norm_by_max = [maxes[i] > 1.0 for i in range(len(maxes))]
+    for i in range(len(column_values)):
+        if norm_negatives[i]:
+            print("Normalizing negative values of " + header[i])
+            column_values[i] = [abs(x) for x in column_values[i]]
+        if norm_by_max[i]:
+            print("Normalizing values to range 0.0-1.0, for " + header[i])
+            column_values[i] = [x/maxes[i] for x in column_values[i]]
+    
+    print("Preparing to plot...")
     cols = header[5:]
-
-    bins = [np.linspace(mins[i], maxes[i], 75) for i in range(len(mins))]
+    bins_x = np.linspace(min_cor, 1.0, 100)
+    bins_y = np.linspace(0.0, 1.0, 100)
     
     fig, freq_ax = plt.subplots(len(ss_col_names), len(cols),
                                 figsize=(3*len(cols), 3*len(ss_col_names)))
@@ -168,23 +186,34 @@ if __name__ == "__main__":
     progress_bar = tqdm(total=len(cols)*len(ss_col_names))
     for i in range(len(cols)):
         col = cols[i]
+        x_index = len(ss_col_names)+i
         #print("Comparing " + col + " ("+str(col_indexes[i])+") to..")
+        filter_list = [x >= min_cor for x in column_values[x_index]]
+        filtered_x = []
+        for filter_index in range(len(filter_list)):
+            if filter_list[filter_index]:
+                filtered_x.append(column_values[x_index][filter_index])
         for j in range(len(ss_col_names)):
             #print("\t" + ss_col_names[j] + " ("+str(j+1)+").")
-            edges_x = bins[len(ss_col_names)+i]
-            edges_y = bins[j]
-            freqs_2d = calc_frequencies(column_values[len(ss_col_names)+i], 
-                                        column_values[j],
-                                        edges_x, edges_y)
+            #edges_x = bins[len(ss_col_names)+i]
+            #edges_y = bins[j]
             
-            freq_ax[j][i].pcolormesh(edges_x, edges_y, freqs_2d,
+            filtered_y = []
+            for filter_index in range(len(filter_list)):
+                if filter_list[filter_index]:
+                    filtered_y.append(column_values[j][filter_index])
+            freqs_2d = calc_frequencies(filtered_x, 
+                                        filtered_y,
+                                        bins_x, bins_y)
+            
+            freq_ax[j][i].pcolormesh(bins_x, bins_y, freqs_2d,
                             norm=colors.SymLogNorm(linthresh = 0.03,
                                                     vmin=freqs_2d.min(), 
                                                     vmax=freqs_2d.max()))
 
             points_to_plot, predictions = make_regression(
-                                            column_values[len(ss_col_names)+i],
-                                            column_values[j], 
+                                            filtered_x,
+                                            filtered_y, 
                                             polyfits)
 
             regress_ax[j][i].plot([x for x,y in points_to_plot], 
@@ -193,7 +222,7 @@ if __name__ == "__main__":
                                     color=pallete["input"],
                                     label="Test Points",
                                     markersize=0.4)
-            example_x = np.linspace(edges_x[0], edges_x[-1], 1000)
+            example_x = np.linspace(min_cor, 1.0, 1000)
             for regression_name, rmse, regressor in predictions:
                 predicted_y = [regressor(x) for x in example_x]
                 regress_ax[j][i].plot(example_x, predicted_y,

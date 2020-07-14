@@ -46,7 +46,7 @@ with open(correlations_path, 'r') as stream:
                     if not method in sim_correlations:
                         sim_correlations[method] = []
                     sim_correlations[method].append((cells[0],cells[1],float(cells[2]),gene_sims[cells[1]]))
-                    
+
 print("Sorting " + str(len(sim_correlations)) + " items")
 for method in list(sim_correlations.keys()):
     sim_correlations[method].sort(key=lambda x: x[2])
