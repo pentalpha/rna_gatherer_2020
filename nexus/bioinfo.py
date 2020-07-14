@@ -537,13 +537,21 @@ def get_gff_attributes(attrs):
         print("Could not split the following attributes:")
         print(str(attrs))
         raise ValueError("Attribute spliting error")
+    last_named_part = 0
+    for i in range(1,len(parts)):
+        if "=" in parts[i]:
+            last_named_part = i
+        else:
+            parts[last_named_part] += ";"+parts[i]
+            parts[i] = ""
     values = {}
     for part in parts:
-        ab = part.split("=")
-        if len(ab) == 2:
-            name = ab[0]
-            val = ab[1].lstrip("'").rstrip("'")
-            values[name] = val
+        if len(part) > 0:
+            ab = part.split("=")
+            if len(ab) == 2:
+                name = ab[0]
+                val = ab[1].lstrip("'").rstrip("'")
+                values[name] = val
     return values
 
 def get_gff_attributes_str(attrs):

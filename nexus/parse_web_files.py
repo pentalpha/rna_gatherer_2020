@@ -76,6 +76,7 @@ with open(output_dir+"/rfam2type.tsv",'w') as output_stream:
 print("Creating ncRNA Type Tree")
 
 nodes = {}
+nodes["scRNA"] = make_node([], parent="Gene")
 for rfam_id, type_vec in rfam2type.items():
     for i in range(len(type_vec)):
         type_name = type_vec[i]

@@ -15,9 +15,14 @@
             "miRNA",
             "lncRNA",
             "CRISPR",
-            "Y_RNA"
+            "Y_RNA",
+            "scRNA"
         ],
         "parent": null
+    },
+    "scRNA": {
+        "children": [],
+        "parent": "Gene"
     },
     "rRNA": {
         "children": [],
