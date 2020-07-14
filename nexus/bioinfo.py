@@ -160,7 +160,6 @@ def get_strand(xstart,xend,ystart,yend):
     else:
         return "-"
 
-
 def blast(query, db, max_evalue = 0.001, threads=8, 
     blast_type="blastn", output = "results.tsv"):
     if threads > 8:

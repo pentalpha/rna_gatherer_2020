@@ -1,21 +1,9 @@
 import os
-import threading
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
-from nexus.bioinfo import readSeqsFromFasta, filterSeqs, writeFastaSeqs, getFastaHeaders, seqListToDict
-from nexus.bioinfo import cluster_all_ranges
-from nexus.bioinfo import read_plast_extended
-from nexus.bioinfo import get_gff_attributes, get_gff_attributes_str
-from nexus.bioinfo import header_to_id
+from nexus.bioinfo import *
 from nexus.util import *
-import math
-from scipy.stats.stats import pearsonr
-from scipy.special import comb
-import multiprocessing
-import networkx
-import obonet
-import statsmodels.stats.multitest as multitest
 
 def read_ids2go(filepath):
     gos_dict = {}
