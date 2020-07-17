@@ -51,6 +51,7 @@ def translator(name):
     return new_name
 
 def calc_min_max(column_values):
+    '''Find min and max value for all columns'''
     mins = []
     maxes = []
     for column in column_values:
@@ -93,6 +94,7 @@ def load_df_values(file_ss):
     return columns, header_line[1:]
 
 def get_combs(ns, values):
+    '''Get combinations of several lengths for a list of values'''
     combs = set()
     for n in ns:
         for vals in combinations(values,n):
@@ -113,6 +115,7 @@ def filter_column(x, min_cor):
     return f
 
 def prepare_data_for_regression(columns, filters):
+    '''Filter a set of columns, so that all values are valid'''
     y = []
     xs = []
     all_filter = set.intersection(*filters)
@@ -122,27 +125,32 @@ def prepare_data_for_regression(columns, filters):
     return xs, y
 
 def make_svr_rbf(y, x_vars):
+    '''Support vector regression with RBF kernel'''
     model = SVR(kernel='rbf', C=100, gamma=0.1, epsilon=.1)
     model.fit(x_vars, y)
     return model, {}
 
 def make_svr_lin(y, x_vars):
+    '''Support vector regression with linear kernel'''
     model = SVR(kernel='linear', C=100, gamma='auto')
     model.fit(x_vars, y)
     return model, {}
 
 def make_svr_poly(y, x_vars):
+    '''Support vector regression with polynomial kernel'''
     model = SVR(kernel='poly', C=100, gamma='auto', degree=3, epsilon=.1,
                coef0=1)
     model.fit(x_vars, y)
     return model, {}
 
 def make_random_forest(y, x_vars):
-    model = RandomForestRegressor(n_jobs = threads)
+    '''Random forest regression'''
+    model = RandomForestRegressor(n_jobs = 1)
     model.fit(x_vars, y)
     return model, {}
 
 def make_regression_poly(y, x_vars, d):
+    '''Polynomial regression'''
     poly = PolynomialFeatures(degree=d)
     X_ = poly.fit_transform(x_vars)
     model = LinearRegression(n_jobs = threads)
@@ -159,9 +167,8 @@ def make_regression_linear(y, x_vars):
     model.fit(x_vars, y)
     return model, {}
 
-model_makers = {
-            "RandomForestRegression": make_random_forest,
-            "LinearRegression": make_regression_linear,
+
+'''"LinearRegression": make_regression_linear,
             "PolynomialRegression(d=2)": 
                 lambda y, x_vars: make_regression_poly(y, x_vars, 2),
             "PolynomialRegression(d=5)": 
@@ -169,12 +176,16 @@ model_makers = {
             "PolynomialRidgeRegression(d=2)": 
                 lambda y, x_vars: make_regression_ridge(y, x_vars, 2),
             "PolynomialRidgeRegression(d=5)": 
-                lambda y, x_vars: make_regression_ridge(y, x_vars, 5),
+                lambda y, x_vars: make_regression_ridge(y, x_vars, 5),'''
+
+model_makers = {
+            "RandomForestRegression": make_random_forest,
             "SupportVectorRegression_RBF": make_svr_rbf,
             "SupportVectorRegression_LIN": make_svr_lin,
             "SupportVectorRegression_POLY": make_svr_poly}
 
 def test_model(result_model, attrs, test_y, test_x_vars):
+    '''Tests a trained model and randonly selects test points to plot'''
     result_y = []
     score = 0.0
     rmse = 0.0
@@ -194,7 +205,8 @@ def test_model(result_model, attrs, test_y, test_x_vars):
     points_y = [result_y[i] for i in point_indexes]
     return score, rmse, (points_x, points_y)
 
-def regress(train_x, train_y, test_x, test_y, model_maker):
+def regress(comb_name, train_x, train_y, test_x, test_y, model_maker, return_dict):
+    '''Create a regression model based on certain columns'''
     #progress_bar = tqdm(total=5)
     
     #print("Train samples: " + str([str(len(train_x)), str(len(train_y))]))
@@ -204,7 +216,7 @@ def regress(train_x, train_y, test_x, test_y, model_maker):
     score, rmse, points_to_plot = test_model(result_model, attrs, test_y, test_x)
     #progress_bar.update(1)
 
-    return score, rmse, points_to_plot, len(train_x)
+    return_dict[comb_name] = (score, rmse, points_to_plot, len(train_x))
 
 if __name__ == "__main__":
     output_dir = sys.argv[1]
@@ -237,6 +249,7 @@ if __name__ == "__main__":
     
     print(open(min_max_path, 'r').read())
     
+    '''Normalizing negatives and high values to 0.0 -> 1.0'''
     norm_negatives = [mins[i] < 0 for i in range(len(mins))]
     norm_by_max = [maxes[i] > 1.0 for i in range(len(maxes))]
     for i in range(len(column_values)):
@@ -247,7 +260,7 @@ if __name__ == "__main__":
             print("Normalizing values to range 0.0-1.0, for " + header[i])
             column_values[i] = [x/maxes[i] for x in column_values[i]]
     
-    combs = get_combs([2,3,4,5], [6,7,8,9,10])
+    combs = get_combs([2,3], [6,7,8,9,10])
     comb_strs = [", ".join([header[i] for i in comb]) for comb in combs]
     print("Combinations of metrics: "
         + str(comb_strs))
@@ -270,10 +283,13 @@ if __name__ == "__main__":
     test_filters = [in_test_indexes.intersection(filt)
                         for filt in column_filters]
     print("Making regressions...")
+    '''Use average and max semantic similarity values'''
     y_indexes = [3,4]
     progress_bar = tqdm(total=len(y_indexes)*len(model_makers.items())*len(combs))
     comb_results = {}
+    '''Each y_index is for one semantic similarity value (cc,mf,bp,avg or max)'''
     for y_index in y_indexes:
+        '''Each i value is for one combination of metrics'''
         for i in range(len(combs)):
             regression_cols = [column_values[index] for index in [y_index] + combs[i]]
             regression_test_filters = [test_filters[index] for index in [y_index] + combs[i]]
@@ -284,15 +300,33 @@ if __name__ == "__main__":
             train_x, train_y = prepare_data_for_regression(regression_cols, 
                                                         regression_train_filters)
             if len(train_y) >= min_samples and len(test_y) >= min_samples*0.3:
+                '''Make and test each model'''
+                manager = multiprocessing.Manager()
+                return_dict = manager.dict()
+                processes = []
+                last_pid = 0
+                
+                '''Start processes'''
                 for model_name, model_maker in model_makers.items():
                     comb_name = (model_name 
                                 + "\nMétricas: " + comb_strs[i] + "\n" 
                                 + translator(header[y_index]))
-                    comb_results[comb_name] = regress(
-                                                train_x, train_y,
-                                                test_x, test_y,
-                                                model_maker)
-                    progress_bar.update(1)
+                    p = multiprocessing.Process(target=regress, 
+                        args=(comb_name, train_x, train_y, test_x, test_y,
+                            model_maker, return_dict, ))
+                    processes.append(p)
+                    p.start()
+                
+                '''Join them'''
+                for p in processes:
+                    p.join()
+                progress_bar.update(4)
+                '''Retrieve results'''
+                for key, value in return_dict.items():
+                    comb_results[key] = value
+                
+                manager.shutdown()
+                del manager
             else:
                 print("Not enough samples: " + str((len(train_y),len(test_y))))
                 progress_bar.update(len(model_makers.items()))
@@ -314,8 +348,6 @@ if __name__ == "__main__":
                 + ": " + str(train_samples))
         else:
             valid_results.append((comb_name, result_items))
-
-
     
     def plot_regressions(subplots, sort_by, valid_results, reverse):    
         valid_results.sort(key=lambda x: abs(x[1][sort_by]), reverse=reverse)
