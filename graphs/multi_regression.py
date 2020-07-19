@@ -219,10 +219,12 @@ def regress(comb_name, train_x, train_y, test_x, test_y, model_maker, return_dic
     return_dict[comb_name] = (score, rmse, points_to_plot, len(train_x))
 
 if __name__ == "__main__":
+    #usage: multi_regression.py output_dir data_file min_correlation min_samples sub_perc
     output_dir = sys.argv[1]
     file_ss = sys.argv[2]
     min_cor = float(sys.argv[3])
     min_samples = int(sys.argv[4])
+    sub_perc = float(sys.argv[5])
 
     print("Loading data...")
     column_values, header = load_df_values(file_ss)
@@ -260,10 +262,18 @@ if __name__ == "__main__":
             print("Normalizing values to range 0.0-1.0, for " + header[i])
             column_values[i] = [x/maxes[i] for x in column_values[i]]
     
-    combs = get_combs([2,3], [6,7,8,9,10])
+    combs = get_combs([2], [6,7,8,9,10])
     comb_strs = [", ".join([header[i] for i in comb]) for comb in combs]
     print("Combinations of metrics: "
         + str(comb_strs))
+    
+    print("Creating subset of rows (" + str(sub_perc) + ")")
+    subset_filter = np.random.choice(list(range(len(column_values[0]))), 
+                                    int(len(column_values[0])*sub_perc),
+                                    replace=False)
+    for i in tqdm(range(len(column_values))):
+        new_col = [column_values[i][j] for j in subset_filter]
+        column_values[i] = new_col
 
     print("Creating filters...")
     column_filters = [filter_column(x, 0.0) for x in tqdm(column_values[:5])] 
@@ -284,7 +294,7 @@ if __name__ == "__main__":
                         for filt in column_filters]
     print("Making regressions...")
     '''Use average and max semantic similarity values'''
-    y_indexes = [3,4]
+    y_indexes = [3]
     progress_bar = tqdm(total=len(y_indexes)*len(model_makers.items())*len(combs))
     comb_results = {}
     '''Each y_index is for one semantic similarity value (cc,mf,bp,avg or max)'''
@@ -325,6 +335,7 @@ if __name__ == "__main__":
                 for key, value in return_dict.items():
                     comb_results[key] = value
                 
+                manager._process.terminate()
                 manager.shutdown()
                 del manager
             else:
