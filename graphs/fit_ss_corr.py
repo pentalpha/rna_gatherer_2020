@@ -48,8 +48,8 @@ def calc_min_max(column_values):
     for column in column_values:
         mins.append(np.nanmin(column))
         maxes.append(np.nanmax(column))
-    norm_mins = [round(x,5) for x in mins]
-    norm_maxes = [round(x,5) for x in maxes]
+    norm_mins = [round(x,3) for x in mins]
+    norm_maxes = [round(x,3) for x in maxes]
     #norm_mins = [math.floor(x) for x in norm_mins]
     #norm_maxes = [math.ceil(x) for x in norm_maxes]
     return mins, maxes, norm_mins, norm_maxes

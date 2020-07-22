@@ -2,6 +2,7 @@ import sys
 import matplotlib.pyplot as plt
 import numpy as np
 from tqdm import tqdm
+import random
 import os
 import math
 import matplotlib.colors as colors
@@ -13,7 +14,8 @@ from sklearn.pipeline import make_pipeline
 from sklearn.svm import SVR
 from sklearn.ensemble import RandomForestRegressor
 import multiprocessing
-threads = max(2, multiprocessing.cpu_count()-1)
+import dcor
+threads = max(2, multiprocessing.cpu_count())
 
 translate_dict = {"cc": "Componente Celular", "CC": "Componente Celular",
                 "mf": "Função Molecular", "MF": "Função Molecular",
@@ -30,6 +32,11 @@ translate_dict = {"cc": "Componente Celular", "CC": "Componente Celular",
 
 full_pallete = ['#ff0000', '#dd0074', '#006600',
                 '#000099', '#000000', '#00ff00']
+
+def chunks(lst, n):
+    """Yield successive n-sized chunks from lst."""
+    for i in range(0, len(lst), n):
+        yield lst[i:i + n]
 
 def get_filename(full_path):
     last = full_path.split("/")[-1]
@@ -114,14 +121,95 @@ def filter_column(x, min_cor):
             f.add(i)
     return f
 
-def prepare_data_for_regression(columns, filters):
+def get_rand_spokesman(row_index, row, filters, min_cor):
+    not_null_cols = []
+    for i in range(len(row)):
+        if row_index in filters[i] and row[i] >= min_cor:
+            not_null_cols.append(i)
+    if len(not_null_cols) > 0:
+        spokesman = random.choice(not_null_cols)
+        spokesman_value = row[spokesman]
+        return spokesman_value
+    else:
+        return None
+
+def get_avg_value(row_index, row, filters, min_cor):
+    valid_corrs = []
+    for x in row:
+        if x >= min_cor:
+            valid_corrs.append(x)
+    if len(valid_corrs) > 0:
+        avg = np.nanmean(valid_corrs)
+        if avg != np.nan:
+            return avg
+        else:
+            return None
+    else:
+        return None
+
+def get_first_value(row_index, row, filters, min_cor):
+    value = row[0]
+    if not math.isnan(value):
+        return value
+    else:
+        return None
+
+def get_norm_filter(columns, filters, min_cor, 
+    min_values=300, n_bins=100, spokesman_selector=get_avg_value,
+    smaller_frequency=None):
+    min_bin_len = int(min_values/n_bins)
+    #print("Filtering normal rows")
+    bins = []
+    min_bin = int(min_cor*n_bins)
+    for i in range(n_bins):
+        bins.append([])
+    #print("Populating frequency table")
+    for row_index in range(len(columns[0])):
+        row_values = [columns[i][row_index] for i in range(len(columns))]
+        spokesman_value = spokesman_selector(row_index, row_values, filters, min_cor)
+        if spokesman_value != None:
+            bin_i = int(spokesman_value*n_bins)
+            if bin_i >= n_bins:
+                #print(str(spokesman_value) + " -> " + str(bin_i))
+                bin_i = n_bins-1
+            bins[bin_i].append(row_index)
+    if smaller_frequency == None:
+        smaller_frequency_index = len(bins)-1
+        for i in range(min_bin, len(bins)):
+            l = len(bins[i])
+            if l >= min_bin_len:
+                if len(bins[smaller_frequency_index]) < min_bin_len:
+                    smaller_frequency_index = i
+                elif l < len(bins[smaller_frequency_index]):
+                    smaller_frequency_index = i
+        smaller_frequency = len(bins[smaller_frequency_index])
+        #print("Bin " + str(smaller_frequency_index) 
+        #    + " has the smaller number of items: " + str(smaller_frequency))
+    #print(str([len(b) for b in bins]))
+    #print("Randonly choosing from columns")
+    for bin_i in range(len(bins)):
+        bin_len = len(bins[bin_i])
+        if bin_len > smaller_frequency:
+            bins[bin_i] = np.random.choice(bins[bin_i], 
+                            smaller_frequency, replace=False)
+    
+    #print("Finishing normalization filter")
+    norm_filter = set()
+    for b in bins:
+        for value in b:
+            norm_filter.add(value)
+    return norm_filter
+
+def prepare_data_for_regression(columns, valid_rows, set_name):
     '''Filter a set of columns, so that all values are valid'''
     y = []
     xs = []
-    all_filter = set.intersection(*filters)
-    for i in all_filter:
+    for i in valid_rows:
         y.append(columns[0][i])
         xs.append([column[i] for column in columns[1:]])
+    '''if len(y) == 0:
+        print("Zero values for " + set_name + ". Filter lengths:")
+        print(str([len(f) for f in filters]))'''
     return xs, y
 
 def make_svr_rbf(y, x_vars):
@@ -168,7 +256,9 @@ def make_regression_linear(y, x_vars):
     return model, {}
 
 
-'''"LinearRegression": make_regression_linear,
+'''"'''
+
+model_makers = {"LinearRegression": make_regression_linear,
             "PolynomialRegression(d=2)": 
                 lambda y, x_vars: make_regression_poly(y, x_vars, 2),
             "PolynomialRegression(d=5)": 
@@ -176,9 +266,7 @@ def make_regression_linear(y, x_vars):
             "PolynomialRidgeRegression(d=2)": 
                 lambda y, x_vars: make_regression_ridge(y, x_vars, 2),
             "PolynomialRidgeRegression(d=5)": 
-                lambda y, x_vars: make_regression_ridge(y, x_vars, 5),'''
-
-model_makers = {
+                lambda y, x_vars: make_regression_ridge(y, x_vars, 5),
             "RandomForestRegression": make_random_forest,
             "SupportVectorRegression_RBF": make_svr_rbf,
             "SupportVectorRegression_LIN": make_svr_lin,
@@ -199,11 +287,15 @@ def test_model(result_model, attrs, test_y, test_x_vars):
         result_y = result_model.predict(test_x_vars)
         score = result_model.score(test_x_vars, test_y)
         rmse = np.sqrt(mean_squared_error(test_y, result_y))
-    n_points = min(len(test_y), 10000)
-    point_indexes = np.random.choice(list(range(len(test_y))), n_points, replace=False)
-    points_x = [test_y[i] for i in point_indexes]
-    points_y = [result_y[i] for i in point_indexes]
-    return score, rmse, (points_x, points_y)
+    correlation = dcor.distance_correlation(np.array(test_y), np.array(result_y))
+    frequencies, bins_x, bins_y = np.histogram2d(result_y, 
+                            test_y, bins=[np.linspace(0.0, 1.0, 100), 
+                                        np.linspace(0.0, 1.0, 100)])
+    #n_points = min(len(test_y), 10000)
+    #point_indexes = np.random.choice(list(range(len(test_y))), n_points, replace=False)
+    #points_x = [test_y[i] for i in point_indexes]
+    #points_y = [result_y[i] for i in point_indexes]
+    return score, rmse, correlation, frequencies
 
 def regress(comb_name, train_x, train_y, test_x, test_y, model_maker, return_dict):
     '''Create a regression model based on certain columns'''
@@ -213,18 +305,19 @@ def regress(comb_name, train_x, train_y, test_x, test_y, model_maker, return_dic
     #progress_bar.update(1)
     result_model, attrs = model_maker(train_y, train_x)
     #progress_bar.update(1)
-    score, rmse, points_to_plot = test_model(result_model, attrs, test_y, test_x)
+    score, rmse, correlation, frequencies = test_model(result_model, attrs, test_y, test_x)
     #progress_bar.update(1)
 
-    return_dict[comb_name] = (score, rmse, points_to_plot, len(train_x))
+    return_dict[comb_name] = (score, rmse, correlation, frequencies, len(train_x))
 
 if __name__ == "__main__":
     #usage: multi_regression.py output_dir data_file min_correlation min_samples sub_perc
     output_dir = sys.argv[1]
     file_ss = sys.argv[2]
     min_cor = float(sys.argv[3])
-    min_samples = int(sys.argv[4])
-    sub_perc = float(sys.argv[5])
+    min_samples = 1000
+    max_rows = int(sys.argv[4])
+    n_bins = int(sys.argv[5])
 
     print("Loading data...")
     column_values, header = load_df_values(file_ss)
@@ -262,39 +355,35 @@ if __name__ == "__main__":
             print("Normalizing values to range 0.0-1.0, for " + header[i])
             column_values[i] = [x/maxes[i] for x in column_values[i]]
     
-    combs = get_combs([2], [6,7,8,9,10])
+    combs = get_combs([1,2,3], [6,7,8,9,10])
     comb_strs = [", ".join([header[i] for i in comb]) for comb in combs]
     print("Combinations of metrics: "
         + str(comb_strs))
-    
-    print("Creating subset of rows (" + str(sub_perc) + ")")
-    subset_filter = np.random.choice(list(range(len(column_values[0]))), 
-                                    int(len(column_values[0])*sub_perc),
-                                    replace=False)
-    for i in tqdm(range(len(column_values))):
-        new_col = [column_values[i][j] for j in subset_filter]
-        column_values[i] = new_col
 
     print("Creating filters...")
     column_filters = [filter_column(x, 0.0) for x in tqdm(column_values[:5])] 
     column_filters += [filter_column(x, min_cor) for x in tqdm(column_values[5:])]
 
-    print("Separating train and test sets...")
+    print("Before normalization filter: ")                                           
+    print(str([len(column_filter) for column_filter in column_filters[:5]]))
+    max_bin_len = math.ceil(max_rows/n_bins)
+    for col_i in tqdm(range(5)):
+        print("Normalizing " + ss_col_names[col_i])
+        norm_filter = get_norm_filter([column_values[col_i]], 
+                                    [column_filters[col_i]],
+                                    0.0, n_bins=n_bins,
+                                    spokesman_selector=get_first_value,
+                                    min_values=min_samples,
+                                    smaller_frequency=max_bin_len
+                                )
+        column_filters[col_i] = column_filters[col_i].intersection(norm_filter)
+    print("After normalization filter: ")                                           
+    print(str([len(column_filter) for column_filter in column_filters[:5]]))
+    #print("Separating train and test sets...")
     elements_len = len(column_values[i])
-    in_train_indexes = set(np.random.choice(list(range(elements_len)), 
-                                        int(elements_len*0.7), 
-                                        replace=False))
-    in_test_indexes = set()
-    for i in list(range(elements_len)):
-        if not i in in_train_indexes:
-            in_test_indexes.add(i)
-    train_filters = [in_train_indexes.intersection(filt)
-                        for filt in column_filters]
-    test_filters = [in_test_indexes.intersection(filt)
-                        for filt in column_filters]
     print("Making regressions...")
     '''Use average and max semantic similarity values'''
-    y_indexes = [3]
+    y_indexes = [0,1,2,3,4]
     progress_bar = tqdm(total=len(y_indexes)*len(model_makers.items())*len(combs))
     comb_results = {}
     '''Each y_index is for one semantic similarity value (cc,mf,bp,avg or max)'''
@@ -302,42 +391,55 @@ if __name__ == "__main__":
         '''Each i value is for one combination of metrics'''
         for i in range(len(combs)):
             regression_cols = [column_values[index] for index in [y_index] + combs[i]]
-            regression_test_filters = [test_filters[index] for index in [y_index] + combs[i]]
-            regression_train_filters = [train_filters[index] for index in [y_index] + combs[i]]
+            regression_filters = [column_filters[index] for index in [y_index] + combs[i]]
+            regression_master_filter = set.intersection(*regression_filters)
+            train_length = int(len(regression_master_filter)*0.7)
+            rand_valid_items = np.random.choice(list(regression_master_filter), 
+                                train_length, 
+                                replace=False)
+            train_filter = set(rand_valid_items)
+            test_filter = regression_master_filter - train_filter
             
             test_x, test_y = prepare_data_for_regression(regression_cols, 
-                                                        regression_test_filters)
+                                                        test_filter,
+                                                        (translator(header[y_index])
+                                                        + " " + comb_strs[i]))
             train_x, train_y = prepare_data_for_regression(regression_cols, 
-                                                        regression_train_filters)
+                                                        train_filter,
+                                                        (translator(header[y_index]) 
+                                                        + " " + comb_strs[i]))
             if len(train_y) >= min_samples and len(test_y) >= min_samples*0.3:
                 '''Make and test each model'''
-                manager = multiprocessing.Manager()
-                return_dict = manager.dict()
-                processes = []
-                last_pid = 0
-                
-                '''Start processes'''
-                for model_name, model_maker in model_makers.items():
-                    comb_name = (model_name 
-                                + "\nMétricas: " + comb_strs[i] + "\n" 
-                                + translator(header[y_index]))
-                    p = multiprocessing.Process(target=regress, 
-                        args=(comb_name, train_x, train_y, test_x, test_y,
-                            model_maker, return_dict, ))
-                    processes.append(p)
-                    p.start()
-                
-                '''Join them'''
-                for p in processes:
-                    p.join()
-                progress_bar.update(4)
-                '''Retrieve results'''
-                for key, value in return_dict.items():
-                    comb_results[key] = value
-                
-                manager._process.terminate()
-                manager.shutdown()
-                del manager
+                maker_items = list(model_makers.items())
+                maker_item_chunks = chunks(maker_items, threads)
+                for maker_chunk in maker_item_chunks:
+                    manager = multiprocessing.Manager()
+                    return_dict = manager.dict()
+                    processes = []
+                    last_pid = 0
+                    
+                    '''Start processes'''
+                    for model_name, model_maker in maker_chunk:
+                        comb_name = (model_name 
+                                    + "\nMétricas: " + comb_strs[i] + "\n" 
+                                    + translator(header[y_index]))
+                        p = multiprocessing.Process(target=regress, 
+                            args=(comb_name, train_x, train_y, test_x, test_y,
+                                model_maker, return_dict, ))
+                        processes.append(p)
+                        p.start()
+                    
+                    '''Join them'''
+                    for p in processes:
+                        p.join()
+                    progress_bar.update(len(processes))
+                    '''Retrieve results'''
+                    for key, value in return_dict.items():
+                        comb_results[key] = value
+                    
+                    manager._process.terminate()
+                    manager.shutdown()
+                    del manager
             else:
                 print("Not enough samples: " + str((len(train_y),len(test_y))))
                 progress_bar.update(len(model_makers.items()))
@@ -348,7 +450,7 @@ if __name__ == "__main__":
     print("\n")
     valid_results = []
     for comb_name, result_items in results:
-        score, rmse, points_to_plot, train_samples = result_items
+        score, rmse, correlation, frequencies, train_samples = result_items
         if score == -100000:
             print("Too few training samples for " 
                 + comb_name 
@@ -367,30 +469,43 @@ if __name__ == "__main__":
             print("\nBest scores: " )
         elif sort_by == 1:
             print("\nBest RMSE values: " )
+        elif sort_by == 2:
+            print("\nBest correlation values: " )
 
         i = 0
-        top_items = valid_results[-10:]
-        if sort_by == 1:
-            top_items = valid_results[:10]
+        top_items = valid_results[-8:]
+        if reverse == True:
+            top_items = valid_results[:8]
+            top_items = top_items[::-1]
         for comb_name, result_items in top_items:
             subplot = subplots[i]
             subplot.set_ylim([0.0,1.0])
-            score, rmse, points, train_samples = result_items
+            score, rmse, dc_corr, frequencies, train_samples = result_items
+            subplot.pcolormesh(np.linspace(0.0,1.0,100), 
+                                np.linspace(0.0,1.0,100), frequencies,
+                                norm=colors.SymLogNorm(linthresh = 0.03,
+                                                    vmin=frequencies.min(), 
+                                                    vmax=frequencies.max()))
             subplot.plot(np.linspace(0.0,1.0,100), np.linspace(0.0,1.0,100))
-            subplot.plot(points[0], points[1], '.', markersize=0.4)
+            #subplot.plot(points[0], points[1], '.', markersize=0.5)
             subplot.set_title(comb_name + "\nScore=" + str(score)
-                            +"\nRMSE="+str(rmse) + "\nAmostras="+str(train_samples))
+                            +"\nRMSE="+str(rmse)
+                            +"\nCorrelação="+str(dc_corr)
+                            +"\nAmostras="+str(train_samples))
             subplot.set_xlabel("Semantic Similarity")
             subplot.set_ylabel("Predicted Semantic Similarity")
             if sort_by == 1:
                 print("For " + comb_name.replace("\n", "; ") + ": " + str(rmse))
-            else:
+            elif sort_by == 0:
                 print("For " + comb_name.replace("\n", "; ") + ": " + str(score))
+            elif sort_by == 2:
+                print("For " + comb_name.replace("\n", "; ") + ": " + str(dc_corr))
             i += 1
         
-    fig, axes = plt.subplots(2, 10, figsize=(10*3.5, 10))
+    fig, axes = plt.subplots(3, 8, figsize=(8*4, 20))
     plot_regressions(axes[0], 0, valid_results, False)
     plot_regressions(axes[1], 1, valid_results, True)
+    plot_regressions(axes[2], 2, valid_results, False)
     fig.tight_layout()
     out_file = output_dir+"/multi_regression-"+str(min_cor)+".png"
     print(out_file)
