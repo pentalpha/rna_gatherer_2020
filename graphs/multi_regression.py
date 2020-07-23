@@ -14,6 +14,7 @@ from sklearn.pipeline import make_pipeline
 from sklearn.svm import SVR
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.ensemble import VotingRegressor
+from sklearn.ensemble import GradientBoostingRegressor
 from sklearn.neural_network import MLPRegressor
 from sklearn.tree import DecisionTreeRegressor
 from sklearn.neighbors import KNeighborsRegressor
@@ -161,7 +162,7 @@ def get_first_value(row_index, row, filters, min_cor):
 def get_norm_filter(columns, filters, min_cor, 
     min_values=300, n_bins=100, spokesman_selector=get_avg_value,
     smaller_frequency=None):
-    min_bin_len = int(min_values/n_bins)
+    min_bin_len = int(min_values)
     #print("Filtering normal rows")
     bins = []
     min_bin = int(min_cor*n_bins)
@@ -177,19 +178,26 @@ def get_norm_filter(columns, filters, min_cor,
                 #print(str(spokesman_value) + " -> " + str(bin_i))
                 bin_i = n_bins-1
             bins[bin_i].append(row_index)
+    smaller_frequency_index = len(bins)-1
+    for i in range(min_bin, len(bins)):
+        l = len(bins[i])
+        if l >= min_bin_len:
+            if len(bins[smaller_frequency_index]) < min_bin_len:
+                smaller_frequency_index = i
+            elif l < len(bins[smaller_frequency_index]):
+                smaller_frequency_index = i
+    new_smaller_frequency = len(bins[smaller_frequency_index])
     if smaller_frequency == None:
-        smaller_frequency_index = len(bins)-1
-        for i in range(min_bin, len(bins)):
-            l = len(bins[i])
-            if l >= min_bin_len:
-                if len(bins[smaller_frequency_index]) < min_bin_len:
-                    smaller_frequency_index = i
-                elif l < len(bins[smaller_frequency_index]):
-                    smaller_frequency_index = i
-        smaller_frequency = len(bins[smaller_frequency_index])
-        #print("Bin " + str(smaller_frequency_index) 
-        #    + " has the smaller number of items: " + str(smaller_frequency))
-    #print(str([len(b) for b in bins]))
+        smaller_frequency = new_smaller_frequency
+    else:
+        if new_smaller_frequency < smaller_frequency:
+            smaller_frequency = new_smaller_frequenc
+            print("Bin " + str(smaller_frequency_index) 
+                + " has the smaller number of items: " + str(smaller_frequency))
+            print(str([len(b) for b in bins]))
+        else:
+            print("Using max number of items:" + str(smaller_frequency))
+
     #print("Randonly choosing from columns")
     for bin_i in range(len(bins)):
         bin_len = len(bins[bin_i])
@@ -202,6 +210,7 @@ def get_norm_filter(columns, filters, min_cor,
     for b in bins:
         for value in b:
             norm_filter.add(value)
+    print("Total values selected: " + str(len(norm_filter)))
     return norm_filter
 
 def prepare_data_for_regression(columns, valid_rows, set_name):
@@ -251,9 +260,14 @@ def make_decision_tree(y, x_vars):
     regressor.fit(x_vars, y)
     return regressor, {}
 
-def make_mlp(y, x_vars):
-    regr = MLPRegressor(random_state=1, max_iter=500).fit(x_vars, y)
+def make_mlp(y, x_vars, iters):
+    regr = MLPRegressor(random_state=1, max_iter=iters).fit(x_vars, y)
     return regr, {}
+
+def make_gradient_boost(y, x_vars):
+    reg = GradientBoostingRegressor(random_state=0)
+    reg.fit(x_vars, y)
+    return reg, {}
 
 def make_regression_poly(y, x_vars, d):
     '''Polynomial regression'''
@@ -269,25 +283,30 @@ def make_regression_linear(y, x_vars):
     return model, {}
 
 def make_voting_regressor(y, x_vars):
-    estimator_list = [("mlp",MLPRegressor(random_state=1, max_iter=500)),
+    estimator_list = [("mlp",MLPRegressor(random_state=1, max_iter=250)),
                 ("random_forest",RandomForestRegressor(n_jobs = 1)),
                 ("nearest_neighbor",KNeighborsRegressor(n_neighbors=4)),
-                ("decision_tree",DecisionTreeRegressor(random_state=0))]
+                ("decision_tree",DecisionTreeRegressor(random_state=0)),
+                ("gradient_boost",GradientBoostingRegressor(random_state=0))]
     ereg = VotingRegressor(estimators=estimator_list)
     ereg.fit(x_vars, y)
     return ereg, {}
-'''"'''
 
-model_makers = {"LinearRegression": make_regression_linear,
-            "PolynomialRegression(d=2)": 
-                lambda y, x_vars: make_regression_poly(y, x_vars, 2),
-            "PolynomialRegression(d=5)": 
-                lambda y, x_vars: make_regression_poly(y, x_vars, 5),
-            "RandomForestRegression": make_random_forest
-            "MultiLayerPerceptron": make_mlp,
+'''
+unused regressors:
+"LinearRegression": make_regression_linear,
+"PolynomialRegression(d=2)": 
+    lambda y, x_vars: make_regression_poly(y, x_vars, 2),
+"PolynomialRegression(d=5)": 
+    lambda y, x_vars: make_regression_poly(y, x_vars, 5),
+'''
+
+model_makers = {"RandomForestRegression": make_random_forest,
+            "MultiLayerPerceptron(iter=250)": lambda y, x: make_mlp(y, x, 250),
             "DecisionTree": make_decision_tree,
             "KNearestNeighbor": make_nearest_neighbor,
-            "Voting(MLP,RF,DT,NN)": make_voting_regressor}
+            "Voting(MLP,RF,DT,NN,GB)": make_voting_regressor,
+            "GradientBoost": make_gradient_boost}
 
 def test_model(result_model, attrs, test_y, test_x_vars):
     '''Tests a trained model and randonly selects test points to plot'''
@@ -308,10 +327,6 @@ def test_model(result_model, attrs, test_y, test_x_vars):
     frequencies, bins_x, bins_y = np.histogram2d(result_y, 
                             test_y, bins=[np.linspace(0.0, 1.0, 100), 
                                         np.linspace(0.0, 1.0, 100)])
-    #n_points = min(len(test_y), 10000)
-    #point_indexes = np.random.choice(list(range(len(test_y))), n_points, replace=False)
-    #points_x = [test_y[i] for i in point_indexes]
-    #points_y = [result_y[i] for i in point_indexes]
     return score, rmse, correlation, frequencies
 
 def regress(comb_name, train_x, train_y, test_x, test_y, model_maker, return_dict):
@@ -325,7 +340,7 @@ def regress(comb_name, train_x, train_y, test_x, test_y, model_maker, return_dic
     score, rmse, correlation, frequencies = test_model(result_model, attrs, test_y, test_x)
     #progress_bar.update(1)
 
-    return_dict[comb_name] = (score, rmse, correlation, frequencies, len(train_x)), result_model
+    return_dict[comb_name] = (score, rmse, correlation, frequencies, len(train_x), result_model)
 
 if __name__ == "__main__":
     #usage: multi_regression.py output_dir data_file min_correlation min_samples sub_perc
@@ -372,7 +387,7 @@ if __name__ == "__main__":
             print("Normalizing values to range 0.0-1.0, for " + header[i])
             column_values[i] = [x/maxes[i] for x in column_values[i]]
     
-    combs = get_combs([2], [5,6,7,8])
+    combs = get_combs([2], [5,6,7,8,9,10])
     comb_strs = [", ".join([header[i] for i in comb]) for comb in combs]
     print("Combinations of metrics: "
         + str(comb_strs))
@@ -384,13 +399,13 @@ if __name__ == "__main__":
     print("Before normalization filter: ")                                           
     print(str([len(column_filter) for column_filter in column_filters[:5]]))
     max_bin_len = math.ceil(max_rows/n_bins)
-    for col_i in tqdm(range(5)):
+    y_indexes = [3]
+    for col_i in y_indexes:
         print("Normalizing " + ss_col_names[col_i])
         norm_filter = get_norm_filter([column_values[col_i]], 
                                     [column_filters[col_i]],
                                     0.0, n_bins=n_bins,
                                     spokesman_selector=get_first_value,
-                                    min_values=min_samples,
                                     smaller_frequency=max_bin_len
                                 )
         column_filters[col_i] = column_filters[col_i].intersection(norm_filter)
@@ -400,8 +415,7 @@ if __name__ == "__main__":
     elements_len = len(column_values[i])
     print("Making regressions...")
     '''Use average and max semantic similarity values'''
-    y_indexes = [0,1,2,3,4]
-    progress_bar = tqdm(total=len(y_indexes)*len(model_makers.items()+1)*len(combs))
+    progress_bar = tqdm(total=len(y_indexes)*len(model_makers.items())*len(combs))
     comb_results = {}
     '''Each y_index is for one semantic similarity value (cc,mf,bp,avg or max)'''
     for y_index in y_indexes:
@@ -466,22 +480,9 @@ if __name__ == "__main__":
         score, real_y, predicted_y = result_items
         print("For " + comb_str + ": " + str(score))'''
     print("\n")
-    valid_results = []
-    for comb_name, result_items in results:
-        score, rmse, correlation, frequencies, train_samples, model = result_items
-        if score == -100000:
-            print("Too few training samples for " 
-                + comb_name 
-                + ": " + str(train_samples))
-        elif score == -200000:
-            print("Too few testing samples for " 
-                + comb_name 
-                + ": " + str(train_samples))
-        else:
-            valid_results.append((comb_name, result_items))
     
-    def plot_regressions(subplots, sort_by, valid_results, reverse):    
-        valid_results.sort(key=lambda x: x[1][sort_by], reverse=reverse)
+    def plot_regressions(subplots, sort_by, results, reverse):    
+        results.sort(key=lambda x: x[1][sort_by], reverse=reverse)
 
         if sort_by == 0:
             print("\nBest R^2 scores: " )
@@ -491,7 +492,7 @@ if __name__ == "__main__":
             print("\nBest correlation values: " )
 
         i = 0
-        top_items = valid_results[-8:]
+        top_items = results[-8:]
         for comb_name, result_items in top_items:
             subplot = subplots[i]
             subplot.set_ylim([0.0,1.0])
@@ -518,10 +519,28 @@ if __name__ == "__main__":
             i += 1
         
     fig, axes = plt.subplots(3, 8, figsize=(8*4, 20))
-    plot_regressions(axes[0], 0, valid_results, False)
-    plot_regressions(axes[1], 1, valid_results, True)
-    plot_regressions(axes[2], 2, valid_results, False)
+    plot_regressions(axes[0], 0, results, False)
+    plot_regressions(axes[1], 1, results, True)
+    plot_regressions(axes[2], 2, results, False)
     fig.tight_layout()
     out_file = output_dir+"/multi_regression-"+str(min_cor)+".png"
     print(out_file)
     fig.savefig(out_file, bbox_inches='tight')
+    with open(out_file.replace(".png", ".tsv"), 'w') as stream:
+        results.sort(key=lambda x: x[1][2])
+        stream.write("Regression Model\tCorrelation Metrics\tSemantic Similarity"
+                    +"\tScore R^2\tRMSE\tDC Correlation\tTrain Samples Used\n")
+        for comb_name, result_items in results:
+            name_parts = comb_name.split("\n")
+            func_name = name_parts[0]
+            metrics = name_parts[1].replace("Métricas: ", "")
+            ss_name = name_parts[2]
+            score, rmse, dc_corr, frequencies, train_samples, model = result_items
+            stream.write("\t".join([str(item) 
+                            for item in [func_name,metrics,ss_name,score,rmse,
+                                dc_corr,train_samples]]) 
+                        + "\n")
+
+
+
+
