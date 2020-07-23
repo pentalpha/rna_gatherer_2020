@@ -13,6 +13,10 @@ from sklearn.preprocessing import PolynomialFeatures
 from sklearn.pipeline import make_pipeline
 from sklearn.svm import SVR
 from sklearn.ensemble import RandomForestRegressor
+from sklearn.ensemble import VotingRegressor
+from sklearn.neural_network import MLPRegressor
+from sklearn.tree import DecisionTreeRegressor
+from sklearn.neighbors import KNeighborsRegressor
 import multiprocessing
 import dcor
 threads = max(2, multiprocessing.cpu_count())
@@ -237,6 +241,20 @@ def make_random_forest(y, x_vars):
     model.fit(x_vars, y)
     return model, {}
 
+def make_nearest_neighbor(y, x_vars):
+    neigh = KNeighborsRegressor(n_neighbors=4)
+    neigh.fit(x_vars, y)
+    return neigh, {}
+
+def make_decision_tree(y, x_vars):
+    regressor = DecisionTreeRegressor(random_state=0)
+    regressor.fit(x_vars, y)
+    return regressor, {}
+
+def make_mlp(y, x_vars):
+    regr = MLPRegressor(random_state=1, max_iter=500).fit(x_vars, y)
+    return regr, {}
+
 def make_regression_poly(y, x_vars, d):
     '''Polynomial regression'''
     poly = PolynomialFeatures(degree=d)
@@ -245,17 +263,19 @@ def make_regression_poly(y, x_vars, d):
     model.fit(X_, y)
     return model, {"poly": poly}
 
-def make_regression_ridge(y, x_vars, d):
-    model = make_pipeline(PolynomialFeatures(), Ridge())
-    model.fit(x_vars, y)
-    return model, {}
-
 def make_regression_linear(y, x_vars):
     model = LinearRegression(n_jobs = threads)
     model.fit(x_vars, y)
     return model, {}
 
-
+def make_voting_regressor(y, x_vars):
+    estimator_list = [("mlp",MLPRegressor(random_state=1, max_iter=500)),
+                ("random_forest",RandomForestRegressor(n_jobs = 1)),
+                ("nearest_neighbor",KNeighborsRegressor(n_neighbors=4)),
+                ("decision_tree",DecisionTreeRegressor(random_state=0))]
+    ereg = VotingRegressor(estimators=estimator_list)
+    ereg.fit(x_vars, y)
+    return ereg, {}
 '''"'''
 
 model_makers = {"LinearRegression": make_regression_linear,
@@ -263,14 +283,11 @@ model_makers = {"LinearRegression": make_regression_linear,
                 lambda y, x_vars: make_regression_poly(y, x_vars, 2),
             "PolynomialRegression(d=5)": 
                 lambda y, x_vars: make_regression_poly(y, x_vars, 5),
-            "PolynomialRidgeRegression(d=2)": 
-                lambda y, x_vars: make_regression_ridge(y, x_vars, 2),
-            "PolynomialRidgeRegression(d=5)": 
-                lambda y, x_vars: make_regression_ridge(y, x_vars, 5),
-            "RandomForestRegression": make_random_forest,
-            "SupportVectorRegression_RBF": make_svr_rbf,
-            "SupportVectorRegression_LIN": make_svr_lin,
-            "SupportVectorRegression_POLY": make_svr_poly}
+            "RandomForestRegression": make_random_forest
+            "MultiLayerPerceptron": make_mlp,
+            "DecisionTree": make_decision_tree,
+            "KNearestNeighbor": make_nearest_neighbor,
+            "Voting(MLP,RF,DT,NN)": make_voting_regressor}
 
 def test_model(result_model, attrs, test_y, test_x_vars):
     '''Tests a trained model and randonly selects test points to plot'''
@@ -308,7 +325,7 @@ def regress(comb_name, train_x, train_y, test_x, test_y, model_maker, return_dic
     score, rmse, correlation, frequencies = test_model(result_model, attrs, test_y, test_x)
     #progress_bar.update(1)
 
-    return_dict[comb_name] = (score, rmse, correlation, frequencies, len(train_x))
+    return_dict[comb_name] = (score, rmse, correlation, frequencies, len(train_x)), result_model
 
 if __name__ == "__main__":
     #usage: multi_regression.py output_dir data_file min_correlation min_samples sub_perc
@@ -384,7 +401,7 @@ if __name__ == "__main__":
     print("Making regressions...")
     '''Use average and max semantic similarity values'''
     y_indexes = [0,1,2,3,4]
-    progress_bar = tqdm(total=len(y_indexes)*len(model_makers.items())*len(combs))
+    progress_bar = tqdm(total=len(y_indexes)*len(model_makers.items()+1)*len(combs))
     comb_results = {}
     '''Each y_index is for one semantic similarity value (cc,mf,bp,avg or max)'''
     for y_index in y_indexes:
@@ -436,10 +453,11 @@ if __name__ == "__main__":
                     '''Retrieve results'''
                     for key, value in return_dict.items():
                         comb_results[key] = value
-                    
                     manager._process.terminate()
                     manager.shutdown()
                     del manager
+
+
             else:
                 print("Not enough samples: " + str((len(train_y),len(test_y))))
                 progress_bar.update(len(model_makers.items()))
@@ -450,7 +468,7 @@ if __name__ == "__main__":
     print("\n")
     valid_results = []
     for comb_name, result_items in results:
-        score, rmse, correlation, frequencies, train_samples = result_items
+        score, rmse, correlation, frequencies, train_samples, model = result_items
         if score == -100000:
             print("Too few training samples for " 
                 + comb_name 
@@ -466,7 +484,7 @@ if __name__ == "__main__":
         valid_results.sort(key=lambda x: abs(x[1][sort_by]), reverse=reverse)
 
         if sort_by == 0:
-            print("\nBest scores: " )
+            print("\nBest R^2 scores: " )
         elif sort_by == 1:
             print("\nBest RMSE values: " )
         elif sort_by == 2:
@@ -474,13 +492,10 @@ if __name__ == "__main__":
 
         i = 0
         top_items = valid_results[-8:]
-        if reverse == True:
-            top_items = valid_results[:8]
-            top_items = top_items[::-1]
         for comb_name, result_items in top_items:
             subplot = subplots[i]
             subplot.set_ylim([0.0,1.0])
-            score, rmse, dc_corr, frequencies, train_samples = result_items
+            score, rmse, dc_corr, frequencies, train_samples, model = result_items
             subplot.pcolormesh(np.linspace(0.0,1.0,100), 
                                 np.linspace(0.0,1.0,100), frequencies,
                                 norm=colors.SymLogNorm(linthresh = 0.03,
