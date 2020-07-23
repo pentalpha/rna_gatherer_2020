@@ -372,7 +372,7 @@ if __name__ == "__main__":
             print("Normalizing values to range 0.0-1.0, for " + header[i])
             column_values[i] = [x/maxes[i] for x in column_values[i]]
     
-    combs = get_combs([1,2,3], [6,7,8,9,10])
+    combs = get_combs([2], [5,6,7,8])
     comb_strs = [", ".join([header[i] for i in comb]) for comb in combs]
     print("Combinations of metrics: "
         + str(comb_strs))
@@ -481,7 +481,7 @@ if __name__ == "__main__":
             valid_results.append((comb_name, result_items))
     
     def plot_regressions(subplots, sort_by, valid_results, reverse):    
-        valid_results.sort(key=lambda x: abs(x[1][sort_by]), reverse=reverse)
+        valid_results.sort(key=lambda x: x[1][sort_by], reverse=reverse)
 
         if sort_by == 0:
             print("\nBest R^2 scores: " )
