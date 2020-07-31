@@ -19,7 +19,8 @@ def add_names_to_set(file_path, names_set):
             names_set.add(cells[1])
     return names_set
 
-def replace_with_dict(in_file, out_file, names_dict, header):
+def replace_with_dict(in_file, out_file, names_dict, header, valid_genes=None):
+    replace_ss_values = valid_genes != None
     total_lines = 0
     wrote = 0
     with open(in_file,'r') as in_stream:
@@ -27,12 +28,24 @@ def replace_with_dict(in_file, out_file, names_dict, header):
             out_stream.write("\t".join(header)+"\n")
             for line in in_stream:
                 total_lines += 1
-                not_null = False
                 cells = line.rstrip("\n").split("\t")
+                if replace_ss_values:
+                    mf_valid = ((cells[0] in valid_genes["mf"]) 
+                                and (cells[1] in valid_genes["mf"]))
+                    bp_valid = ((cells[0] in valid_genes["bp"]) 
+                                and (cells[1] in valid_genes["bp"]))
+                    cc_valid = ((cells[0] in valid_genes["cc"]) 
+                                and (cells[1] in valid_genes["cc"]))
+                    cells[2] = cells[2] if mf_valid else "NaN"
+                    cells[3] = cells[3] if bp_valid else "NaN"
+                    cells[4] = cells[4] if cc_valid else "NaN"
+                
+                not_null = False
                 for cell in cells[2:]:
                     if cell != "None" and cells != "NaN":
                         not_null = True
                         break
+
                 if not_null:
                     pair = cells[0]+cells[1]
                     if pair in names_dict:
@@ -54,7 +67,8 @@ if __name__ == "__main__":
         os.mkdir(output_dir)
 
     print("Reading gene annotation")
-    n_terms = {}
+    onto_trans = {"P": "bp", "F": "mf", "C": "cc"}
+    n_terms = {key: {} for key in onto_trans.values()}
     with open(annotation,'r') as in_stream:
         terms_by_gene = {}
         for line in in_stream:
@@ -63,36 +77,55 @@ if __name__ == "__main__":
                 if len(cells) >= 5:
                     gene_name = cells[1]
                     go_term = cells[4]
+                    onto = onto_trans[cells[8]]
                     if not gene_name in terms_by_gene:
-                        terms_by_gene[gene_name] = set()
-                    terms_by_gene[gene_name].add(go_term)
+                        terms_by_gene[gene_name] = {key: set() for key in onto_trans.values()}
+                    terms_by_gene[gene_name][onto].add(go_term)
                 else:
                     print("Invalid line:" + str(cells))
-        for gene_name, term_set in terms_by_gene.items():
-            n_terms[gene_name] = len(term_set)
+        for gene_name, term_sets in terms_by_gene.items():
+            for key in onto_trans.values():
+                n_terms[key][gene_name] = len(term_sets[key])
     
-    useful_genes = []
-    for gene_name, n_terms in n_terms.items():
-        if n_terms >= 3:
-            useful_genes.append(gene_name)
-
-    print(str(len(useful_genes)) + " genes with enough annotation")
+    useful_genes = {"bp": set(), "mf": set(), "cc": set()}
+    for onto, len_dict in n_terms.items():
+        for gene_name, n_terms in len_dict.items():
+            if n_terms >= 3:
+                useful_genes[onto].add(gene_name)
+    all_useful_genes = list(set.union(*[useful_genes["bp"], useful_genes["mf"], useful_genes["cc"]]))
+    
+    log = open(output_dir+"/parsing_log.txt", 'w')
+    log.write(str(len(all_useful_genes)) + " genes with enough annotation\n")
+    log.write("\t" + str(len(useful_genes["bp"])) + " with enough BP terms\n")
+    log.write("\t" + str(len(useful_genes["mf"])) + " with enough MF terms\n")
+    log.write("\t" + str(len(useful_genes["cc"])) + " with enough CC terms\n")
 
     print("Creating ID dictionaries")
     pair_to_id = {}
     id_ = 0
-    for i in tqdm(range(len(useful_genes))):
-        for j in range(len(useful_genes)):
-            pair_name_a = useful_genes[i]+useful_genes[j]
-            pair_name_b = useful_genes[j]+useful_genes[i]
-            if not(pair_name_a in pair_to_id) and not(pair_name_b in pair_to_id):
-                pair_to_id[pair_name_a] = id_
-                id_ += 1
+    for i in tqdm(range(len(all_useful_genes))):
+        for j in range(len(all_useful_genes)):
+            name_a = all_useful_genes[i]
+            name_b = all_useful_genes[j]
+            valid = False
+            for onto_name, valid_ids in useful_genes.items():
+                if name_a in valid_ids and name_b in valid_ids:
+                    valid = True
+                    break
+            if valid:
+                pair_name_a = name_a+name_b
+                pair_name_b = name_b+name_a
+                if not(pair_name_a in pair_to_id) and not(pair_name_b in pair_to_id):
+                    pair_to_id[pair_name_a] = id_
+                    id_ += 1
     
-    print(str(list(pair_to_id.items())[0:10]))
+    log.write(str(len(pair_to_id.keys())) + " valid pairs.\n")
+    log.write("Example pairs: \n")
+    log.write(str(list(pair_to_id.items())[0:10])+"\n")
+    log.close()
 
     print("Creating versions without gene names, but IDs instead")
-    def replace_in_files(files, header):
+    def replace_in_files(files, header, useful_genes):
         n_files = []
         for f in tqdm(files):
             new_path = output_dir + "/" + get_filename(f)
@@ -101,17 +134,19 @@ if __name__ == "__main__":
                     new_header = header + [get_name(f)]
                     replace_with_dict(f, new_path, pair_to_id, new_header)
                 else:
-                    replace_with_dict(f, new_path, pair_to_id, header)
+                    replace_with_dict(f, new_path, pair_to_id, header, valid_genes=useful_genes)
             else:
                 print("Skiping " + f)
             n_files.append(new_path)
         return n_files
     print("\tFor correlations files...")
     new_files_corr = replace_in_files(files_corr, 
-                                ["pair_id"])
+                                ["pair_id"],
+                                None)
     print("\tFor ss files...")
     new_files_ss = replace_in_files(files_ss, 
-                                ["pair_id", "mf", "bp", "cc"])
+                                ["pair_id", "mf", "bp", "cc"],
+                                useful_genes)
     print("Loading all correlations into memory")
     correlations = {}
     metric_names = []
