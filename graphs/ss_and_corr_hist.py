@@ -100,13 +100,15 @@ def get_lines(stream, limit = 100000, min_len=1):
     return lines, False
 
 def get_frequencies(file_ss, index, converter, my_bins):
+    #print("Index " + str(index) + " of " + file_ss)
     frequencies = np.array([])
-    line_limit = 10000
     failed_lines = 0
     with open(file_ss, 'r') as stream:
         header_line = stream.readline().rstrip("\n").split("\t")
-        line_chunk, more_lines = get_lines(stream, min_len=index+1)
+        more_lines = True
         while more_lines:
+            line_chunk, more_lines = get_lines(stream, min_len=index+1)
+            #print("Processing chunk of " + str(len(line_chunk)) + " lines.")
             values = []
             for value_str in [cells[index] for cells in line_chunk]:
                 try:
@@ -119,13 +121,94 @@ def get_frequencies(file_ss, index, converter, my_bins):
                 frequencies = new_frequencies
             else:
                 frequencies = frequencies + new_frequencies
-            line_chunk, more_lines = get_lines(stream, min_len=index+1)
     return frequencies
 
 def legend_without_duplicate_labels(fig, ax):
     handles, labels = ax.get_legend_handles_labels()
     unique = [(h, l) for i, (h, l) in enumerate(zip(handles, labels)) if l not in labels[:i]]
     fig.legend(*zip(*unique), loc='center left', bbox_to_anchor=(1, 0.5))
+
+def get_averages_by_bins(ss_column, corr_column, invalid_lines, n_bins=100):
+    bins_totals = [0.0 for i in range(n_bins)]
+    bin_ids     = [[]  for i in range(n_bins)]
+    for i in range(len(ss_column)):
+        if not i in invalid_lines:
+            ss_val   = ss_column[i]
+            corr_val = corr_column[i]
+            corr_bin = int(round(corr_val*n_bins,0))
+            if corr_bin >= n_bins:
+                corr_bin = n_bins - 1
+            bin_ids[corr_bin].append(i)
+            bins_totals[corr_bin] += ss_val
+    x = []
+    y = []
+    freq_x = []
+    freq_y = []
+    lowest_avg_bin = 0
+    lowest_avg = 1.0
+    for i in range(n_bins):
+        x1 = i/n_bins
+        x2 = (i+1)/n_bins
+        bin_n = len(bin_ids[i])
+        if bin_n > 0:
+            avg = bins_totals[i]/bin_n
+            if i < n_bins/4:
+                if avg < lowest_avg:
+                    lowest_avg = avg
+                    lowest_avg_bin = i
+
+            y.append(avg)
+            y.append(avg)
+            x.append(x1)
+            x.append(x2)
+
+            freq_y.append(bin_n)
+            freq_x.append((i+0.5)/n_bins)
+    
+    bizarre_indexes = []
+    for b in bin_ids[:lowest_avg_bin]:
+        for ID in b:
+            if ss_column[ID] > lowest_avg:
+                bizarre_indexes.append(ID)
+
+    return x, y, freq_x, freq_y, bizarre_indexes
+
+def load_df_values(file_ss):
+    min_cells = 1+5+6
+    columns = []
+    for n_cell in range(min_cells):
+        columns.append([])
+    failed_lines = 0
+    aprox_lines_to_read = int((25*1024*1024*1024)/195)
+    stream = open(file_ss, 'r')
+    progress_bar = tqdm(total=aprox_lines_to_read)
+    header_line = stream.readline().rstrip("\n").split("\t")
+    raw_line = stream.readline()
+    progress_bar.update(2)
+    while raw_line:
+        try:
+            np_values = np.fromstring(raw_line.rstrip("\n"),
+                                    sep='\t',dtype=float)
+            if len(np_values) >= min_cells:
+                for i in range(len(np_values)):
+                    columns[i].append(np_values[i])
+            else:
+                failed_lines += 1
+        except ValueError:
+            failed_lines += 1
+        raw_line = stream.readline()
+        progress_bar.update(1)
+    print("Failed lines: " + str(failed_lines))
+    stream.close()
+    progress_bar.close()
+    return columns[1:], header_line[1:], [int(x) for x in columns[0]]
+
+def filter_column(x, min_cor):
+    f = set()
+    for i in range(len(x)):
+        if (not np.isfinite(x[i]) or np.isnan(x[i])) or x[i] < min_cor:
+            f.add(i)
+    return f
 
 if __name__ == "__main__":
     output_dir = sys.argv[1]
@@ -136,16 +219,17 @@ if __name__ == "__main__":
     
     name = get_filename(file_ss).split(".")[0]
     ss_col_names = ["mf", "bp", "cc", "avg", "max"]
-    mins, maxes, header = get_min_max(file_ss)
+    unorm_mins, unorm_maxes, header = get_min_max(file_ss)
+    
     min_max_path = output_dir+"/"+name+"min_max.tsv"
     with open(min_max_path, 'w') as stream:
         stream.write("\t".join(["Column Name","Min","Max"])+"\n")
-        for i in range(len(mins)):
-            stream.write("\t".join([str(x) for x in [header[i], mins[i],maxes[i]]]) + "\n")
+        for i in range(len(unorm_mins)):
+            stream.write("\t".join([str(x) for x in [header[i], unorm_mins[i], unorm_maxes[i]]]) + "\n")
     
     print(open(min_max_path, 'r').read())
-    mins = [math.floor(x) for x in mins]
-    maxes = [math.ceil(x) for x in maxes]
+    mins  = [math.floor(x) for x in unorm_mins]
+    maxes = [math.ceil(x) for x in unorm_maxes]
     bins = [np.linspace(mins[i], maxes[i], 100) for i in range(len(mins))]
 
     print("Plot semantic similarities")
@@ -153,12 +237,15 @@ if __name__ == "__main__":
                         figsize=(5, 7))
     print("\tCalculating frequencies")
     freqs = [get_frequencies(file_ss, i, float, bins[i])
-            for i in tqdm([1,2,3,4,5])]
+            for i in tqdm([1,2,3])]
     x_values = [((bin_edges[:-1] + bin_edges[1:]) / 2) 
-                for bin_edges in [bins[1],bins[2],bins[3],bins[4],bins[5]]]
+                for bin_edges in [bins[1],bins[2],bins[3]]]
+    '''print(str([len(freq) for freq in freqs]))
+    print(str(freqs[0]))
+    print(str([len(x) for x in x_values]))'''
     print("Plotting lines")
     pallete = make_pallete(ss_col_names)
-    for i in tqdm(range(len(ss_col_names))):
+    for i in tqdm(range(len(ss_col_names[:3]))):
         col = ss_col_names[i]
         freq = freqs[i]
         x = x_values[i]
@@ -169,16 +256,19 @@ if __name__ == "__main__":
     fig.tight_layout()
     fig.savefig(output_dir+"/semantic_similarity_hist.png", bbox_inches='tight')
 
-    bins = [np.linspace(mins[i], maxes[i], 300) for i in range(len(mins))]
-
+    range_len = [min(int(abs(unorm_mins[i]-unorm_maxes[i])*25),2000)
+            for i in range(len(unorm_mins))]
+    bins = [np.linspace(unorm_mins[i], unorm_maxes[i], range_len[i]) 
+            for i in range(len(unorm_mins))]
     print("Plotting correlations")
     fig, ax = plt.subplots(figsize=(6, 5))
     print("\tCalculating frequencies")
     cols = header[6:]
     print("\t\tGetting frequencies for columns:")
     print("\t\t\t"+str(cols))
-    col_indexes = list(range(4,6+len(cols)))
+    col_indexes = [6,7,8,9,10,11]
     print("\t\t\t"+str(col_indexes))
+    print("\t\t\t"+str(range_len))
     freqs = [get_frequencies(file_ss, i, float, bins[i])
             for i in tqdm(col_indexes)]
     x_values = [((bin_edges[:-1] + bin_edges[1:]) / 2) 
@@ -196,6 +286,82 @@ if __name__ == "__main__":
     fig.tight_layout()
     fig.savefig(output_dir+"/correlations_hist.png", bbox_inches='tight')
 
-    
+    mins  = [round(x,2) for x in unorm_mins]
+    maxes = [round(x,2) for x in unorm_maxes]
+
+    mins = mins[1:]
+    maxes = maxes[1:]
+    column_values, header, ids = load_df_values(file_ss)
+    corr_col_names = header[5:]
+    '''Normalizing negatives and high values to 0.0 -> 1.0'''
+    norm_negatives = [mins[i] < 0 for i in range(len(mins))]
+    norm_by_max = [maxes[i] > 1.0 for i in range(len(maxes))]
+    for i in range(len(column_values)):
+        if norm_negatives[i]:
+            print("Normalizing negative values of " + header[i])
+            column_values[i] = [abs(x) for x in column_values[i]]
+        if norm_by_max[i]:
+            print("Normalizing values to range 0.0-1.0, for " + header[i])
+            column_values[i] = [x/maxes[i] for x in column_values[i]]
+        if header[i] in ["SOB","FSH"]:
+            column_values[i] = [max(1.0-x, 0) for x in column_values[i]]
+    print("Creating filters...")
+    all_corrs_filter = set.union(*[filter_column(x, 0.0) 
+                                          for x in tqdm(column_values[5:])])
+    ss_filters = [filter_column(x, 0.0) for x in tqdm(column_values[:5])]
+    ss_filters = [ss_filter.union(all_corrs_filter) for ss_filter in ss_filters]
+
+    print("Plot average SS values")
+    x_plots = len(corr_col_names)
+    y_plots = len(ss_col_names[:-2])
+    fig, axes = plt.subplots(y_plots, x_plots,
+                            figsize=(x_plots*5, y_plots*3))
+    print(str([len(axes),len(axes[0])]))
+    bar = tqdm(total=x_plots*y_plots)
+    axes_j = 0
+    for j in range(len(ss_col_names[:-2])):
+        corr_plots = axes[axes_j]
+        ss_filter = ss_filters[j]
+        i = 0
+        bizarres = set()
+        for corr_i in [5,6,7,8,9,10]:
+            sub_plot = corr_plots[i]
+            x, y, freq_x, freq_y, bizarre_indexes = get_averages_by_bins(
+                                        column_values[j],
+                                        column_values[corr_i],
+                                        ss_filter)
+            bizarres.update(bizarre_indexes)
+            sub_plot.set_yscale('symlog')
+            sub_plot.fill_between(freq_x, freq_y, 0, color='red')
+            sub_plot.xaxis.set_label_position('top')
+            if j == 0:
+                sub_plot.set_xlabel(translator(header[corr_i]))
+            if i == 0:
+                sub_plot.text(-0.25, 0.5, translator(header[j]),
+                    rotation=90,
+                    horizontalalignment='center',
+                    verticalalignment='center',
+                    multialignment='center', 
+                    transform=sub_plot.transAxes)
+            sub_plot.set_ylabel("Frequência por segmento", color='red')
+            sub_plot.tick_params(axis='y', colors='red')
+
+            avg_ax = sub_plot.twinx()
+            avg_ax.plot(x, y, color="blue")
+            avg_ax.set_ylabel("Média por segmento", color="blue")
+            avg_ax.tick_params(axis='y', colors='blue')
+            bar.update(1)
+            i += 1
+        bizarre_rows = [[ids[index]] + [column_values[j][index]] + [col[index] for col in column_values[5:]] 
+                        for index in bizarre_indexes]
+        bizarre_lines= ["\t".join([str(val) for val in row]) for row in bizarre_rows]
+        with open(output_dir+"/bizarre_ss-"+ss_col_names[j]+".tsv", 'w') as stream:
+            stream.write("\t".join(["pair_id"]+[ss_col_names[j]]+header[5:])+"\n")
+            for line in bizarre_lines:
+                stream.write(line+"\n")
+        axes_j += 1
+    bar.close()
+    fig.tight_layout()
+    fig.savefig(output_dir+"/correlations_ranges.png", bbox_inches='tight')
 
 
