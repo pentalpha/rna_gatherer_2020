@@ -6,6 +6,8 @@ import os
 import pandas as pd
 import math
 import matplotlib.colors as colors
+import dcor
+from scipy.stats.stats import pearsonr, spearmanr
 
 translate_dict_en = {"cc": "Cellular Component", "CC": "Cellular Component",
                 "mf": "Molecular Function", "MF": "Molecular Function",
@@ -128,9 +130,21 @@ def legend_without_duplicate_labels(fig, ax):
     unique = [(h, l) for i, (h, l) in enumerate(zip(handles, labels)) if l not in labels[:i]]
     fig.legend(*zip(*unique), loc='center left', bbox_to_anchor=(1, 0.5))
 
-def get_averages_by_bins(ss_column, corr_column, invalid_lines, n_bins=100):
-    bins_totals = [0.0 for i in range(n_bins)]
-    bin_ids     = [[]  for i in range(n_bins)]
+def convert_to_ranges(ranges, y_points):
+    new_x = []
+    new_y = []
+    for i in range(len(ranges)):
+        a, b = ranges[i]
+        y = y_points[i]
+        new_x.append(a)
+        new_y.append(y)
+        new_x.append(b)
+        new_y.append(y)
+    return new_x, new_y
+
+def get_percentiles_by_bins(ss_column, corr_column, invalid_lines, n_bins=500):
+    bin_vals = [[] for i in range(n_bins)]
+    #bin_ids  = [[] for i in range(n_bins)]
     for i in range(len(ss_column)):
         if not i in invalid_lines:
             ss_val   = ss_column[i]
@@ -138,40 +152,30 @@ def get_averages_by_bins(ss_column, corr_column, invalid_lines, n_bins=100):
             corr_bin = int(round(corr_val*n_bins,0))
             if corr_bin >= n_bins:
                 corr_bin = n_bins - 1
-            bin_ids[corr_bin].append(i)
-            bins_totals[corr_bin] += ss_val
-    x = []
-    y = []
-    freq_x = []
-    freq_y = []
-    lowest_avg_bin = 0
-    lowest_avg = 1.0
+            #bin_ids[corr_bin].append(i)
+            bin_vals[corr_bin].append(ss_val)
+
+    x               = []
+    medians         = []
+    top_quantile    = []
+    bottom_quantile = []
     for i in range(n_bins):
-        x1 = i/n_bins
-        x2 = (i+1)/n_bins
-        bin_n = len(bin_ids[i])
-        if bin_n > 0:
-            avg = bins_totals[i]/bin_n
-            if i < n_bins/4:
-                if avg < lowest_avg:
-                    lowest_avg = avg
-                    lowest_avg_bin = i
+        if len(bin_vals[i]) > 0:
+            x1 = i/n_bins
+            x2 = (i+1)/n_bins
+            x.append((x1,x2))
 
-            y.append(avg)
-            y.append(avg)
-            x.append(x1)
-            x.append(x2)
+            bin_vals[i].sort()
+            top_quantile.append(np.percentile(bin_vals[i], 75))
+            medians.append(np.percentile(bin_vals[i], 50))
+            bottom_quantile.append(np.percentile(bin_vals[i], 25))
+        '''else:
+            top_quantile.append(0.0)
+            medians.append(0.0)
+            bottom_quantile.append(0.0)'''
+    corr = dcor.distance_correlation(np.array([a for a,b in x]), np.array(medians))
 
-            freq_y.append(bin_n)
-            freq_x.append((i+0.5)/n_bins)
-    
-    bizarre_indexes = []
-    for b in bin_ids[:lowest_avg_bin]:
-        for ID in b:
-            if ss_column[ID] > lowest_avg:
-                bizarre_indexes.append(ID)
-
-    return x, y, freq_x, freq_y, bizarre_indexes
+    return x, top_quantile, medians, bottom_quantile, corr
 
 def load_df_values(file_ss):
     min_cells = 1+5+6
@@ -215,10 +219,12 @@ if __name__ == "__main__":
     file_ss = sys.argv[2]
     
     if not os.path.exists(output_dir):
+        print("creating output dir")
         os.mkdir(output_dir)
     
     name = get_filename(file_ss).split(".")[0]
     ss_col_names = ["mf", "bp", "cc", "avg", "max"]
+    print("Reading minimum and maximum values for columns")
     unorm_mins, unorm_maxes, header = get_min_max(file_ss)
     
     min_max_path = output_dir+"/"+name+"min_max.tsv"
@@ -232,7 +238,7 @@ if __name__ == "__main__":
     maxes = [math.ceil(x) for x in unorm_maxes]
     bins = [np.linspace(mins[i], maxes[i], 100) for i in range(len(mins))]
 
-    print("Plot semantic similarities")
+    '''print("Plot semantic similarities")
     fig, ax = plt.subplots(1, 
                         figsize=(5, 7))
     print("\tCalculating frequencies")
@@ -240,9 +246,9 @@ if __name__ == "__main__":
             for i in tqdm([1,2,3])]
     x_values = [((bin_edges[:-1] + bin_edges[1:]) / 2) 
                 for bin_edges in [bins[1],bins[2],bins[3]]]
-    '''print(str([len(freq) for freq in freqs]))
-    print(str(freqs[0]))
-    print(str([len(x) for x in x_values]))'''
+    #print(str([len(freq) for freq in freqs]))
+    #print(str(freqs[0]))
+    #print(str([len(x) for x in x_values]))
     print("Plotting lines")
     pallete = make_pallete(ss_col_names)
     for i in tqdm(range(len(ss_col_names[:3]))):
@@ -284,7 +290,7 @@ if __name__ == "__main__":
     legend_without_duplicate_labels(fig, ax)
     ax.set_title("Distribuição dos Valores de Coeficientes de Correlação")
     fig.tight_layout()
-    fig.savefig(output_dir+"/correlations_hist.png", bbox_inches='tight')
+    fig.savefig(output_dir+"/correlations_hist.png", bbox_inches='tight')'''
 
     mins  = [round(x,2) for x in unorm_mins]
     maxes = [round(x,2) for x in unorm_maxes]
@@ -293,7 +299,7 @@ if __name__ == "__main__":
     maxes = maxes[1:]
     column_values, header, ids = load_df_values(file_ss)
     corr_col_names = header[5:]
-    '''Normalizing negatives and high values to 0.0 -> 1.0'''
+    #Normalizing negatives and high values to 0.0 -> 1.0
     norm_negatives = [mins[i] < 0 for i in range(len(mins))]
     norm_by_max = [maxes[i] > 1.0 for i in range(len(maxes))]
     for i in range(len(column_values)):
@@ -315,50 +321,57 @@ if __name__ == "__main__":
     x_plots = len(corr_col_names)
     y_plots = len(ss_col_names[:-2])
     fig, axes = plt.subplots(y_plots, x_plots,
-                            figsize=(x_plots*5, y_plots*3))
+                            figsize=(x_plots*8, y_plots*3))
     print(str([len(axes),len(axes[0])]))
     bar = tqdm(total=x_plots*y_plots)
     axes_j = 0
+    higher_y = 0.0
     for j in range(len(ss_col_names[:-2])):
         corr_plots = axes[axes_j]
         ss_filter = ss_filters[j]
         i = 0
-        bizarres = set()
+        #bizarres = set()
         for corr_i in [5,6,7,8,9,10]:
             sub_plot = corr_plots[i]
-            x, y, freq_x, freq_y, bizarre_indexes = get_averages_by_bins(
+            x, top_quantile, medians, bottom_quantile, corr = get_percentiles_by_bins(
                                         column_values[j],
                                         column_values[corr_i],
                                         ss_filter)
-            bizarres.update(bizarre_indexes)
-            sub_plot.set_yscale('symlog')
-            sub_plot.fill_between(freq_x, freq_y, 0, color='red')
-            sub_plot.xaxis.set_label_position('top')
-            if j == 0:
+            
+            x_median, y_median = convert_to_ranges(x, medians)
+            x_top, y_top = convert_to_ranges(x, top_quantile)
+            x_bottom, y_bottom = convert_to_ranges(x, bottom_quantile)
+
+            sub_plot.fill_between(x_top, y_top, y_bottom, color='red')
+            #sub_plot.xaxis.set_label_position('top')
+            if j == 2:
                 sub_plot.set_xlabel(translator(header[corr_i]))
             if i == 0:
-                sub_plot.text(-0.25, 0.5, translator(header[j]),
+                sub_plot.text(-0.2, 0.5, translator(header[j]),
                     rotation=90,
                     horizontalalignment='center',
                     verticalalignment='center',
                     multialignment='center', 
                     transform=sub_plot.transAxes)
-            sub_plot.set_ylabel("Frequência por segmento", color='red')
-            sub_plot.tick_params(axis='y', colors='red')
+            sub_plot.set_ylabel("Percentis de S.S. por segmento")
+            sub_plot.set_title("Correlação das Medianas = " + str(round(corr,4)))
 
-            avg_ax = sub_plot.twinx()
+            sub_plot.plot(x_median, y_median, color="blue")
+            sub_plot.set_ylim(0.0, 0.6)
+
+            '''avg_ax = sub_plot.twinx()
             avg_ax.plot(x, y, color="blue")
             avg_ax.set_ylabel("Média por segmento", color="blue")
-            avg_ax.tick_params(axis='y', colors='blue')
+            avg_ax.tick_params(axis='y', colors='blue')'''
             bar.update(1)
             i += 1
-        bizarre_rows = [[ids[index]] + [column_values[j][index]] + [col[index] for col in column_values[5:]] 
+        '''bizarre_rows = [[ids[index]] + [column_values[j][index]] + [col[index] for col in column_values[5:]] 
                         for index in bizarre_indexes]
         bizarre_lines= ["\t".join([str(val) for val in row]) for row in bizarre_rows]
         with open(output_dir+"/bizarre_ss-"+ss_col_names[j]+".tsv", 'w') as stream:
             stream.write("\t".join(["pair_id"]+[ss_col_names[j]]+header[5:])+"\n")
             for line in bizarre_lines:
-                stream.write(line+"\n")
+                stream.write(line+"\n")'''
         axes_j += 1
     bar.close()
     fig.tight_layout()
