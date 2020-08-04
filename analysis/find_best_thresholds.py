@@ -159,6 +159,7 @@ def get_not_none(pairs, min_val=0.0):
 if __name__ == "__main__":
     output_dir = sys.argv[1]
     file_ss = sys.argv[2]
+    max_ss = float(sys.argv[3])
     
     if not os.path.exists(output_dir):
         print("creating output dir")
@@ -166,7 +167,7 @@ if __name__ == "__main__":
     
     name = get_filename(file_ss).split(".")[0]
     ss_col_names = ["mf", "bp", "cc", "avg", "max"]
-    print("Reading minimum and maximum values for columns")
+    '''print("Reading minimum and maximum values for columns")
     unorm_mins, unorm_maxes, header = get_min_max(file_ss)
     
     min_max_path = output_dir+"/"+name+"min_max.tsv"
@@ -181,11 +182,36 @@ if __name__ == "__main__":
     maxes = [round(x,2) for x in unorm_maxes]
 
     mins = mins[1:]
-    maxes = maxes[1:]
+    maxes = maxes[1:]'''
     column_values, header, ids = load_df_values(file_ss)
     corr_col_names = header[5:]
+    for i in range(len(column_values)):
+        column = column_values[i]
+        name = header[i]
+        max_val = max_ss
+        if name in corr_col_names:
+            max_val = 1.0
+            if name == "SOB" or name == "FSH":
+                max_val = max(column)
+        print("Maximum of " + name + " is " + str(max_val))
+        if name == "SPR" or name == "PRS":
+            print("Normalizing negative values for " + name)
+            column_values[i] = [abs(x) for x in column_values[i]]
+        if name == "SOB" or name == "FSH":
+            print("Value inversion for " + name)
+            column_values[i] = [max(max_val-x, 0.0) for x in column_values[i]]
+        if max_val != 1.0:
+            print("Normalizing values to range 0.0 -> 1.0 for " + name)
+            column_values[i] = [min(x/max_val, 1.0) for x in column_values[i]]
+        else:
+            column_values[i] = [min(x, 1.0) for x in column_values[i]]
+        if name in corr_col_names:
+            print("Rounding values for " + name)
+            column_values[i] = [round(x, 5) for x in column_values[i]]
 
-    norm_negatives = [mins[i] < 0 for i in range(len(mins))]
+    corr_col_names = header[5:]
+
+    '''norm_negatives = [mins[i] < 0 for i in range(len(mins))]
     norm_by_max = [maxes[i] > 1.0 for i in range(len(maxes))]
     for i in range(len(column_values)):
         if norm_negatives[i]:
@@ -195,7 +221,7 @@ if __name__ == "__main__":
             print("Normalizing values to range 0.0-1.0, for " + header[i])
             column_values[i] = [x/maxes[i] for x in column_values[i]]
         if header[i] in ["SOB","FSH"]:
-            column_values[i] = [max(1.0-x, 0) for x in column_values[i]]
+            column_values[i] = [max(1.0-x, 0) for x in column_values[i]]'''
     print("Creating filters...")
     corr_filters = [filter_column(x, 0.0) for x in tqdm(column_values[5:])]
     all_corrs_filter = set.union(*corr_filters)
@@ -233,11 +259,11 @@ if __name__ == "__main__":
     zord = 0
     for corr_name, sub_plt in tqdm(subplots):
         mf_th, bp_th, cc_th = ths_by_metric[corr_name]
-        mf_confs_raw, bp_confs_raw, cc_confs_raw = confs_by_metric[corr_name]
+        '''mf_confs_raw, bp_confs_raw, cc_confs_raw = confs_by_metric[corr_name]
 
         mf_confs_x, mf_confs_y = get_not_none(mf_confs_raw, min_val=mf_th[0][-1])
         bp_confs_x, bp_confs_y = get_not_none(bp_confs_raw, min_val=bp_th[0][-1])
-        cc_confs_x, cc_confs_y = get_not_none(cc_confs_raw, min_val=cc_th[0][-1])
+        cc_confs_x, cc_confs_y = get_not_none(cc_confs_raw, min_val=cc_th[0][-1])'''
         
         sub_plt.yaxis.set_major_locator(MultipleLocator(0.05))
         sub_plt.yaxis.set_minor_locator(MultipleLocator(0.01))
@@ -255,7 +281,7 @@ if __name__ == "__main__":
             zorder=zord)
         zord += 1
 
-        sub_plt.scatter(mf_confs_x, mf_confs_y, marker='>', 
+        '''sub_plt.scatter(mf_confs_x, mf_confs_y, marker='>', 
             color="lightcoral", s=40, alpha=0.75, zorder=zord)
         zord += 1
         sub_plt.scatter(bp_confs_x, bp_confs_y, marker='>', 
@@ -263,7 +289,7 @@ if __name__ == "__main__":
         zord += 1
         sub_plt.scatter(cc_confs_x, cc_confs_y, marker='>', 
             color="springgreen", s=40, alpha=0.75, zorder=zord)
-        zord += 1
+        zord += 1'''
 
         sub_plt.set_title(translator(corr_name))
         sub_plt.set_ylabel("Similaridade Semântica Média")
