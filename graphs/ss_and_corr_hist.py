@@ -238,7 +238,7 @@ if __name__ == "__main__":
     maxes = [math.ceil(x) for x in unorm_maxes]
     bins = [np.linspace(mins[i], maxes[i], 100) for i in range(len(mins))]
 
-    '''print("Plot semantic similarities")
+    print("Plot semantic similarities")
     fig, ax = plt.subplots(1, 
                         figsize=(5, 7))
     print("\tCalculating frequencies")
@@ -246,9 +246,6 @@ if __name__ == "__main__":
             for i in tqdm([1,2,3])]
     x_values = [((bin_edges[:-1] + bin_edges[1:]) / 2) 
                 for bin_edges in [bins[1],bins[2],bins[3]]]
-    #print(str([len(freq) for freq in freqs]))
-    #print(str(freqs[0]))
-    #print(str([len(x) for x in x_values]))
     print("Plotting lines")
     pallete = make_pallete(ss_col_names)
     for i in tqdm(range(len(ss_col_names[:3]))):
@@ -290,7 +287,7 @@ if __name__ == "__main__":
     legend_without_duplicate_labels(fig, ax)
     ax.set_title("Distribuição dos Valores de Coeficientes de Correlação")
     fig.tight_layout()
-    fig.savefig(output_dir+"/correlations_hist.png", bbox_inches='tight')'''
+    fig.savefig(output_dir+"/correlations_hist.png", bbox_inches='tight')
 
     mins  = [round(x,2) for x in unorm_mins]
     maxes = [round(x,2) for x in unorm_maxes]
@@ -358,20 +355,8 @@ if __name__ == "__main__":
 
             sub_plot.plot(x_median, y_median, color="blue")
             sub_plot.set_ylim(0.0, 0.6)
-
-            '''avg_ax = sub_plot.twinx()
-            avg_ax.plot(x, y, color="blue")
-            avg_ax.set_ylabel("Média por segmento", color="blue")
-            avg_ax.tick_params(axis='y', colors='blue')'''
             bar.update(1)
             i += 1
-        '''bizarre_rows = [[ids[index]] + [column_values[j][index]] + [col[index] for col in column_values[5:]] 
-                        for index in bizarre_indexes]
-        bizarre_lines= ["\t".join([str(val) for val in row]) for row in bizarre_rows]
-        with open(output_dir+"/bizarre_ss-"+ss_col_names[j]+".tsv", 'w') as stream:
-            stream.write("\t".join(["pair_id"]+[ss_col_names[j]]+header[5:])+"\n")
-            for line in bizarre_lines:
-                stream.write(line+"\n")'''
         axes_j += 1
     bar.close()
     fig.tight_layout()
