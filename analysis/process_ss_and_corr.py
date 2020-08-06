@@ -84,14 +84,13 @@ if __name__ == "__main__":
         for gene_name, term_set in terms_by_gene.items():
             for key in onto_trans.values():
                 n_terms[gene_name] = len(term_set)
-    
+
+    n_terms_vec = np.array(list(n_terms.values()))
+    mean = n_terms_vec.mean()
+    std = n_terms_vec.std()
     if max_terms == None:
-        n_terms_vec = np.array(list(n_terms.values()))
-        mean = n_terms_vec.mean()
-        std = n_terms_vec.std()
         min_terms = math.floor(mean)
         max_terms = math.ceil(mean)
-
     to_log = ("Mean terms per gene: " + str(mean)+ "\n")
     to_log += ("Standard deviation: " + str(std) + "\n")
     to_log += ("Minimum terms: " + str(min_terms) + "\n")
