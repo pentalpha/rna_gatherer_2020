@@ -154,7 +154,7 @@ def quantify_coding(fasta_path, sample_list, output_dir):
     index = indexing_dir + "/index"
     cmd = " ".join(['salmon',"index","-t",path,"-i",index,"-k",str(31)])
     code = runCommand(cmd)
-    code = 0
+    #code = 0
     if code != 0:
         return False
 
