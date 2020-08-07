@@ -25,12 +25,6 @@ def is_constant(vec):
             return False
     return True
 
-def normalize_sob_and_fisher(value):
-    value = 1.0 - value
-    if value < 0.0:
-        value = 0.0
-    return value
-
 def calc_sobolev(reads1,reads2):
     z1 = ((np.square(reads1) / np.sum(np.square(reads1))) -
         (np.square(reads2) / np.sum(np.square(reads2))))
@@ -48,10 +42,10 @@ def calc_sobolev(reads1,reads2):
 
 def calc_sobolev_norm(reads1, reads2):
     sob = calc_sobolev(reads1,reads2)
-    reduced_sum = sob / 20.0
+    reduced_sum = sob / 14.675
     corrected_corr = 1.0 - reduced_sum
     if corrected_corr < 0.0:
-            corrected_corr = 0
+            corrected_corr = 0.0
     return corrected_corr
 
 def calc_fisher_information(reads1,reads2):
@@ -72,9 +66,10 @@ def calc_fisher_information(reads1,reads2):
 
 def calc_fisher_information_norm(reads1,reads2):
     fisher = calc_fisher_information(reads1,reads2)
+    norm_fisher = fisher / 1.57
     corrected_corr = 1.0 - fisher
     if corrected_corr < 0.0:
-        corrected_corr = 0
+        corrected_corr = 0.0
     return corrected_corr
 
 def calc_mic(reads1,reads2,mine):
@@ -89,24 +84,27 @@ def spr(reads1,reads2):
     spearman_corr, p = spearmanr(reads1, reads2)
     return spearman_corr
 
+def abs_func(func):
+    return lambda x, y: abs(func(x,y))
+
 def dc(reads1,reads2):
     return dcor.distance_correlation(reads1, reads2)
 
-def filter(val, min_value):
-    if val <= -min_value or val >= min_value:
+def filter_by_min(val, min_value):
+    if val >= min_value:
         return val
     else:
         return None
 
 def metric_with_filter(metric, min_value):
-    return lambda a,b: filter(metric(a,b),min_value)
+    return lambda a,b: filter_by_min(metric(a,b),min_value)
 
 def get_mic():
     mine = MINE()
     mic = lambda reads1,reads2: calc_mic(reads1,reads2,mine)
     return mic
 
-method_names = {"MIC": get_mic(), "PRS": prs, "SPR": spr, "DC": dc, 
+method_names = {"MIC": get_mic(), "PRS": abs_func(prs), "SPR": abs_func(spr), "DC": dc, 
                 "FSH": calc_fisher_information_norm, "SOB": calc_sobolev_norm}
 
 def calc_all(pid, coding_rows, regulators, metrics_used, return_dict):
@@ -135,11 +133,10 @@ def calc_all(pid, coding_rows, regulators, metrics_used, return_dict):
                     coding_noncoding_pairs.append((row1[0], row2[0], corr, method_ids[i]))
     return_dict[pid] = coding_noncoding_pairs
 
-def leave_one_out(pid, coding_rows, regulators, method_ids, return_dict):
+def leave_one_out(pid, coding_rows, regulators, method_ids, min_thresholds, return_dict):
+    minimum_coefs = min_thresholds
     #print("Turning warnings into errors.")
     warnings.filterwarnings('error')
-    minimum_coefs = load_confidence(os.path.dirname(os.path.realpath(__file__)) 
-                                    + "/../data/confidence_intervals.csv")[0]
     valid_metrics = []
     for metric_name in method_ids:
         if minimum_coefs[metric_name] != None:
@@ -172,9 +169,8 @@ def leave_one_out(pid, coding_rows, regulators, method_ids, return_dict):
     #print(str(len(coding_noncoding_pairs)) + " correlation pairs found.")
     return_dict[pid] = coding_noncoding_pairs
 
-def try_find_coexpression_process(pid, coding_rows, nc_rows, method_ids, return_dict):
-    minimum_coefs = load_confidence(os.path.dirname(os.path.realpath(__file__)) 
-                                    + "/../data/confidence_intervals.csv")[0]
+def try_find_coexpression_process(pid, coding_rows, nc_rows, method_ids, min_thresholds, return_dict):
+    minimum_coefs = min_thresholds
 
     valid_metrics = []
     for metric_name in method_ids:
@@ -199,7 +195,6 @@ def try_find_coexpression_process(pid, coding_rows, nc_rows, method_ids, return_
             reads2 = np.array(row2.values[1:],dtype=np.float32)
             for i in range(len(method_ids)):
                 corr = methods[i](reads1,reads2)
-                #if(corr > 0.74) or (corr < -0.74):
                 if corr != None:
                     coding_noncoding_pairs.append((row1[0], row2[0], corr, method_ids[i]))
     #print(str(len(coding_noncoding_pairs)) + " correlation pairs found.")

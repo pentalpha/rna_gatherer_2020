@@ -26,7 +26,7 @@ import sys
 from nexus.functional_prediction import *
 from nexus.util import *
 from nexus.confidence_levels import *
-from nexus.bioinfo import load_metrics
+from nexus.bioinfo import load_metrics, short_ontology_name
 import obonet
 import networkx
 import numpy as np
@@ -36,7 +36,7 @@ import multiprocessing
 '''
 Loading configurations and command line arguments
 '''
-from config import configs
+from config import configs, require_files
 mandatory_files = ["go_obo"]
 require_files(mandatory_files)
 
@@ -44,6 +44,8 @@ require_files(mandatory_files)
 confs = {}
 for conf in configs:
     confs[conf] = configs[conf]
+
+available_species = get_available_species()
 
 display_cache = get_cache()
 
@@ -69,7 +71,6 @@ def getArgs():
     ap.add_argument("-ont", "--ontology-type", required=False,
         default="molecular_function", help=("One of the following: molecular_function (default),"
         +" cellular_component or biological_process."))
-
     ap.add_argument("-met", "--method", required=False,
         default=None, help=("Correlation coefficient calculation method:"
         +" MIC (Maximal Information Coefficient), "
@@ -83,7 +84,9 @@ def getArgs():
     default_threads = max(2, multiprocessing.cpu_count()-1)
     ap.add_argument("-p", "--processes", required=False,
         default=default_threads, help=("CPUs to use. Default: " + str(default_threads)+"."))
-
+    ap.add_argument("-md", "--model-species", required=False,
+        default="mus_musculus", help=("Model organism used to calculate confidence levels: "
+        + ",".join(available_species)) + ". Default: mus_musculus.")
     ap.add_argument("-th", "--threshold", required=False,
         default=None, help=("Sets an unique correlation coefficient threshold for all methods: 0.5 <= x <= 0.99."))
     ap.add_argument("-K", "--k-min-coexpressions", required=False,
@@ -131,20 +134,39 @@ if "cache_size" in cmdArgs:
     available_cache = int(int(cmdArgs["cache_size"]) * cache_usage)
 print("Available cache memory: " + str(int(available_cache/1024)) + "KB")
 
+model_name = cmdArgs["model_species"]
+if not model_name in available_species:
+    print(model_name + " is not a valid model species.")
+    print("Available species are: " + str(available_species))
+    quit()
+
+print("Loading confidence levels for " + model_name)
+confidence_thresholds = load_confidence_levels(model_name)
 confidence_levels = [int(x) for x in cmdArgs["confidence_level"].split(",")]
-confidence_thresholds = load_confidence(confs["intervals_file"])
 
 if cmdArgs["threshold"] != None:
     universal_th = float(cmdArgs["threshold"])
-    print(str(len(confidence_thresholds)))
-    print(str(confidence_levels))
+    #print(str(len(confidence_thresholds)))
+    #print(str(confidence_levels))
     for i in confidence_levels:
-        for metric in confidence_thresholds[i].keys():
-            print(str(i))
-            confidence_thresholds[i][metric] = universal_th
+        for onto in confidence_thresholds.keys():
+            for metric in confidence_thresholds[onto][i].keys():
+                confidence_thresholds[onto][i][metric] = universal_th
 
 min_confidence = confidence_levels[0]
-min_thresholds = confidence_thresholds[min_confidence]
+min_thresholds_by_onto = {onto: confs[min_confidence] 
+                        for onto, confs in confidence_thresholds.items()}
+print(str(min_thresholds_by_onto))
+min_thresholds = {}
+for metric in min_thresholds_by_onto["MF"].keys():
+    values = [mins[metric] 
+                for onto, mins in min_thresholds_by_onto.items() 
+                if mins[metric] is not None]
+    if len(values) > 0:
+        min_thresholds[metric] = min(values)
+    else:
+        min_thresholds[metric] = None
+print(str(min_thresholds))
 
 if cmdArgs["method"] != None:
     new_metrics = {}
@@ -152,13 +174,13 @@ if cmdArgs["method"] != None:
     if method[0] == "ALL":
         method = all_methods
 
-    metrics_with_minimum_conf = []
+    metrics_with_minimum_conf = set(method)
     for metric_name in method:
-        if min_thresholds[metric_name] != None:
-            metrics_with_minimum_conf.append(metric_name)
-        else:
-            print(metric_name + " does not have the minimum confidence level.")
-    method = metrics_with_minimum_conf
+        if mins[metric_name] == None:
+            metrics_with_minimum_conf.remove(metric_name)
+            print(metric_name + " does not have the minimum confidence level for " 
+                + onto + ", not using it.")
+    method = list(metrics_with_minimum_conf)
 
     for conf in default_methods.keys():
         new_metrics[conf] = {o: method for o in all_ontologies}    
@@ -217,7 +239,7 @@ def find_correlated(reads, regulators, tempDir, methods, method_streams, separat
             end = limit
         parcial_df = reads.iloc[start:end]
         p = multiprocessing.Process(target=func, 
-            args=(i, parcial_df, regulators, methods, return_dict, ))
+            args=(i, parcial_df, regulators, methods, min_thresholds, return_dict, ))
         processes.append(p)
         #print("Spawned process from gene " + str(start) + " to " + str(end))
         p.start()
@@ -229,7 +251,7 @@ def find_correlated(reads, regulators, tempDir, methods, method_streams, separat
     if end < limit:
         parcial_df = reads.iloc[end:limit]
         p = multiprocessing.Process(target=func, 
-            args=(last_pid+1, parcial_df, regulators, methods, return_dict, ))
+            args=(last_pid+1, parcial_df, regulators, methods, min_thresholds, return_dict, ))
         processes.append(p)
         #print("Spawned process from gene " + str(end) + " to " + str(limit))
         p.start()
@@ -270,7 +292,7 @@ print("Reading regulators")
 regulators = []
 with open(regulators_path,'r') as stream:
     for line in stream.readlines():
-        regulators.append(line.rstrip("\n"))
+        regulators.append(line.rstrip("\n").lstrip(">"))
 
 '''
 Looking for metrics not calculated yet.
@@ -348,8 +370,9 @@ correlation_values = {}
 '''
 Load correlation coefficients from the files where they are stored.
 '''
-for m,correlation_file_path in correlation_files.items():
+for m, correlation_file_path in correlation_files.items():
     print("Loading correlations from " + correlation_file_path + ".")
+    min_value = min_thresholds[m]
     with open(correlation_file_path,'r') as stream:
         lines = 0
         invalid_lines = 0
@@ -360,9 +383,8 @@ for m,correlation_file_path in correlation_files.items():
                 rna = cells[1]
                 corr = cells[2]
                 corr_val = float(corr)
-                valid_corr = False
-                valid_corr = (corr_val >= min_thresholds[m] or corr_val <= -min_thresholds[m])
-                if valid_corr:
+                
+                if corr_val >= min_value:
                     if not gene in coding_genes:
                         coding_genes[gene] = 0
                     coding_genes[gene] += 1
@@ -425,12 +447,6 @@ with open(coding_gene_ontology_path,'r') as stream:
             + " lines without proper number of columns (3 or 4 columns)")
     print(str(associations) + " valid associations loaded.")
 
-def short_ontology_name(onto_type):
-    onto_type = onto_type.replace("biological_process","BP")
-    onto_type = onto_type.replace("molecular_function","MF")
-    onto_type = onto_type.replace("cellular_component","CC")
-    return onto_type
-
 def predict(tempDir,ontology_type="molecular_function",current_method=["MIC","SPR","FSH"],
             conf_arg=None,benchmarking=False,k_min_coexpressions=1,
             pval_threshold=0.05,fdr_threshold=0.05,
@@ -438,14 +454,13 @@ def predict(tempDir,ontology_type="molecular_function",current_method=["MIC","SP
     """Predict functions based on the loaded correlation coefficients."""
     
     K = k_min_coexpressions
+    ontology_type_mini = short_ontology_name(ontology_type)
     confidence = conf_arg
-    thresholds = confidence_thresholds[confidence]
+    thresholds = confidence_thresholds[ontology_type_mini][confidence]
     
     print("Current method = " + str(current_method) + ", ontology type = " + ontology_type
             + ", pvalue = " + str(pval_threshold) + ", fdr = " + str(fdr_threshold))
     print("Current thresholds = " + str(thresholds))
-
-    ontology_type_mini = short_ontology_name(ontology_type)
     
     out_dir = tempDir+"/"+ontology_type_mini
     if not os.path.exists(out_dir):
@@ -602,13 +617,14 @@ for conf in confidence_levels:
         metrics_for_params = default_methods[str(conf)][onto]
 
         valid_metrics = []
-        current_ths = confidence_thresholds[conf]
+        current_ths = confidence_thresholds[short_ontology_name(onto)][conf]
         for metric_name in metrics_for_params:
             if current_ths[metric_name] != None:
                 valid_metrics.append(metric_name)
         if len(valid_metrics) > 0:
             metrics_for_params = valid_metrics
-            out_file = predict(tempDir,ontology_type=onto,current_method=metrics_for_params,
+            out_file = predict(tempDir,ontology_type=onto,
+                    current_method=metrics_for_params,
                     conf_arg=conf,
                     benchmarking=benchmarking,k_min_coexpressions=K,
                     pval_threshold=pval,fdr_threshold=fdr,
