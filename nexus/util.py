@@ -41,9 +41,8 @@ def replace_last(original, to_repl, repl):
         return new_string
 
 def file_name(path):
-        no_file_extension = rm_last_part(path, ".")
-        name = no_file_extension.split("/")[-1]
-        return name
+        no_file_extension = rm_last_part(os.path.basename(path), ".")
+        return no_file_extension
 
 def get_subdirs(dir):
         subs = os.listdir(dir)

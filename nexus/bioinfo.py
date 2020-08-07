@@ -591,3 +591,9 @@ def get_ids_from_annotation(annotation):
         return 0
     annotation.apply(lambda row: update_attribute(row),axis=1)
     return ids
+
+def short_ontology_name(onto_type):
+    onto_type = onto_type.replace("biological_process","BP")
+    onto_type = onto_type.replace("molecular_function","MF")
+    onto_type = onto_type.replace("cellular_component","CC")
+    return onto_type
