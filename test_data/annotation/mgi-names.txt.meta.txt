@@ -1,4 +1,0 @@
-Median annotation length: 9.0
-Valid Annotated genes: 22569
-GO Terms: 18390
-Original genes: 24529
