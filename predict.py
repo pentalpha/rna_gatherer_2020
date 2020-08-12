@@ -176,7 +176,7 @@ if cmdArgs["method"] != None:
 
     metrics_with_minimum_conf = set(method)
     for metric_name in method:
-        if mins[metric_name] == None:
+        if min_thresholds[metric_name] == None:
             metrics_with_minimum_conf.remove(metric_name)
             print(metric_name + " does not have the minimum confidence level for " 
                 + onto + ", not using it.")
