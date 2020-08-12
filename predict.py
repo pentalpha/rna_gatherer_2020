@@ -267,7 +267,7 @@ def find_correlated(reads, regulators, tempDir, methods, method_streams, separat
     output = tempDir+"/correlated.tsv"
     for coding_name, noncoding_name, corr, method_name in coding_noncoding_pairs:
         method_streams[method_name].write("\t".join([coding_name,noncoding_name,str(corr)]) + "\n")
-
+    manager._process.terminate()
     manager.shutdown()
     del manager
 
