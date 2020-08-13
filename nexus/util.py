@@ -127,7 +127,7 @@ def split_df_to_max_mem(df, available_size):
                 print("percent_per_part: " + str(percent_per_part))
                 lines_per_part = int(len(df)*percent_per_part)
                 print("lines_per_part = " + str(lines_per_part))
-
+        lines_per_part = min(lines_per_part,int(round(len(df)/10.0,0)))
         dfs = splitDataFrameIntoSmaller(df, chunkSize=lines_per_part)
         return dfs
 
