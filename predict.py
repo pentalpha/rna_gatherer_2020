@@ -216,15 +216,17 @@ if not os.path.exists(correlations_dir):
 def get_metric_file(metric_name):
     return open(correlations_dir + "/" + metric_name + ".tsv", 'a+')
 
-def find_correlated(reads, regulators, tempDir, methods, method_streams, separate_regulators = False):
+def find_correlated(reads, regulators, tempDir, methods, method_streams, threads, separate_regulators = False):
     """Find coexpressed pairs using a set of metrics."""
-
+    if len(reads) < threads*2:
+        threads = len(reads)/2
     coding_noncoding_pairs = []
     func = try_find_coexpression_process
     if separate_regulators:
         print("Running 'leave one out' (benchmarking) mode.")
         func = leave_one_out
     genes_per_process = int(len(reads) / threads)
+    
     limit = len(reads)-1
     end = 0
     last = -1
@@ -357,7 +359,7 @@ if len(missing_metrics) > 0:
     i = 1
     for df,regulator_df in tqdm(df_pairs):
         find_correlated(df, regulators_reads, tempDir, missing_metrics, 
-                    method_streams, separate_regulators = benchmarking)
+                    method_streams, int(threads), separate_regulators = benchmarking)
         i += 1
     
     for method_name, stream in method_streams.items():
