@@ -182,8 +182,8 @@ if cmdArgs["method"] != None:
                 + onto + ", not using it.")
     method = list(metrics_with_minimum_conf)
 
-    for conf in default_methods.keys():
-        new_metrics[conf] = {o: method for o in all_ontologies}    
+    for conf in confidence_levels:
+        new_metrics[str(conf)] = {o: method for o in all_ontologies}    
     default_methods = new_metrics
 
 metrics_used = set()

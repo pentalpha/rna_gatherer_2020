@@ -64,7 +64,7 @@ def get_min_max(df_path):
     return mins, maxes, header_line
 
 def load_df_values(file_ss):
-    min_cells = 1+5+6
+    min_cells = 3+5+6
     columns = []
     for n_cell in range(min_cells):
         columns.append([])
@@ -93,7 +93,7 @@ def load_df_values(file_ss):
     print("Failed lines: " + str(failed_lines))
     stream.close()
     progress_bar.close()
-    return columns[1:], header_line[1:], [int(x) for x in columns[0]]
+    return columns[3:], header_line[3:], [int(x) for x in columns[0]]
 
 def filter_column(x, min_cor):
     f = set()
@@ -207,7 +207,7 @@ if __name__ == "__main__":
             column_values[i] = [min(x, 1.0) for x in column_values[i]]
         if name in corr_col_names:
             print("Rounding values for " + name)
-            column_values[i] = [round(x, 5) for x in column_values[i]]
+            column_values[i] = [round(x, 7) for x in column_values[i]]
 
     corr_col_names = header[5:]
 
@@ -241,7 +241,10 @@ if __name__ == "__main__":
         i += 1
 
     print("Finding confidence levels")
-    conf_levels = [round(x, 2) for x in np.arange(0.1, 1.05, 0.05)]
+    conf_levels = [0.025, 0.05, 0.075, 0.1, 0.125, 0.15, 0.175, 0.2, 0.225, 0.25]
+    conf_levels += [0.275, 0.3, 0.325, 0.35, 0.375, 0.4, 0.425, 0.45, 0.475, 0.5]
+    conf_levels += [0.525, 0.55, 0.575, 0.6, 0.625, 0.65]
+    #conf_levels = [round(x, 2) for x in np.arange(0.1, 1.05, 0.05)]
     confs_by_metric = {corr_name: (get_confs(onto_ths[0], conf_levels), 
                                     get_confs(onto_ths[1], conf_levels), 
                                     get_confs(onto_ths[2], conf_levels))
