@@ -25,7 +25,6 @@ gaf_file = sys.argv[4]
 ontology_file = sys.argv[5]
 output_sims = sys.argv[-1]
 
-
 def chunks(lst, n):
     """Yield successive n-sized chunks from lst."""
     for i in range(0, len(lst), n):

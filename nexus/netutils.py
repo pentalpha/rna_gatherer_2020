@@ -6,6 +6,7 @@ from nexus.util import *
 from nexus.bioinfo import *
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from nexus.rna_type import *
+import sys
 
 def get_md5(sequence):
     """
@@ -259,3 +260,4 @@ def retrieve_func_annotation(annotation_path, output, confs, taxon_id):
         with open(output, 'w') as stream:
             for id_, go, aspect in results:
                 stream.write(id_+"\t"+go+"\t"+aspect+"\n")
+
