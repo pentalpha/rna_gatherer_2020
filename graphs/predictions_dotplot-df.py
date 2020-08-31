@@ -14,13 +14,13 @@ python predictions_dotplot.py [reference_path] [go_obo] [confidence_file] [aspec
 
 reference_path = sys.argv[1]
 go_obo = sys.argv[2]
-confidence_file = sys.argv[3]
-aspect = sys.argv[4].split(",")
-output = sys.argv[5]
-annotation_path_dir = [sys.argv[6]]
+#confidence_file = sys.argv[3]
+aspect = sys.argv[3].split(",")
+output = sys.argv[4]
+annotation_path_dir = [sys.argv[5]]
 external_anno = None
-if len(sys.argv) >= 8:
-    external_anno = sys.argv[7]
+if len(sys.argv) >= 7:
+    external_anno = sys.argv[6]
 
 def load_confidences(intervals_file):
     with open(intervals_file, 'r') as stream:
@@ -37,7 +37,7 @@ def load_confidences(intervals_file):
         return confidences
     return []
 
-confidence_by_method = load_confidences(confidence_file)
+#confidence_by_method = load_confidences(confidence_file)
 
 #print(str(confidence_by_method))
 def get_annotations(dir, name_part):
