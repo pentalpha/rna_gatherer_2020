@@ -1,15 +1,27 @@
 from itertools import combinations
 import subprocess
 import multiprocessing
+import sys
+
+'''
+usage:  
+    python run_all_metric_combinations.py <prediction_dir> <counts_file> <annotation_file> <lnc_list>
+'''
+
+prediction_dir = sys.argv[1]
+counts_file = sys.argv[2]
+annotation_file = sys.argv[3]
+lnc_list_file = sys.argv[4]
 threads = max(2, int(multiprocessing.cpu_count()*0.8))
+
 def runCommand(cmd, print_cmd=True):
     if print_cmd:
             print("\t> " + cmd)
     process = subprocess.call(cmd, shell=True)
     return process
 
-metrics = ['MIC', 'DC', 'SPR', 'PRS', 'FSH','SOB']
-ns = [6,1,5,2,4,3]
+metrics = ['DC', 'SPR', 'PRS', 'FSH','SOB']
+ns = [5,1,4,2,3]
 #ns = [1,2,3,4,5,6]
 def combs_n(n):
     combs = set()
@@ -23,13 +35,16 @@ comb_n = [combs_n(n) for n in ns]
 n_predictions = 0
 for combs in comb_n:
     n_predictions += len(combs)
-n_predictions = n_predictions*7
+conf_levels = [0,1,2,3,4,5,6,7,8,9,10]
+n_predictions = n_predictions*len(conf_levels)
+confs_str = ",".join([str(x) for x in conf_levels])
+
 print(str(n_predictions))
 base_command = ("cd ../ && "
-            +"python predict.py -cr test_data/counts/mus_musculus_tpm.tsv"
-            +" -reg test_data/lnc_list/mus_musculus_lncRNA.txt"
-            +" -ann test_data/annotation/mgi_genes_annotation.tsv"
-            +" -o ~/experiments/predictions/mgi_tpm_combos -conf 0,1,2,3,4,5,6"
+            +"python predict.py -cr " + counts_file
+            +" -reg " + lnc_list_file
+            +" -ann " + annotation_file
+            +" -o " + prediction_dir + " -conf " + confs_str
             +" -ont molecular_function,biological_process,cellular_component"
             +" -met [METRICS] -p " + str(threads))
 
@@ -40,4 +55,5 @@ for combs_list in comb_n:
         ms = comb.split(",")
         ms.sort()
         #print("\t"+"-".join(ms))
-        runCommand(base_command.replace("[METRICS]",",".join(ms)))
+        metrics_str = ",".join(ms)
+        runCommand(base_command.replace("[METRICS]", metrics_str))
