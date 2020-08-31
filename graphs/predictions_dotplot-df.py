@@ -14,13 +14,13 @@ python predictions_dotplot.py [reference_path] [go_obo] [confidence_file] [aspec
 
 reference_path = sys.argv[1]
 go_obo = sys.argv[2]
-confidence_file = sys.argv[3]
-aspect = sys.argv[4].split(",")
-output = sys.argv[5]
-annotation_path_dir = [sys.argv[6]]
+#confidence_file = sys.argv[3]
+aspect = sys.argv[3].split(",")
+output = sys.argv[4]
+annotation_path_dir = [sys.argv[5]]
 external_anno = None
-if len(sys.argv) >= 8:
-    external_anno = sys.argv[7]
+if len(sys.argv) >= 7:
+    external_anno = sys.argv[6]
 
 def load_confidences(intervals_file):
     with open(intervals_file, 'r') as stream:
@@ -37,7 +37,7 @@ def load_confidences(intervals_file):
         return confidences
     return []
 
-confidence_by_method = load_confidences(confidence_file)
+#confidence_by_method = load_confidences(confidence_file)
 
 #print(str(confidence_by_method))
 def get_annotations(dir, name_part):
@@ -56,6 +56,15 @@ for path in annotation_path_dir:
 print("Loading GO network.")
 graph = obonet.read_obo(go_obo)
 
+obo_nodes = graph.nodes(data=True)
+go_ids = [id_ for id_, data in obo_nodes]
+alt_ids = {}
+print("Solving redundant GO ids")
+for ID in tqdm(go_ids):
+    if "alt_id" in obo_nodes[ID]:
+        for alt_id in obo_nodes[ID]["alt_id"]:
+            alt_ids[alt_id] = ID
+print("Solved " + str(len(alt_ids.keys())))
 association_sets = {}
 gos = {}
 antecesors = {}
@@ -104,7 +113,7 @@ def term_value(ref_terms, new_term):
                    for ref_term in ref_terms]
     return max(term_values)
 
-def read_id2gos(filepath,ontology_type=["ALL"]):
+def read_id2gos(filepath, alt_ids, ontology_type=["ALL"]):
     if ontology_type[0] == "ALL":
         ontology_type = ["molecular_function",
                         "biological_process",
@@ -116,15 +125,17 @@ def read_id2gos(filepath,ontology_type=["ALL"]):
             if len(cols) >= 3:
                 gene_id = cols[0]
                 go_str = cols[1]
-                aspect = cols[2]
-                if aspect in ontology_type:
+                if go_str in alt_ids:
+                    go_str = alt_ids[go_str]
+                aspect_str = cols[2]
+                if aspect_str in ontology_type:
                     if not gene_id in gos_dict:
                         gos_dict[gene_id] = set()
                     gos_dict[gene_id].add(go_str)
-                    id_2_ontology[go_str] = aspect
+                    id_2_ontology[go_str] = aspect_str
     return gos_dict
 
-reference = read_id2gos(reference_path, ontology_type = aspect)
+reference = read_id2gos(reference_path, alt_ids, ontology_type = aspect)
 reference_name = reference_path.split("/")[-1]
 
 def get_ancestors(graph, parent_id):
@@ -221,7 +232,7 @@ def get_label_and_confidence(filename):
         return methods_str, -1
 
 def analyze_annotation(p):
-    id2gos = read_id2gos(p, ontology_type=aspect)
+    id2gos = read_id2gos(p, alt_ids, ontology_type=aspect)
     #print(str(len(id2gos)) + " annotated genes in " + p)
     file_name = p.split("/")[-1]
     lens_dict = overview(id2gos, file_name)
@@ -245,12 +256,12 @@ def analyze_annotation(p):
                     matching_predictions.add(pred_term)'''
             if len(matching_predictions) > 0:
                 if is_upper_to(term,matching_predictions):
+                    association_found += 1
                     association_children_found += 1
                     association_missing -= 1
                 elif is_part_of(term,matching_predictions):
                     association_parent_found += 1
                     association_missing -= 1
-        
 
     total = len(association_sets[file_name])
     in_reference = 0
@@ -334,7 +345,6 @@ for label, conf_level, completion, missing_coef, number_of_metrics, has_path_per
     id_series[prediction_label] = i
     conf_series[prediction_label] = conf_level
     
-    
     completion_series[prediction_label] = completion*100.0
     missing_series[prediction_label] = missing_coef*100.0
     number_of_metrics_series[prediction_label] = int(number_of_metrics)
@@ -343,7 +353,7 @@ for label, conf_level, completion, missing_coef, number_of_metrics, has_path_per
 
     dist = euclids(np.array([completion, missing_coef]), top_point)*100.0
     distance_series[prediction_label] = dist
-    quality = dist * (has_path_perc/100.0)
+    quality = completion * (has_path_perc/100.0)
     quality_series[prediction_label] = quality
     if conf_level >= 0:
         if not conf_level in qualities_by_conf:
@@ -377,6 +387,6 @@ df = pd.concat([conf_series, metric_comb_series, completion_series,
                 distance_series, quality_series, best_series],
             axis=1)
 
-df.to_csv(output + "-predictions_stats.tsv",sep="\t",header=True,index=True)
+df.to_csv(output + "-predictions_stats.tsv",sep=",",header=True,index=True)
 best_df = df[df['best']=='BEST']
 best_df.to_csv(output + "-best_predictions.tsv",sep="\t",header=True,index=True)
