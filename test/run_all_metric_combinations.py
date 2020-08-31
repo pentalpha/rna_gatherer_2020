@@ -2,6 +2,7 @@ from itertools import combinations
 import subprocess
 import multiprocessing
 import sys
+import numpy as np
 
 '''
 usage:  
@@ -12,6 +13,7 @@ prediction_dir = sys.argv[1]
 counts_file = sys.argv[2]
 annotation_file = sys.argv[3]
 lnc_list_file = sys.argv[4]
+model = sys.argv[5]
 threads = max(2, int(multiprocessing.cpu_count()*0.8))
 
 def runCommand(cmd, print_cmd=True):
@@ -35,7 +37,8 @@ comb_n = [combs_n(n) for n in ns]
 n_predictions = 0
 for combs in comb_n:
     n_predictions += len(combs)
-conf_levels = [0,1,2,3,4,5,6,7,8,9,10]
+conf_levels = [0,1,2,3,4,5]
+#conf_levels = list(np.arange(3,26))
 n_predictions = n_predictions*len(conf_levels)
 confs_str = ",".join([str(x) for x in conf_levels])
 
@@ -46,7 +49,7 @@ base_command = ("cd ../ && "
             +" -ann " + annotation_file
             +" -o " + prediction_dir + " -conf " + confs_str
             +" -ont molecular_function,biological_process,cellular_component"
-            +" -met [METRICS] -p " + str(threads))
+            +" -met [METRICS] -p " + str(threads) + " -md " + model)
 
 for combs_list in comb_n:
     print("combinations of " + str(len(combs_list[0].split(','))) 

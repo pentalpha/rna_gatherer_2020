@@ -632,7 +632,8 @@ for conf in confidence_levels:
                     pval_threshold=pval,fdr_threshold=fdr,
                     min_n=min_n, min_M=min_M, min_m=min_m)
             output_files.append((out_file,onto))
-
+        else:
+            print("No valid metrics for current confidence level")
     print("Writing annotation file with all ontologies")
     if len(output_files) > 1:
         lines = []
