@@ -188,7 +188,10 @@ def try_find_coexpression_process(pid, coding_rows, nc_rows, method_ids, min_thr
                 method_names[method_name],minimum_coefs[method_name]))
         #methods.append(method_names[method_name])
     #print("Methods="+str(methods))
-    for i in range(len(coding_rows)):
+    iterator = range(len(coding_rows))
+    if pid == 0:
+        iterator = tqdm(range(len(coding_rows)))
+    for i in iterator:
         row1 = coding_rows.iloc[i]
         reads1 = np.array(row1.values[1:],dtype=np.float32)
         for name, row2 in nc_rows.iterrows():
