@@ -18,6 +18,8 @@ def getArgs():
     ap.add_argument("-cr", "--count-reads", required=True,
         help=("Count reads table path. TSV file with where the first column must be the gene names and the " +
             " following columns are the FPKM normalized counts of each sample."))
+    ap.add_argument("-reg", "--regulators", required=False, 
+        default=None, help="Optional regulators list.", )
     ap.add_argument("-o", "--output-dir", required=True, help=("Output directory."))
     default_threads = max(2, multiprocessing.cpu_count()-1)
     ap.add_argument("-p", "--processes", required=False,
@@ -110,18 +112,36 @@ def find_correlated(reads, regulators, tempDir, method_streams):
     manager.shutdown()
     del manager
 
+def separate_reads(reads, regulator_names):
+    mask = reads[reads.columns[0]].isin(regulator_names)
+    regulator_reads = reads.loc[mask]
+
+    non_regulator_reads = reads
+    if len(regulator_names) < len(reads[reads.columns[0]].tolist()):
+        non_regulator_reads = reads.loc[~mask]
+    return regulator_reads, non_regulator_reads
+
 reads = pd.read_csv(count_reads_path, sep='\t')
-print(str(len(reads)))
+reads.fillna(0,inplace=True)
+print(str(len(reads)) + " rows in the input file.")
 reads["constant"] = reads.drop([reads.columns[0]], axis=1).apply(
         lambda row: is_constant(np.array(row.values,dtype=np.float32)),axis=1
     )
 mask = reads["constant"] == False
 reads = reads[mask]
 del reads["constant"]
+print(str(len(reads)) + " non-constant rows to process.")
 print(reads.head())
-print(str(len(reads)))
 
 regulator_names = reads[reads.columns[0]].tolist()
+if cmdArgs['regulators'] != None:
+    reg_path = cmdArgs['regulators']
+    with open(reg_path,'r') as stream:
+        regulator_names = []
+        for line in stream.readlines():
+            regulator_names.append(line.rstrip("\n").lstrip(">"))
+
+regulator_reads, non_regulator_reads = separate_reads(reads, regulator_names)
 
 correlation_files = {method_name:correlations_dir+"/"+method_name+".tsv" for method_name in metrics_used}
 
@@ -130,23 +150,29 @@ for m,f in correlation_files.items():
 
 available_size = available_cache
 
-'''max_for_regulators = available_size*regulators_max_portion
-regs_size = getsizeof(regulators_reads)
-regulator_dfs = [regulators_reads]
+max_for_regulators = available_size*regulators_max_portion
+regs_size = getsizeof(regulator_reads)
+regulator_dfs = [regulator_reads]
 if regs_size > max_for_regulators:
-    regulator_dfs = split_df_to_max_mem(regulators_reads, max_for_regulators)
+    regulator_dfs = split_df_to_max_mem(regulator_reads, max_for_regulators)
     available_size -= max_for_regulators
 else:
-    available_size -= regs_size'''
+    available_size -= regs_size
 
+if len(getFilesWith(tempDir, "-counts_part-a.tsv", ending=True)) == 0:
+    dfs = split_df_to_max_mem(non_regulator_reads, int(available_size*(1.0-regulators_max_portion)))
+    print("Splitting up dataframe into smaller DFs: " + str(len(dfs)) + " DFs.")
+    for i in range(len(dfs)):
+        path_to_write = tempDir + "/" + str(i) + "-counts_part-a.tsv"
+        if not os.path.exists(path_to_write):
+            dfs[i].to_csv(path_to_write, sep="\t", header=True, index=False)
+    del dfs
 
-dfs = split_df_to_max_mem(reads, int(available_size/2))
-print("Splitting up dataframe into smaller DFs: " + str(len(dfs)))
-for i in range(len(dfs)):
-    path_to_write = tempDir + "/" + str(i) + "-counts_part.tsv"
-    if not os.path.exists(path_to_write):
-        dfs[i].to_csv(path_to_write, sep="\t", header=True, index=False)
-del dfs
+    for i in range(len(regulator_dfs)):
+        path_to_write = tempDir + "/" + str(i) + "-counts_part-b.tsv"
+        if not os.path.exists(path_to_write):
+            regulator_dfs[i].to_csv(path_to_write, sep="\t", header=True, index=False)
+    del regulator_dfs
 
 print("Reading smaller DFs")
 def get_corrs_paths(df_path):
@@ -164,35 +190,38 @@ def get_corrs_paths(df_path):
     else:
         return corrs_paths
 
-small_df_paths = getFilesWith(tempDir, "-counts_part.tsv")
-dfs = {p: pd.read_csv(p, sep="\t") for p in small_df_paths}
+small_df_a_paths = getFilesWith(tempDir, "-counts_part-a.tsv", ending=True)
+small_df_b_paths = getFilesWith(tempDir, "-counts_part-b.tsv", ending=True)
+dfs = {p: pd.read_csv(p, sep="\t") for p in small_df_a_paths}
+regulator_dfs = {p: pd.read_csv(p, sep="\t") for p in small_df_b_paths}
 mini_corrs_paths = {p: get_corrs_paths(p) 
-                    for p in small_df_paths}
-should_run = {p: True if len(corr_paths) == len(metrics_used) else False 
+                    for p in small_df_a_paths}
+should_run = {p: False if len(corr_paths) == len(metrics_used) else True 
                     for p, corr_paths in mini_corrs_paths.items()}
 
 print("Processing counts")
 
-pbar = tqdm(total=len(small_df_paths)*len(small_df_paths))
-for i in range(len(small_df_paths)):
-    current_df_path = small_df_paths[i]
+pbar = tqdm(total=len(small_df_a_paths)*len(small_df_b_paths))
+for i in range(len(small_df_a_paths)):
+    current_df_path = small_df_a_paths[i]
     current_df = dfs[current_df_path]
-    if not should_run[current_df_path]:
+    if should_run[current_df_path]:
         method_streams = {metric_name:get_temp_metric_file(current_df_path,metric_name) 
                     for metric_name in metrics_used}
-        for j in range(len(small_df_paths)):
-            find_correlated(current_df, dfs[small_df_paths[j]], 
+        for j in range(len(small_df_b_paths)):
+            find_correlated(current_df, regulator_dfs[small_df_b_paths[j]], 
                 tempDir, method_streams)
             pbar.update(1)
         for method_name, stream in method_streams.items():
             stream.close()
     else:
+        pbar.update(len(small_df_b_paths))
         print("Skiping " + current_df_path)
 pbar.close()
         
 print("Joining results")
 mini_corrs_paths = {p: get_corrs_paths(p) 
-                    for p in small_df_paths}
+                    for p in small_df_a_paths}
 final_method_streams = {metric_name:get_metric_file(metric_name) 
                     for metric_name in metrics_used}
 
