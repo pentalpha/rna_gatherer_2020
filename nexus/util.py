@@ -19,12 +19,13 @@ def write_file(content, path):
         with open(path, 'w') as stream:
                 stream.write(content)
 
-def getFilesWith(directory, name_part):
+def getFilesWith(directory, name_part, ending=False):
         files = []
         # r=root, d=directories, f = files
         for r, d, f in os.walk(directory):
                 for file in f:
-                        if name_part in file:
+                        success = (name_part in file and not ending) or (file.endswith(name_part) and ending)
+                        if success:
                                 files.append(os.path.join(r, file))
         return files
 
