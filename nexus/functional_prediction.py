@@ -107,20 +107,103 @@ def get_mic():
 method_names = {"MIC": get_mic(), "PRS": abs_func(prs), "SPR": abs_func(spr), "DC": dc, 
                 "FSH": calc_fisher_information_norm, "SOB": calc_sobolev_norm}
 
+'''
+def ai_find_coexpression_process(pid, coding_rows, regulators, predictor, return_dict):
+    warnings.filterwarnings('error')
+    coding_noncoding_pairs = []
+    methods = []
+    method_ids = ['DC','MIC','SPR','PRS','SOB','FSH']
+    method_names["SOB"] = calc_sobolev
+    method_names["FSH"] = calc_fisher_information
+    method_names["SPR"] = spr
+    method_names["PRS"] = prs
+    for method_name in method_ids:
+        methods.append(method_names[method_name])
+
+    iterator = range(len(regulators))
+    if pid == 0:
+        iterator = tqdm(range(len(regulators)))
+    for i in iterator:
+        row2 = regulators.iloc[i]
+        reads2 = np.array(row2.values[1:],dtype=np.float32)
+        rows = coding_rows[coding_rows[coding_rows.columns[0]] != row2[coding_rows.columns[0]]]
+        correlation_lists = []
+        name_pairs = []
+        for j in range(len(rows)):
+            row1 = coding_rows.iloc[j]
+            reads1 = np.array(row1.values[1:],dtype=np.float32)
+            corrs = [methods[method_index](reads1,reads2) 
+                    for method_index in range(len(methods))]
+            corrs_nan = [x if x != None else np.nan for x in corrs]
+            corrs_valid = [x if x != np.nan else 0.0 for x in corrs_nan]
+            correlation_lists.append(corrs_valid)
+            name_pairs.append((row1[0], row2[0]))
+        interacting = predictor.predict_many(correlation_lists)
+        predicted = 0
+        for index in range(len(interacting)):
+            if interacting[index]:
+                coding_noncoding_pairs.append(name_pairs[index])
+                predicted += 1
+        if predicted > 0:
+            print("\n" + str(predicted) + " predictions added to " + str(len(coding_noncoding_pairs)))
+    return_dict[pid] = coding_noncoding_pairs
+'''
+
+def ai_find_coexpression_process(pid, coding_rows, nc_rows, predictor, return_dict):
+    warnings.filterwarnings('error')
+    coding_noncoding_pairs = []
+    methods = []
+    method_ids = ['DC','MIC','SPR','PRS','SOB','FSH']
+    method_names["SOB"] = calc_sobolev
+    method_names["FSH"] = calc_fisher_information
+    method_names["SPR"] = spr
+    method_names["PRS"] = prs
+    for method_name in method_ids:
+        methods.append(method_names[method_name])
+
+    iterator = range(len(coding_rows))
+    if pid == 0:
+        iterator = tqdm(range(len(coding_rows)))
+    for i in iterator:
+        row1 = coding_rows.iloc[i]
+        reads1 = np.array(row1.values[1:],dtype=np.float32)
+        correlation_lists = []
+        name_pairs = []
+        for name, row2 in nc_rows.iterrows():
+            reads2 = np.array(row2.values[1:],dtype=np.float32)
+            corrs = [methods[method_index](reads1,reads2) 
+                    for method_index in range(len(methods))]
+            corrs_nan = [x if x != None else np.nan for x in corrs]
+            corrs_valid = [x if x != np.nan else 0.0 for x in corrs_nan]
+            correlation_lists.append(corrs_valid)
+            name_pairs.append((row1[0], row2[0]))
+
+        interacting = predictor.predict_many(correlation_lists)
+        predicted = 0
+        for index in range(len(interacting)):
+            if interacting[index]:
+                coding_noncoding_pairs.append(name_pairs[index])
+                predicted += 1
+        if predicted > 0:
+            print("\n" + str(predicted) + " predictions added to " + str(len(coding_noncoding_pairs)))
+    print(str(len(coding_noncoding_pairs)) + " correlation pairs found.")
+    return_dict[pid] = coding_noncoding_pairs
+
 def calc_all(pid, coding_rows, regulators, metrics_used, return_dict):
     warnings.filterwarnings('error')
     coding_noncoding_pairs = []
 
     methods = []
-    names = []
     method_ids = metrics_used
     method_names["SOB"] = calc_sobolev
     method_names["FSH"] = calc_fisher_information
 
     for method_name in method_ids:
         methods.append(method_names[method_name])
-
-    for i in range(len(regulators)):
+    iterator = range(len(regulators))
+    if pid == 0:
+        iterator = tqdm(range(len(regulators)))
+    for i in iterator:
         row2 = regulators.iloc[i]
         reads2 = np.array(row2.values[1:],dtype=np.float32)
         rows = coding_rows[coding_rows[coding_rows.columns[0]] != row2[coding_rows.columns[0]]]
