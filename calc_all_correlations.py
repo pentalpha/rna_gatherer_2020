@@ -142,6 +142,7 @@ if cmdArgs['regulators'] != None:
             regulator_names.append(line.rstrip("\n").lstrip(">"))
 
 regulator_reads, non_regulator_reads = separate_reads(reads, regulator_names)
+print("Regulator rows: ", len(regulator_reads), "Non-Regulator rows: ", len(non_regulator_reads))
 
 correlation_files = {method_name:correlations_dir+"/"+method_name+".tsv" for method_name in metrics_used}
 
@@ -150,17 +151,19 @@ for m,f in correlation_files.items():
 
 available_size = available_cache
 
-max_for_regulators = available_size*regulators_max_portion
+'''max_for_regulators = available_size*regulators_max_portion
 regs_size = getsizeof(regulator_reads)
 regulator_dfs = [regulator_reads]
 if regs_size > max_for_regulators:
     regulator_dfs = split_df_to_max_mem(regulator_reads, max_for_regulators)
     available_size -= max_for_regulators
 else:
-    available_size -= regs_size
+    available_size -= regs_size'''
+regulator_dfs = [regulator_reads]
 
 if len(getFilesWith(tempDir, "-counts_part-a.tsv", ending=True)) == 0:
-    dfs = split_df_to_max_mem(non_regulator_reads, int(available_size*(1.0-regulators_max_portion)))
+    #dfs = split_df_to_max_mem(non_regulator_reads, int(available_size*(1.0-regulators_max_portion)))
+    dfs = [non_regulator_reads]
     print("Splitting up dataframe into smaller DFs: " + str(len(dfs)) + " DFs.")
     for i in range(len(dfs)):
         path_to_write = tempDir + "/" + str(i) + "-counts_part-a.tsv"

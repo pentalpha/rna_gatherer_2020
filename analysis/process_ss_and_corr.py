@@ -20,11 +20,10 @@ def add_names_to_set(file_path, names_set):
             names_set.add(cells[1])
     return names_set
 
-def replace_with_dict(in_file, out_file, names_dict, header, n_terms = None): 
+def replace_with_dict(in_file, out_file, names_dict, header): 
     total_lines = 0
     wrote = 0
     pairs_done = set()
-    print_terms = "terms_a" in header
     with open(in_file,'r') as in_stream:
         with open(out_file,'w') as out_stream:
             out_stream.write("\t".join(header)+"\n")
@@ -46,9 +45,6 @@ def replace_with_dict(in_file, out_file, names_dict, header, n_terms = None):
                         if not pair_id in pairs_done:
                             pairs_done.add(pair_id)
                             first_part = [str(a) for a in [pair_id]]
-                            if print_terms == True:
-                                first_part.append(str(n_terms[cells[0]]))
-                                first_part.append(str(n_terms[cells[1]]))
                             out_stream.write(
                                 "\t".join(first_part + cells[2:]).replace("\tNone", "\tNaN")
                                 +"\n")
@@ -67,28 +63,11 @@ def get_gene_names(files):
                     gene_names.add(cells[1])
     return gene_names
 
-if __name__ == "__main__":
-    files_ss = sys.argv[1].split(",")
-    files_corr = sys.argv[2].split(",")
-    annotation = sys.argv[3]
-    output_dir = sys.argv[4]
-    min_terms = None
-    max_terms = None
-    if len(sys.argv) > 5:
-        min_terms = int(sys.argv[5])
-        max_terms = int(sys.argv[6])
-    
-    if not os.path.exists(output_dir):
-        os.mkdir(output_dir)
-    
-    print("Reading gene names")
-    gene_names = get_gene_names(files_ss)
-
-    print("Reading gene annotation")
+def reg_from_annotation(annotation_path, min_terms, max_terms, to_log):
     onto_trans = {"P": "bp", "F": "mf", "C": "cc"}
     n_terms = {}
     terms_by_gene = {}
-    with open(annotation,'r') as in_stream:
+    with open(annotation_path,'r') as in_stream:
         for line in in_stream:
             if not(line.startswith("!") or line.startswith("#")):
                 cells = line.rstrip("\n").split("\t")
@@ -103,8 +82,8 @@ if __name__ == "__main__":
                     print("Invalid line:" + str(cells))
         for gene_name, term_set in terms_by_gene.items():
             #for key in onto_trans.values():
-            if gene_name in gene_names:
-                n_terms[gene_name] = len(term_set)
+            #if gene_name in gene_names:
+           n_terms[gene_name] = len(term_set)
 
     n_terms_vec = np.array(list(n_terms.values()))
     mean = n_terms_vec.mean()
@@ -112,7 +91,7 @@ if __name__ == "__main__":
     if max_terms == None:
         min_terms = math.floor(mean)
         max_terms = math.ceil(mean)
-    to_log = ("Mean terms per gene: " + str(mean)+ "\n")
+    to_log += ("Mean terms per gene: " + str(mean)+ "\n")
     to_log += ("Standard deviation: " + str(std) + "\n")
     to_log += ("Minimum terms: " + str(min_terms) + "\n")
     to_log += ("Maximum terms: " + str(max_terms) + "\n")
@@ -120,30 +99,50 @@ if __name__ == "__main__":
     normally_annotated_genes = []
     all_genes = list(n_terms.keys())
     for gene_name, n_term in n_terms.items():
-        if n_term >= min_terms and n_term <= max_terms:
+        if (n_term >= min_terms and n_term <= max_terms) and gene_name in gene_names:
             normally_annotated_genes.append(gene_name)
 
     to_log += ("Normally annotated genes: " + str(len(normally_annotated_genes)) 
             + " of " + str(len(n_terms_vec)) + "\n")
     print(to_log)
     print(str(len(normally_annotated_genes)*len(all_genes)) + " maximum pairs")
-    '''useful_genes = {"bp": set(), "mf": set(), "cc": set()}
-    for onto, len_dict in n_terms.items():
-        for gene_name, n_terms in len_dict.items():
-            if n_terms >= 3:
-                useful_genes[onto].add(gene_name)
-    all_useful_genes = list(set.union(*[useful_genes["bp"], useful_genes["mf"], useful_genes["cc"]]))'''
+
+    return set(normally_annotated_genes)
+
+if __name__ == "__main__":
+    files_ss = sys.argv[1].split(",")
+    files_corr = [sys.argv[2] + "/" + a + ".tsv" 
+                for a in ["MIC","DC","SOB","FSH","PRS","SPR"]]
+    reg_str = sys.argv[3]
+    annotation_path = sys.argv[4]
+    single_ss_per_file = sys.argv[5] == "True"
+    output_dir = sys.argv[6]
+    
+    if not os.path.exists(output_dir):
+        os.mkdir(output_dir)
+    
+    print("Reading gene names")
+    gene_names = get_gene_names(files_ss)
+    to_log = ("Genes: " + str(len(gene_names))+ "\n")
+    reg_names = set([])
+    if os.path.exists(reg_str):
+        reg_names = set([line.rstrip("\n").split("\t")[0] 
+                    for line in open(reg_path).readlines()])
+    else:
+        min_terms, max_terms = [int(x) for x in reg_str.split(',')]
+        reg_names = reg_from_annotation(annotation_path, min_terms, max_terms, to_log)
+    reg_names = gene_names.intersection(reg_names)
+    
+    to_log += ("Reg. genes: " + str(len(reg_names)) + "\n")
     
     print("Creating ID dictionaries")
     pair_to_id = {}
     id_ = 0
-    for i in tqdm(range(len(normally_annotated_genes))):
-        name_a = normally_annotated_genes[i]
-        for j in range(len(all_genes)):
-            name_b = all_genes[j]
-            if name_a != name_b:
-                pair_name_a = name_a+name_b
-                pair_name_b = name_b+name_a
+    for gene_a in tqdm(gene_names):
+        for gene_b in reg_names:
+            if gene_a != gene_b:
+                pair_name_a = gene_a+gene_b
+                pair_name_b = gene_b+gene_a
                 if not(pair_name_a in pair_to_id) and not(pair_name_b in pair_to_id):
                     pair_to_id[pair_name_a] = id_
                     pair_to_id[pair_name_b] = id_
@@ -167,7 +166,7 @@ if __name__ == "__main__":
                     new_header = header + [get_name(f)]
                     replace_with_dict(f, new_path, pair_to_id, new_header)
                 else:
-                    replace_with_dict(f, new_path, pair_to_id, header, n_terms=n_terms)
+                    replace_with_dict(f, new_path, pair_to_id, header)
             else:
                 print("Skiping " + f)
             n_files.append(new_path)
@@ -176,9 +175,11 @@ if __name__ == "__main__":
     new_files_corr = replace_in_files(files_corr, 
                                 ["pair_id"])
     print("\tFor ss files...")
-    new_files_ss = replace_in_files(files_ss, 
-                                ["pair_id", "terms_a", "terms_b", 
-                                "mf", "bp", "cc"])
+    h = ["pair_id", "mf", "bp", "cc"]
+    if single_ss_per_file:
+        h = ["pair_id", "ss"]
+    new_files_ss = replace_in_files(files_ss, h)
+
     print("Loading all correlations into memory")
     correlations = {}
     metric_names = []
@@ -208,10 +209,14 @@ if __name__ == "__main__":
         big_path = ss_file.replace(".tsv", "-with_correlations.tsv")
         with open(ss_file, 'r') as in_stream:
             with open(big_path, 'w') as out_stream:
-                expected_size = 8 + len(metric_names)
+                expected_size = 6 + len(metric_names)
+                if single_ss_per_file:
+                    expected_size = 2 + len(metric_names)
                 line = in_stream.readline()
                 base_header = line.rstrip("\n")
                 header = base_header + "\tavg\tmax\t" + "\t".join(metric_names)
+                if single_ss_per_file:
+                    header = base_header + "\t" + "\t".join(metric_names)
                 out_stream.write(header+"\n")
                 line = in_stream.readline()
                 progress_bar = tqdm(total=id_)
@@ -221,11 +226,12 @@ if __name__ == "__main__":
                     if id_ in correlations:
                         '''int_terms = np.fromstring(cells[1]+"\t"+cells[2],
                                                         sep="\t")'''
-                        float_ss_values = np.fromstring("\t".join(cells[3:6]),
+                        if not single_ss_per_file:
+                            float_ss_values = np.fromstring("\t".join(cells[1:4]),
                                                         sep="\t")
-                        max_ss = np.nanmax(float_ss_values)
-                        avg_ss = np.nanmean(float_ss_values)
-                        cells += [str(avg_ss), str(max_ss)] 
+                            max_ss = np.nanmax(float_ss_values)
+                            avg_ss = np.nanmean(float_ss_values)
+                            cells += [str(avg_ss), str(max_ss)] 
                         cells += [str(x) for x in correlations[id_]]
                         nan_to_add = "\tnan"*(expected_size - len(cells))
                         out_stream.write("\t".join(cells) + nan_to_add + "\n")

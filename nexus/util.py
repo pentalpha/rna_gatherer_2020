@@ -121,15 +121,17 @@ def split_df_to_max_mem(df, available_size):
         print("Available KB: " + str(available_size/1024))
 
         lines_per_part = len(df)
+        print(lines_per_part)
         counts_size = getsizeof(df)
         print("Counts table size: " + str(counts_size/1024))
-        if counts_size > available_size:
+        dfs = [df]
+        if counts_size > available_size*2:
                 percent_per_part = float(available_size) / float(counts_size)
                 print("percent_per_part: " + str(percent_per_part))
                 lines_per_part = int(len(df)*percent_per_part)
                 print("lines_per_part = " + str(lines_per_part))
-        lines_per_part = min(lines_per_part,int(round(len(df)/10.0,0)))
-        dfs = splitDataFrameIntoSmaller(df, chunkSize=lines_per_part)
+                lines_per_part = min(lines_per_part,int(round(len(df)/2.0,0)))
+                dfs = splitDataFrameIntoSmaller(df, chunkSize=lines_per_part)
         return dfs
 
 def read_to_list(file_path):
