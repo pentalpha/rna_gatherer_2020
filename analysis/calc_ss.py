@@ -3,10 +3,9 @@ import os
 import subprocess
 import multiprocessing
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from tqdm import tqdm
 
 id_chunk_len = 2300
-pair_chunk_len = 2000000
+pair_chunk_len = 20000
 ontologies = ["molecular_function",
     "biological_process",
     "cellular_component"]
@@ -141,7 +140,7 @@ append_sims(calculated_sims, output_sims)
 
 print("Creating pairs")
 chunk_number = 0
-for id_chunk in tqdm(id_chunks):
+for id_chunk in id_chunks:
     print("Current chunk:" + str(chunk_number))
     pairs_to_calc = []
     for a in id_chunk:

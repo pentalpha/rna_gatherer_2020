@@ -64,15 +64,20 @@ def get_min_max(df_path):
     return mins, maxes, header_line
 
 def load_df_values(file_ss):
-    min_cells = 3+5+6
+    stream = open(file_ss, 'r')
+    header_line = stream.readline().rstrip("\n").split("\t")
+    ss_names = header_line[:-6][1:]
+    n_ss_measures = len(ss_names)
+    single_ss = n_ss_measures == 1
+    min_cells = 1+n_ss_measures+6
     columns = []
     for n_cell in range(min_cells):
         columns.append([])
     failed_lines = 0
     aprox_lines_to_read = int((25*1024*1024*1024)/195)
-    stream = open(file_ss, 'r')
+    
     progress_bar = tqdm(total=aprox_lines_to_read)
-    header_line = stream.readline().rstrip("\n").split("\t")
+    
     raw_line = stream.readline()
     progress_bar.update(2)
     while raw_line:
@@ -93,12 +98,12 @@ def load_df_values(file_ss):
     print("Failed lines: " + str(failed_lines))
     stream.close()
     progress_bar.close()
-    return columns[3:], header_line[3:], [int(x) for x in columns[0]]
+    return columns[1:], header_line[1:], [int(x) for x in columns[0]], ss_names, single_ss
 
 def filter_column(x, min_cor):
     f = set()
     for i in range(len(x)):
-        if (not np.isfinite(x[i]) or np.isnan(x[i])) or x[i] < min_cor:
+        if (not np.isfinite(x[i]) or np.isnan(x[i])) and x[i] >= min_cor:
             f.add(i)
     return f
 
@@ -109,29 +114,30 @@ def lists_to_feature_list(lists, corr_filter):
             features.append([col[i] for col in lists])
     return features
 
-def test_threasholds(feature_list, min_val=0.6):
-    ss_totals = [0.0,0.0,0.0]
-    ss_n = [0,0,0]
-    ths = [[], [], []]
-    ss_avgs = [[], [], []]
+def test_threasholds(feature_list, min_val=-9999, n_ss_cols=1):
+    ss_totals = [0.0 for a in range(n_ss_cols)]
+    ss_n      =   [0 for a in range(n_ss_cols)]
+    ths       =  [[] for a in range(n_ss_cols)]
+    ss_avgs   =  [[] for a in range(n_ss_cols)]
 
-    for i in range(len(feature_list)):
-        if i != len(feature_list)-1:
+    for i in tqdm(range(len(feature_list))):
+        if i < len(feature_list)-1:
             feature_values = feature_list[i]
             corr_value = feature_values[-1]
             if corr_value >= min_val:
-                for ss_index in [0,1,2]:
+                for ss_index in range(n_ss_cols):
                     ss_val = feature_values[ss_index]
+                    last_total = ss_totals[ss_index]
                     if not np.isnan(ss_val):
                         ss_totals[ss_index] += ss_val
                         ss_n[ss_index] += 1
-                        if corr_value > feature_list[i+1][-1]:
-                            new_avg = ss_totals[ss_index] / ss_n[ss_index]
-                            ss_avgs[ss_index].append(new_avg)
-                            ths[ss_index].append(corr_value)
+                        #if corr_value > feature_list[i+1][-1]:
+                        new_avg = ss_totals[ss_index] / ss_n[ss_index]
+                        ss_avgs[ss_index].append(new_avg)
+                        ths[ss_index].append(corr_value)
             else:
                 break
-    return (ths[0], ss_avgs[0]), (ths[1], ss_avgs[1]), (ths[2], ss_avgs[2])
+    return [(ths[i], ss_avgs[i]) for i in range(len(ss_avgs))]
 
 def get_confs(ths, conf_levels):
     corr_values, ss_values = ths
@@ -157,16 +163,16 @@ def get_not_none(pairs, min_val=0.0):
     return x, y
 
 if __name__ == "__main__":
-    output_dir = sys.argv[1]
-    file_ss = sys.argv[2]
-    max_ss = float(sys.argv[3])
+    file_ss = sys.argv[1]
+    output_dir = sys.argv[2]
+    #max_ss = float(sys.argv[3])
     
     if not os.path.exists(output_dir):
         print("creating output dir")
         os.mkdir(output_dir)
     
     name = get_filename(file_ss).split(".")[0]
-    ss_col_names = ["mf", "bp", "cc", "avg", "max"]
+    
     '''print("Reading minimum and maximum values for columns")
     unorm_mins, unorm_maxes, header = get_min_max(file_ss)
     
@@ -183,33 +189,31 @@ if __name__ == "__main__":
 
     mins = mins[1:]
     maxes = maxes[1:]'''
-    column_values, header, ids = load_df_values(file_ss)
-    corr_col_names = header[5:]
+    column_values, header, ids, ss_col_names, single_ss = load_df_values(file_ss)
+    corr_col_names = header[len(ss_col_names):]
     for i in range(len(column_values)):
         column = column_values[i]
         name = header[i]
-        max_val = max_ss
+        '''max_val = max_ss
         if name in corr_col_names:
             max_val = 1.0
             if name == "SOB" or name == "FSH":
                 max_val = max(column)
-        print("Maximum of " + name + " is " + str(max_val))
+        print("Maximum of " + name + " is " + str(max_val))'''
         if name == "SPR" or name == "PRS":
             print("Normalizing negative values for " + name)
             column_values[i] = [abs(x) for x in column_values[i]]
         if name == "SOB" or name == "FSH":
             print("Value inversion for " + name)
-            column_values[i] = [max(max_val-x, 0.0) for x in column_values[i]]
-        if max_val != 1.0:
+            column_values[i] = [max(0.0, 0.0-x+1.0) for x in column_values[i]]
+        '''if max_val != 1.0:
             print("Normalizing values to range 0.0 -> 1.0 for " + name)
             column_values[i] = [min(x/max_val, 1.0) for x in column_values[i]]
         else:
             column_values[i] = [min(x, 1.0) for x in column_values[i]]
         if name in corr_col_names:
             print("Rounding values for " + name)
-            column_values[i] = [round(x, 7) for x in column_values[i]]
-
-    corr_col_names = header[5:]
+            column_values[i] = [round(x, 7) for x in column_values[i]]'''
 
     '''norm_negatives = [mins[i] < 0 for i in range(len(mins))]
     norm_by_max = [maxes[i] > 1.0 for i in range(len(maxes))]
@@ -223,17 +227,17 @@ if __name__ == "__main__":
         if header[i] in ["SOB","FSH"]:
             column_values[i] = [max(1.0-x, 0) for x in column_values[i]]'''
     print("Creating filters...")
-    corr_filters = [filter_column(x, 0.0) for x in tqdm(column_values[5:])]
+    corr_filters = [filter_column(x, -99999) for x in tqdm(column_values[len(ss_col_names):])]
     all_corrs_filter = set.union(*corr_filters)
     i = 0
     ths_by_metric = {}
-    for corr_col in tqdm(column_values[5:]):
+    for corr_col in tqdm(column_values[-6:]):
         corr_filter = corr_filters[i]
         corr_name = corr_col_names[i]
         print("Testing threasholds for " + corr_name)
         print("\tCreating list with values.")
-        feature_list = lists_to_feature_list([column_values[0], column_values[1], 
-                                            column_values[2], corr_col], corr_filter)
+        cols_list = [column_values[j] for j in range(len(ss_col_names))] + [corr_col]
+        feature_list = lists_to_feature_list(cols_list, corr_filter)
         print("\tSorting list")
         feature_list.sort(key=lambda features: features[-1], reverse=True)
         print("\tFinding thresholds")
@@ -243,11 +247,10 @@ if __name__ == "__main__":
     print("Finding confidence levels")
     conf_levels = [0.025, 0.05, 0.075, 0.1, 0.125, 0.15, 0.175, 0.2, 0.225, 0.25]
     conf_levels += [0.275, 0.3, 0.325, 0.35, 0.375, 0.4, 0.425, 0.45, 0.475, 0.5]
-    conf_levels += [0.525, 0.55, 0.575, 0.6, 0.625, 0.65]
+    conf_levels += [0.525, 0.55, 0.575, 0.6, 0.625, 0.65, 0.675, 0.7, 0.725, 0.75]
+    conf_levels += [0.775, 0.8, 0.825, 0.85, 0.875, 0.9, 0.925, 0.95, 0.975, 0.999]
     #conf_levels = [round(x, 2) for x in np.arange(0.1, 1.05, 0.05)]
-    confs_by_metric = {corr_name: (get_confs(onto_ths[0], conf_levels), 
-                                    get_confs(onto_ths[1], conf_levels), 
-                                    get_confs(onto_ths[2], conf_levels))
+    confs_by_metric = {corr_name: [get_confs(onto_ths[n], conf_levels) for n in range(len(onto_ths))]
                         for corr_name, onto_ths in tqdm(ths_by_metric.items())}
 
     print("Plotting")
@@ -260,29 +263,35 @@ if __name__ == "__main__":
             subplots.append((corr_col_names[name_i], sub_plt))
             name_i += 1
     zord = 0
+    colors = ["black", "orange", "darkred", "navy", "forestgreen"]
     for corr_name, sub_plt in tqdm(subplots):
-        mf_th, bp_th, cc_th = ths_by_metric[corr_name]
+        ss_ths = ths_by_metric[corr_name]
+        
         '''mf_confs_raw, bp_confs_raw, cc_confs_raw = confs_by_metric[corr_name]
 
         mf_confs_x, mf_confs_y = get_not_none(mf_confs_raw, min_val=mf_th[0][-1])
         bp_confs_x, bp_confs_y = get_not_none(bp_confs_raw, min_val=bp_th[0][-1])
         cc_confs_x, cc_confs_y = get_not_none(cc_confs_raw, min_val=cc_th[0][-1])'''
         
-        sub_plt.yaxis.set_major_locator(MultipleLocator(0.05))
-        sub_plt.yaxis.set_minor_locator(MultipleLocator(0.01))
-        sub_plt.xaxis.set_major_locator(MultipleLocator(0.1))
-        sub_plt.xaxis.set_minor_locator(MultipleLocator(0.05))
+        min_y = min([min(y) for x, y in ss_ths])
+        min_x = min([min(x) for x, y in ss_ths])
+        max_y = max([max(y) for x, y in ss_ths])
+        max_x = max([max(x) for x, y in ss_ths])
+
+        y_range = max_y - min_y
+        sub_plt.yaxis.set_major_locator(MultipleLocator(y_range/5))
+        sub_plt.yaxis.set_minor_locator(MultipleLocator(y_range/10))
+        
+        x_range = max_x - min_x
+        sub_plt.xaxis.set_major_locator(MultipleLocator(x_range/5))
+        sub_plt.xaxis.set_minor_locator(MultipleLocator(x_range/10))
         sub_plt.grid(True, which="major", axis="y", linestyle="--")
 
-        sub_plt.plot(mf_th[0], mf_th[1], color="darkred", 
-            zorder=zord)
-        zord += 1
-        sub_plt.plot(bp_th[0], bp_th[1], color="navy", 
-            zorder=zord)
-        zord += 1
-        sub_plt.plot(cc_th[0], cc_th[1], color="forestgreen", 
-            zorder=zord)
-        zord += 1
+        for i in range(len(ss_ths)):
+            x = ss_ths[i][0]
+            y = ss_ths[i][1]
+            sub_plt.plot(x, y, color=colors[i], zorder=zord)
+            zord += 1
 
         '''sub_plt.scatter(mf_confs_x, mf_confs_y, marker='>', 
             color="lightcoral", s=40, alpha=0.75, zorder=zord)
@@ -301,7 +310,7 @@ if __name__ == "__main__":
     fig.tight_layout()
     fig.savefig(output_dir+"/correlation_thresholds.png", bbox_inches='tight')
 
-    for ss_index in [0,1,2]:
+    for ss_index in range(len(ss_col_names)):
         ss_name = ss_col_names[ss_index]
         output_table = output_dir+"/confidence_intervals-"+ss_name.upper()+".tsv"
         out_str = "\t".join(["Average Semantic Similarity"] + [str(val) for val in conf_levels])+"\n"
