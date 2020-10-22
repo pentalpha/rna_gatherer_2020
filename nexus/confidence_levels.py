@@ -34,6 +34,18 @@ def load_confidence_levels(species):
             "CC": load_confidence(species_dir+"/confidence_intervals-CC.tsv")}
     return confs
 
+def geometric_filter(value, th):
+    if value <= th:
+        return value
+    else:
+        return None
+
+def normal_filter(value, th):
+   if value >= th:
+       return value
+   else:
+       return None
+
 def geometric_pass(value, th):
     return value <= th
 
