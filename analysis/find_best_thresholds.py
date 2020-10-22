@@ -63,32 +63,40 @@ def get_min_max(df_path):
     print(str(invalid_values/current_line) + " invalid lines.")
     return mins, maxes, header_line
 
-def load_df_values(file_ss):
-    stream = open(file_ss, 'r')
-    header_line = stream.readline().rstrip("\n").split("\t")
-    ss_names = header_line[:-6][1:]
-    n_ss_measures = len(ss_names)
-    single_ss = n_ss_measures == 1
-    min_cells = 1+n_ss_measures+6
-    columns = []
-    for n_cell in range(min_cells):
-        columns.append([])
+def load_df_values(file_ss, ss_col_names):
+    min_cells = len(ss_col_names)+6
+    corr_cols = [[] for a in range(6)]
+    ss_cols = [[] for a in range(len(ss_col_names))]
+    
     failed_lines = 0
     aprox_lines_to_read = int((25*1024*1024*1024)/195)
-    
+    stream = open(file_ss, 'r')
     progress_bar = tqdm(total=aprox_lines_to_read)
-    
+    header_line = stream.readline().rstrip("\n").split("\t")[1:]
+    ss_indexes = []
+    for ss_name in ss_col_names:
+        if ss_name in header_line:
+            ss_indexes.append(header_line.index(ss_name))
+    print("ss column names:"+str(ss_col_names))
+    print("ss col indexes:"+str(ss_indexes))
     raw_line = stream.readline()
     progress_bar.update(2)
     while raw_line:
         try:
             np_values = np.fromstring(raw_line.rstrip("\n"),
-                                    sep='\t',dtype=float)
-            if len(np_values) >= min_cells:
-                for i in range(len(np_values)):
-                    if not np.isfinite(np_values[i]):
-                        np_values[i] = np.nan
-                    columns[i].append(np_values[i])
+                                    sep='\t',dtype=float)[1:]
+            if min_cells <= len(np_values):
+                for i in range(len(ss_indexes)):
+                    value = np.float(np_values[ss_indexes[i]])
+                    if not np.isfinite(value):
+                        value = np.nan
+                    ss_cols[i].append(value)
+                corr_col_i = 0
+                for value in np_values[-6:]:
+                    if not np.isfinite(value):
+                        corr_cols[corr_col_i].append(np.nan)
+                    corr_cols[corr_col_i].append(value)
+                    corr_col_i += 1
             else:
                 failed_lines += 1
         except ValueError:
@@ -98,12 +106,12 @@ def load_df_values(file_ss):
     print("Failed lines: " + str(failed_lines))
     stream.close()
     progress_bar.close()
-    return columns[1:], header_line[1:], [int(x) for x in columns[0]], ss_names, single_ss
+    return ss_cols, corr_cols, header_line[-6:]
 
 def filter_column(x, min_cor):
     f = set()
     for i in range(len(x)):
-        if (not np.isfinite(x[i]) or np.isnan(x[i])) and x[i] >= min_cor:
+        if (not np.isfinite(x[i]) or np.isnan(x[i])) or x[i] < min_cor:
             f.add(i)
     return f
 
@@ -114,30 +122,42 @@ def lists_to_feature_list(lists, corr_filter):
             features.append([col[i] for col in lists])
     return features
 
-def test_threasholds(feature_list, min_val=-9999, n_ss_cols=1):
-    ss_totals = [0.0 for a in range(n_ss_cols)]
-    ss_n      =   [0 for a in range(n_ss_cols)]
-    ths       =  [[] for a in range(n_ss_cols)]
-    ss_avgs   =  [[] for a in range(n_ss_cols)]
-
-    for i in tqdm(range(len(feature_list))):
-        if i < len(feature_list)-1:
+def test_thresholds(feature_list, smaller=False, min_val=0.0):
+    n_ss = len(feature_list[0])-1
+    #ss_totals = [0.0,0.0,0.0]
+    ss_totals = [0.0 for x in range(n_ss)]
+    #ss_n = [0,0,0]
+    ss_n = [0 for x in range(n_ss)]
+    #ths = [[], [], []]
+    ths = [[] for x in range(n_ss)]
+    #ss_avgs = [[], [], []]
+    ss_avgs = [[] for x in range(n_ss)]
+    
+    for i in range(len(feature_list)):
+        if i != len(feature_list)-1:
             feature_values = feature_list[i]
             corr_value = feature_values[-1]
             if corr_value >= min_val:
-                for ss_index in range(n_ss_cols):
+                for ss_index in range(len(ss_totals)):
                     ss_val = feature_values[ss_index]
-                    last_total = ss_totals[ss_index]
                     if not np.isnan(ss_val):
                         ss_totals[ss_index] += ss_val
                         ss_n[ss_index] += 1
-                        #if corr_value > feature_list[i+1][-1]:
-                        new_avg = ss_totals[ss_index] / ss_n[ss_index]
-                        ss_avgs[ss_index].append(new_avg)
-                        ths[ss_index].append(corr_value)
-            else:
-                break
-    return [(ths[i], ss_avgs[i]) for i in range(len(ss_avgs))]
+                        cond = corr_value > feature_list[i+1][-1]
+                        if smaller: 
+                            cond = corr_value < feature_list[i+1][-1]
+                        if cond:
+                            new_avg = ss_totals[ss_index] / ss_n[ss_index]
+                            ss_avgs[ss_index].append(new_avg)
+                            ths[ss_index].append(corr_value)
+    #return (ths[0], ss_avgs[0]), (ths[1], ss_avgs[1]), (ths[2], ss_avgs[2])
+    return [(ths[i], ss_avgs[i]) for i in range(len(ths))]
+
+'''def test_ths(feature_list, greater_values, min_v):
+    if greater_values:
+        return test_threasholds(feature_list, min_val=min_v)
+    else:
+        return test_threasholds_smaller(feature_list, min_val=min_v)'''
 
 def get_confs(ths, conf_levels):
     corr_values, ss_values = ths
@@ -162,99 +182,87 @@ def get_not_none(pairs, min_val=0.0):
     
     return x, y
 
+def get_hist(vec, n_bins=10):
+    #hist_vec, hist_edges = np.histogram(vec, bins=n_bins)
+    plt.hist(vec, bins=n_bins, histtype='stepfilled')
+    plt.show()
+
+# %%
 if __name__ == "__main__":
-    file_ss = sys.argv[1]
-    output_dir = sys.argv[2]
-    #max_ss = float(sys.argv[3])
-    
+    output_dir = sys.argv[1]
+    file_ss = sys.argv[2]
+    max_ss = float(sys.argv[3])
+    ss_col_names = sys.argv[4].split(',')
+    #output_dir,file_ss,max_ss = ('test_05','sample05.tsv',1.0)
+    '''output_dir,file_ss,max_ss,ss_col_names = ("mgi/test_02_1",
+                                 "mgi/sample02.tsv",
+                                 1.0,
+                                 ['mf','avg'])'''
     if not os.path.exists(output_dir):
         print("creating output dir")
         os.mkdir(output_dir)
     
     name = get_filename(file_ss).split(".")[0]
+    #ss_col_names = ["mf", "bp", "cc", "avg", "max"]
+    ss_cols, corr_cols, corr_col_names = load_df_values(file_ss, ss_col_names)
+    #column_values, header, ids = load_df_values(file_ss, ss_col_names)
     
-    '''print("Reading minimum and maximum values for columns")
-    unorm_mins, unorm_maxes, header = get_min_max(file_ss)
-    
-    min_max_path = output_dir+"/"+name+"min_max.tsv"
-    with open(min_max_path, 'w') as stream:
-        stream.write("\t".join(["Column Name","Min","Max"])+"\n")
-        for i in range(len(unorm_mins)):
-            stream.write("\t".join([str(x) for x in [header[i], unorm_mins[i], unorm_maxes[i]]]) + "\n")
-    
-    print(open(min_max_path, 'r').read())
-
-    mins  = [round(x,2) for x in unorm_mins]
-    maxes = [round(x,2) for x in unorm_maxes]
-
-    mins = mins[1:]
-    maxes = maxes[1:]'''
-    column_values, header, ids, ss_col_names, single_ss = load_df_values(file_ss)
-    corr_col_names = header[len(ss_col_names):]
-    for i in range(len(column_values)):
-        column = column_values[i]
-        name = header[i]
-        '''max_val = max_ss
-        if name in corr_col_names:
-            max_val = 1.0
-            if name == "SOB" or name == "FSH":
-                max_val = max(column)
-        print("Maximum of " + name + " is " + str(max_val))'''
+    def normalize(column, name, is_corr = False):
         if name == "SPR" or name == "PRS":
             print("Normalizing negative values for " + name)
-            column_values[i] = [abs(x) for x in column_values[i]]
-        if name == "SOB" or name == "FSH":
-            print("Value inversion for " + name)
-            column_values[i] = [max(0.0, 0.0-x+1.0) for x in column_values[i]]
-        '''if max_val != 1.0:
-            print("Normalizing values to range 0.0 -> 1.0 for " + name)
-            column_values[i] = [min(x/max_val, 1.0) for x in column_values[i]]
-        else:
-            column_values[i] = [min(x, 1.0) for x in column_values[i]]
-        if name in corr_col_names:
+            column = [abs(x) for x in column]
+        if is_corr:
             print("Rounding values for " + name)
-            column_values[i] = [round(x, 7) for x in column_values[i]]'''
+            column = [round(x, 7) for x in column]
+        return column
+    
+    for i in range(len(ss_cols)):
+        col_name = ss_col_names[i]
+        ss_cols[i] = normalize(ss_cols[i], col_name)
+    
+    for i in range(len(corr_cols)):
+        col_name = corr_col_names[i]
+        corr_cols[i] = normalize(corr_cols[i], col_name, is_corr=True)
 
-    '''norm_negatives = [mins[i] < 0 for i in range(len(mins))]
-    norm_by_max = [maxes[i] > 1.0 for i in range(len(maxes))]
-    for i in range(len(column_values)):
-        if norm_negatives[i]:
-            print("Normalizing negative values of " + header[i])
-            column_values[i] = [abs(x) for x in column_values[i]]
-        if norm_by_max[i]:
-            print("Normalizing values to range 0.0-1.0, for " + header[i])
-            column_values[i] = [x/maxes[i] for x in column_values[i]]
-        if header[i] in ["SOB","FSH"]:
-            column_values[i] = [max(1.0-x, 0) for x in column_values[i]]'''
+# %%
     print("Creating filters...")
-    corr_filters = [filter_column(x, -99999) for x in tqdm(column_values[len(ss_col_names):])]
+    corr_filters = [filter_column(x, 0.0) for x in tqdm(corr_cols)]
     all_corrs_filter = set.union(*corr_filters)
+    
+# %%
+    def use_smaller_values(corr_name):
+        if corr_name != "SOB" and corr_name != "FSH":
+            return False
+        else:
+            return True
     i = 0
     ths_by_metric = {}
-    for corr_col in tqdm(column_values[-6:]):
+    for corr_col in tqdm(corr_cols):
         corr_filter = corr_filters[i]
         corr_name = corr_col_names[i]
         print("Testing threasholds for " + corr_name)
         print("\tCreating list with values.")
-        cols_list = [column_values[j] for j in range(len(ss_col_names))] + [corr_col]
-        feature_list = lists_to_feature_list(cols_list, corr_filter)
+        feature_list = lists_to_feature_list(ss_cols + [corr_col], corr_filter)
         print("\tSorting list")
-        feature_list.sort(key=lambda features: features[-1], reverse=True)
+        feature_list.sort(key=lambda features: features[-1],
+                          reverse=(not use_smaller_values(corr_name)))
         print("\tFinding thresholds")
-        ths_by_metric[corr_name] = test_threasholds(feature_list, min_val=0.0)
+        ths_by_metric[corr_name] = test_thresholds(feature_list, 
+                                                   use_smaller_values(corr_name))
         i += 1
 
+# %%
     print("Finding confidence levels")
     conf_levels = [0.025, 0.05, 0.075, 0.1, 0.125, 0.15, 0.175, 0.2, 0.225, 0.25]
     conf_levels += [0.275, 0.3, 0.325, 0.35, 0.375, 0.4, 0.425, 0.45, 0.475, 0.5]
     conf_levels += [0.525, 0.55, 0.575, 0.6, 0.625, 0.65, 0.675, 0.7, 0.725, 0.75]
-    conf_levels += [0.775, 0.8, 0.825, 0.85, 0.875, 0.9, 0.925, 0.95, 0.975, 0.999]
+    conf_levels += [0.775, 0.8, 0.825, 0.85, 0.875, 0.9, 0.925, 0.95, 0.975, 0.99]
     #conf_levels = [round(x, 2) for x in np.arange(0.1, 1.05, 0.05)]
-    confs_by_metric = {corr_name: [get_confs(onto_ths[n], conf_levels) for n in range(len(onto_ths))]
+    confs_by_metric = {corr_name: [get_confs(onto_th, conf_levels) for onto_th in onto_ths]
                         for corr_name, onto_ths in tqdm(ths_by_metric.items())}
-
+# %%
     print("Plotting")
-    fig, axes = plt.subplots(2, 3, figsize=(16, 8))
+    fig, axes = plt.subplots(2, 3, figsize=(12, 8))
     subplots = []
     name_i = 0
     for i in range(len(axes)):
@@ -263,49 +271,47 @@ if __name__ == "__main__":
             subplots.append((corr_col_names[name_i], sub_plt))
             name_i += 1
     zord = 0
-    colors = ["black", "orange", "darkred", "navy", "forestgreen"]
+    colors = ["darkred", "navy", "forestgreen", "black", "orange"]
     for corr_name, sub_plt in tqdm(subplots):
         ss_ths = ths_by_metric[corr_name]
-        
-        '''mf_confs_raw, bp_confs_raw, cc_confs_raw = confs_by_metric[corr_name]
 
-        mf_confs_x, mf_confs_y = get_not_none(mf_confs_raw, min_val=mf_th[0][-1])
-        bp_confs_x, bp_confs_y = get_not_none(bp_confs_raw, min_val=bp_th[0][-1])
-        cc_confs_x, cc_confs_y = get_not_none(cc_confs_raw, min_val=cc_th[0][-1])'''
+        sub_plt.yaxis.set_major_locator(MultipleLocator(0.1))
+        sub_plt.set_ylim(0,0.65)
         
-        min_y = min([min(y) for x, y in ss_ths])
-        min_x = min([min(x) for x, y in ss_ths])
-        max_y = max([max(y) for x, y in ss_ths])
-        max_x = max([max(x) for x, y in ss_ths])
+        sub_plt.set_xlim(-0.05,1.05)
+        sub_plt.xaxis.set_major_locator(MultipleLocator(0.2))
+        
+        if corr_name == "MIC":
+            sub_plt.yaxis.set_major_locator(MultipleLocator(0.05))
+            sub_plt.set_ylim(0,0.25)
+        elif corr_name == "SOB":
+            sub_plt.xaxis.set_major_locator(MultipleLocator(2))
+            sub_plt.set_xlim(-0.05,15)
+        elif corr_name == "DC":
+            sub_plt.yaxis.set_major_locator(MultipleLocator(0.1))
+            sub_plt.set_ylim(0,1.05)
+        elif corr_name== "FSH":
+            sub_plt.xaxis.set_major_locator(MultipleLocator(0.25))
+            sub_plt.set_xlim(-0.05,1.6)
 
-        y_range = max_y - min_y
-        sub_plt.yaxis.set_major_locator(MultipleLocator(y_range/5))
-        sub_plt.yaxis.set_minor_locator(MultipleLocator(y_range/10))
-        
-        x_range = max_x - min_x
-        sub_plt.xaxis.set_major_locator(MultipleLocator(x_range/5))
-        sub_plt.xaxis.set_minor_locator(MultipleLocator(x_range/10))
         sub_plt.grid(True, which="major", axis="y", linestyle="--")
 
         for i in range(len(ss_ths)):
             x = ss_ths[i][0]
             y = ss_ths[i][1]
-            sub_plt.plot(x, y, color=colors[i], zorder=zord)
+            sub_plt.plot(x, y, color=colors[i], 
+                         zorder=zord, label=ss_col_names[i].upper())
             zord += 1
-
-        '''sub_plt.scatter(mf_confs_x, mf_confs_y, marker='>', 
-            color="lightcoral", s=40, alpha=0.75, zorder=zord)
-        zord += 1
-        sub_plt.scatter(bp_confs_x, bp_confs_y, marker='>', 
-            color="slateblue", s=40, alpha=0.75, zorder=zord)
-        zord += 1
-        sub_plt.scatter(cc_confs_x, cc_confs_y, marker='>', 
-            color="springgreen", s=40, alpha=0.75, zorder=zord)
-        zord += 1'''
 
         sub_plt.set_title(translator(corr_name))
         sub_plt.set_ylabel("Similaridade Semântica Média")
         sub_plt.set_xlabel("Threshold de Correlação")
+        
+        if corr_col_names.index(corr_name) == 4:
+            #draw legend
+            sub_plt.legend(loc='upper center', bbox_to_anchor=(0.5, -0.2),
+                      fancybox=True, shadow=True, ncol=len(ss_ths))
+            
 
     fig.tight_layout()
     fig.savefig(output_dir+"/correlation_thresholds.png", bbox_inches='tight')
