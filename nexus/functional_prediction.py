@@ -96,8 +96,11 @@ def filter_by_min(val, min_value):
     else:
         return None
 
-def metric_with_filter(metric, min_value):
-    return lambda a,b: filter_by_min(metric(a,b),min_value)
+def metric_with_filter(metric, th_value, metric_name):
+    if metric_name == "SOB" or metric_name == "FSH":
+        return lambda a,b: geometric_pass(metric(a,b), th_value)
+    else:
+        return lambda a,b: normal_pass(metric(a,b), th_value)
 
 def get_mic():
     mine = MINE()
@@ -105,7 +108,7 @@ def get_mic():
     return mic
 
 method_names = {"MIC": get_mic(), "PRS": abs_func(prs), "SPR": abs_func(spr), "DC": dc, 
-                "FSH": calc_fisher_information_norm, "SOB": calc_sobolev_norm}
+                "FSH": calc_fisher_information, "SOB": calc_sobolev}
 
 '''
 def ai_find_coexpression_process(pid, coding_rows, regulators, predictor, return_dict):
@@ -233,7 +236,7 @@ def leave_one_out(pid, coding_rows, regulators, method_ids, min_thresholds, retu
     for method_name in method_ids:
         methods.append(
             metric_with_filter(
-                method_names[method_name],minimum_coefs[method_name]))
+                method_names[method_name],minimum_coefs[method_name], method_name))
     '''if show:
         print("Regulators list:\n\t"+str(regulators.head())+"\nLen="+str(len(regulators)))
         print(str(coding_rows.head())+"\nLen="+str(len(coding_rows)))'''
@@ -247,12 +250,14 @@ def leave_one_out(pid, coding_rows, regulators, method_ids, min_thresholds, retu
             for i in range(len(method_ids)):
                 corr = methods[i](reads1,reads2)
                 if corr != None:
-                    coding_noncoding_pairs.append((row1[0], row2[0], corr, method_ids[i]))
+                    coding_noncoding_pairs.append((row1[0], row2[0], 
+                                                    corr, method_ids[i]))
             
     #print(str(len(coding_noncoding_pairs)) + " correlation pairs found.")
     return_dict[pid] = coding_noncoding_pairs
 
-def try_find_coexpression_process(pid, coding_rows, nc_rows, method_ids, min_thresholds, return_dict):
+def try_find_coexpression_process(pid, coding_rows, nc_rows, method_ids, 
+    min_thresholds, return_dict):
     minimum_coefs = min_thresholds
 
     valid_metrics = []
@@ -268,7 +273,7 @@ def try_find_coexpression_process(pid, coding_rows, nc_rows, method_ids, min_thr
     for method_name in method_ids:
         methods.append(
             metric_with_filter(
-                method_names[method_name],minimum_coefs[method_name]))
+                method_names[method_name],minimum_coefs[method_name],method_name))
         #methods.append(method_names[method_name])
     #print("Methods="+str(methods))
     iterator = range(len(coding_rows))

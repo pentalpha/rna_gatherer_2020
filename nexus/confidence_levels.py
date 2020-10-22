@@ -33,3 +33,15 @@ def load_confidence_levels(species):
             "BP": load_confidence(species_dir+"/confidence_intervals-BP.tsv"),
             "CC": load_confidence(species_dir+"/confidence_intervals-CC.tsv")}
     return confs
+
+def geometric_pass(value, th):
+    return value <= th
+
+def normal_pass(value, th):
+    return value >= th
+
+def compare_to_th(value, th, metric):
+    if metric != "SOB" and metric != "FSH":
+        return normal_pass(value, th)
+    else:
+        return geometric_pass(value, th)
