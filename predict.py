@@ -163,9 +163,14 @@ for metric in min_thresholds_by_onto["MF"].keys():
                 for onto, mins in min_thresholds_by_onto.items() 
                 if mins[metric] is not None]
     if len(values) > 0:
-        min_thresholds[metric] = min(values)
+        if metric == "SOB" or metric == "FSH":
+            min_thresholds[metric] = max(values)
+        else:
+            min_thresholds[metric] = min(values)
     else:
         min_thresholds[metric] = None
+
+print("Minimum thrsholds to load correlations:")
 print(str(min_thresholds))
 
 if cmdArgs["method"] != None:
@@ -375,6 +380,9 @@ Load correlation coefficients from the files where they are stored.
 for m, correlation_file_path in correlation_files.items():
     print("Loading correlations from " + correlation_file_path + ".")
     min_value = min_thresholds[m]
+    load_condition = lambda x: x >= min_value
+    if m == "SOB" or m == "FSH":
+        load_condition = lambda x: x <= min_value
     with open(correlation_file_path,'r') as stream:
         lines = 0
         invalid_lines = 0
@@ -386,7 +394,8 @@ for m, correlation_file_path in correlation_files.items():
                 corr = cells[2]
                 corr_val = float(corr)
                 
-                if corr_val >= min_value:
+                #if corr_val >= min_value:
+                if load_condition(corr_val):
                     if not gene in coding_genes:
                         coding_genes[gene] = 0
                     coding_genes[gene] += 1
@@ -495,7 +504,8 @@ def predict(tempDir,ontology_type="molecular_function",current_method=["MIC","SP
                 if key in correlation_values.keys():
                     corr = float(correlation_values[key])
                     correct_method += 1
-                    if corr >= thresholds[metric] or corr <= -thresholds[metric]:
+                    if compare_to_th(corr, thresholds[metric], metric):
+                    #if corr >= thresholds[metric] or corr <= -thresholds[metric]:
                         valid_corr += 1
                         if not gene in valid_coding_genes:
                             valid_coding_genes[gene] = 0
