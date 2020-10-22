@@ -70,15 +70,19 @@ def get_cache(usage=1.0):
 
         lscpu_out = subprocess.check_output("lscpu | grep 'cache'", shell=True).decode("utf-8").split("\n")
         #print(str(lscpu_out))
+        kilo_byte_notations = ["KB","K","k","kb","KiB","kib"]
+        mega_byte_notations = ["MB","M","m","mb","MiB","mib"]
         if len(lscpu_out) >= 2:
                 raw_nums = []
                 for line in lscpu_out:
                         if len(line) > 0:
-                                raw_nums.append(line.split()[-1])
+                                last = line.split()[-1]
+                                if last in kilo_byte_notations or last in mega_byte_notations:
+                                        last = line.split()[-2]+line.split()[-1]
+                                raw_nums.append(last)
                 #print(str(raw_nums))
                 nums = []
-                kilo_byte_notations = ["KB","K","k","kb","KiB","kib"]
-                mega_byte_notations = ["MB","M","m","mb","MiB","mib"]
+                
                 if len(raw_nums) > 0:
                         for raw_num in raw_nums:
                                 for notation in kilo_byte_notations:
@@ -117,21 +121,27 @@ def splitDataFrameIntoSmaller(df, chunkSize = 10000):
         else:
                 return listOfDf
 
-def split_df_to_max_mem(df, available_size):
-        print("Available KB: " + str(available_size/1024))
-
+def split_df_to_max_mem(df, available_size, max_lines=2000, min_lines=1000):
+        original_ids = set(df[df.columns[0]].tolist())
+        print("\tAvailable KB: " + str(available_size/1024))
         lines_per_part = len(df)
-        print(lines_per_part)
         counts_size = getsizeof(df)
-        print("Counts table size: " + str(counts_size/1024))
+        print("\tCounts table size: " + str(counts_size/1024) + "KB")
         dfs = [df]
-        if counts_size > available_size*2:
-                percent_per_part = float(available_size) / float(counts_size)
-                print("percent_per_part: " + str(percent_per_part))
-                lines_per_part = int(len(df)*percent_per_part)
-                print("lines_per_part = " + str(lines_per_part))
-                lines_per_part = min(lines_per_part,int(round(len(df)/2.0,0)))
-                dfs = splitDataFrameIntoSmaller(df, chunkSize=lines_per_part)
+        percent_per_part = float(available_size) / float(counts_size)
+        print("\tpercent per part: " + str(percent_per_part))
+        lines_per_part = int(len(df)*percent_per_part)
+        if lines_per_part > max_lines:
+                lines_per_part = max_lines
+        elif lines_per_part < min_lines:
+                lines_per_part = min_lines
+        print("\tlines per part: " + str(lines_per_part))
+        dfs = splitDataFrameIntoSmaller(df, chunkSize=lines_per_part)
+        print("\tSplitted into " + str(len(dfs)))
+        id_found = set()
+        for data in dfs:
+                id_found.update(data[data.columns[0]].tolist())
+        print("\tIDs expected/found:", len(original_ids), "/", len(id_found))
         return dfs
 
 def read_to_list(file_path):

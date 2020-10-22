@@ -98,9 +98,9 @@ def filter_by_min(val, min_value):
 
 def metric_with_filter(metric, th_value, metric_name):
     if metric_name == "SOB" or metric_name == "FSH":
-        return lambda a,b: geometric_pass(metric(a,b), th_value)
+        return lambda a,b: geometric_filter(metric(a,b), th_value)
     else:
-        return lambda a,b: normal_pass(metric(a,b), th_value)
+        return lambda a,b: normal_filter(metric(a,b), th_value)
 
 def get_mic():
     mine = MINE()

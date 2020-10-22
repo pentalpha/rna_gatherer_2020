@@ -239,6 +239,7 @@ def find_correlated(reads, regulators, tempDir, methods, method_streams, threads
     return_dict = manager.dict()
     processes = []
     last_pid = 0
+    print('Spawning', threads, 'threads')
     for i in range(threads-1):
         start = last+1
         end = start + genes_per_process
@@ -248,7 +249,7 @@ def find_correlated(reads, regulators, tempDir, methods, method_streams, threads
         p = multiprocessing.Process(target=func, 
             args=(i, parcial_df, regulators, methods, min_thresholds, return_dict, ))
         processes.append(p)
-        #print("Spawned process from gene " + str(start) + " to " + str(end))
+        print("Spawned process from gene " + str(start) + " to " + str(end))
         p.start()
         last = end
 
@@ -260,9 +261,9 @@ def find_correlated(reads, regulators, tempDir, methods, method_streams, threads
         p = multiprocessing.Process(target=func, 
             args=(last_pid+1, parcial_df, regulators, methods, min_thresholds, return_dict, ))
         processes.append(p)
-        #print("Spawned process from gene " + str(end) + " to " + str(limit))
+        print("Spawned process from gene " + str(end) + " to " + str(limit))
         p.start()
-
+    quit()
     for p in processes:
         p.join()
 
@@ -285,15 +286,15 @@ Pre-processing of the count-reads table
 print("Ontology type is " + str(ontology_types_arg))
 print("Used metrics are: " + str(metrics_used))
 reads = pd.read_csv(count_reads_path, sep='\t')
-print(str(len(reads)))
+print(str(len(reads)) + " raw rows.")
 reads["constant"] = reads.drop([reads.columns[0]], axis=1).apply(
         lambda row: is_constant(np.array(row.values,dtype=np.float32)),axis=1
     )
 mask = reads["constant"] == False
 reads = reads[mask]
 del reads["constant"]
+print(str(len(reads)) + " rows after removing constant rows.")
 print(reads.head())
-print(str(len(reads)))
 
 print("Reading regulators")
 regulators = []
@@ -321,16 +322,17 @@ if len(missing_metrics) > 0:
     '''
     print("Calculating correlation coefficients for the following metrics: "
         + str(missing_metrics))
-    #print("Separating regulators from regulated.")
+    print("Separating regulators from regulated.")
+    print("\tRegulator IDs: " + str(len(regulators)))
     mask = reads[reads.columns[0]].isin(regulators)
     regulators_reads = reads.loc[mask]
-
+    print("\tRegulator IDs in dataframe: " 
+        + str(len(regulators_reads[regulators_reads.columns[0]].tolist())))
     non_regulators_reads = reads
     if not benchmarking:
         non_regulators_reads = reads.loc[~mask]
     print(str(len(non_regulators_reads)) + " regulated.")
     print(str(len(regulators_reads)) + " regulators.")
-    #print("Generating correlations.")
     
     available_size = available_cache
 
@@ -338,14 +340,14 @@ if len(missing_metrics) > 0:
     Split the table into cache-sized smaller parts.
     '''
     max_for_regulators = available_size*regulators_max_portion
+    #print("Available for regulators: " + str(int(max_for_regulators/1024)) + "KB")
     regs_size = getsizeof(regulators_reads)
+    #print("Regulators size: " + str(int(regs_size/1024)) + "KB")
     regulator_dfs = [regulators_reads]
-    if regs_size > max_for_regulators:
-        regulator_dfs = split_df_to_max_mem(regulators_reads, max_for_regulators)
-        available_size -= max_for_regulators
-    else:
-        available_size -= regs_size
-
+    print("Dividing regulator rows:")
+    regulator_dfs = split_df_to_max_mem(regulators_reads, max_for_regulators)
+    available_size -= getsizeof(regulator_dfs[0])
+    print("Dividing non-regulator rows:")
     dfs = split_df_to_max_mem(non_regulators_reads, available_size)
     
     '''print("Chunks for regulated: " + str(len(dfs)) 
@@ -356,6 +358,7 @@ if len(missing_metrics) > 0:
         for regulator_df in regulator_dfs:
             df_pairs.append((df,regulator_df))
 
+    
     method_streams = {metric_name:get_metric_file(metric_name) for metric_name in missing_metrics}
 
     '''
