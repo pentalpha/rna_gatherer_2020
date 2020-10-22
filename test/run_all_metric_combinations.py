@@ -2,6 +2,7 @@ from itertools import combinations
 import subprocess
 import multiprocessing
 import sys
+import numpy as np
 
 '''
 usage:  
