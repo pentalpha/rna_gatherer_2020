@@ -5,6 +5,8 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import MultipleLocator
 #import matplotlib.ticker as ticker
 import os
+import gzip
+import io
 #import seaborn as sns
 #import statistics as stc
 
@@ -70,7 +72,13 @@ def load_df_values(file_ss, ss_col_names):
     
     failed_lines = 0
     aprox_lines_to_read = int((25*1024*1024*1024)/195)
-    stream = open(file_ss, 'r')
+    stream = None
+    if file_ss.endswith(".tsv"):
+        stream = open(file_ss, 'r')
+    elif file_ss.endswith(".gzip") or file_ss.endswith(".gz"):
+        print("Opening gzip file")
+        stream = gzip.open(file_ss, 'rt')
+        #stream = io.BufferedReader(gz)
     progress_bar = tqdm(total=aprox_lines_to_read)
     header_line = stream.readline().rstrip("\n").split("\t")[1:]
     ss_indexes = []

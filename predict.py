@@ -263,7 +263,7 @@ def find_correlated(reads, regulators, tempDir, methods, method_streams, threads
         processes.append(p)
         print("Spawned process from gene " + str(end) + " to " + str(limit))
         p.start()
-    quit()
+    
     for p in processes:
         p.join()
 
@@ -389,6 +389,7 @@ for m, correlation_file_path in correlation_files.items():
     with open(correlation_file_path,'r') as stream:
         lines = 0
         invalid_lines = 0
+        loaded = 0
         for raw_line in stream.readlines():
             cells = raw_line.rstrip("\n").split("\t")
             if len(cells) == 3:
@@ -407,6 +408,7 @@ for m, correlation_file_path in correlation_files.items():
                         genes_coexpressed_with_ncRNA[rna] = set()
                     genes_coexpressed_with_ncRNA[rna].add(gene)
                     correlation_values[(rna,gene,m)] = corr
+                    loaded += 1
             else:
                 invalid_lines += 1
             lines += 1
@@ -418,6 +420,7 @@ for m, correlation_file_path in correlation_files.items():
         else: 
             print(str(float(invalid_lines)/lines)
                 + " lines without proper number of columns (4 columns)")
+            print(str(loaded), "total correlations loaded from file")
 print("correlation_values = "+str(len(correlation_values.keys())))
 print("genes_coexpressed_with_ncRNA = "+str(len(genes_coexpressed_with_ncRNA.keys())))
 print("coding_genes = "+str(len(coding_genes.keys())))
@@ -492,7 +495,7 @@ def predict(tempDir,ontology_type="molecular_function",current_method=["MIC","SP
 
     if os.path.exists(output_file):
         print(output_file + " already created, skiping.")
-        return output_file
+        return output_file, False
 
     print("Selecting significant genes for processing")
     valid_coding_genes = {}
@@ -518,7 +521,8 @@ def predict(tempDir,ontology_type="molecular_function",current_method=["MIC","SP
                         valid_genes_coexpressed_with_ncRNA[rna].add(gene)
             total += 1
     
-    #print("len(valid_genes_coexpressed_with_ncRNA)=" + str(len(valid_genes_coexpressed_with_ncRNA)))
+    print("len(valid_genes_coexpressed_with_ncRNA)=" + str(len(valid_genes_coexpressed_with_ncRNA)))
+    print("valid correlations loaded:", str(valid_corr))
     #print("Discarding coding genes with too little correlations with regulators.")
     genes_to_discard = set()
     for coding_gene in valid_coding_genes.keys():
@@ -575,7 +579,7 @@ def predict(tempDir,ontology_type="molecular_function",current_method=["MIC","SP
     if len(possible_gene_term) == 0:
         print("No possible association to make, under current parameters and data."
             + " Suggestions: Try a different correlation threshold or a different method.")
-        return
+        return "", False
     #print("len(valid_genes_coexpressed_with_ncRNA)=" + str(len(valid_genes_coexpressed_with_ncRNA)))
     #print("len(valid_genes_annotated_with_term)= " + str(len(valid_genes_annotated_with_term)))
     #print("Possible gene,term = " + str(len(possible_gene_term)))
@@ -624,10 +628,11 @@ def predict(tempDir,ontology_type="molecular_function",current_method=["MIC","SP
     with open(output_file, 'w') as stream:
         for rna, term, pvalue, fdr in relevant_pvals:
             stream.write("\t".join([rna,term,ontology_type,str(pvalue),str(fdr)])+"\n")
-    return output_file
+    return output_file, True
 
 for conf in confidence_levels:
     output_files = []
+    created = 0
     for onto in ontology_types_arg:
         metrics_for_params = default_methods[str(conf)][onto]
 
@@ -638,17 +643,20 @@ for conf in confidence_levels:
                 valid_metrics.append(metric_name)
         if len(valid_metrics) > 0:
             metrics_for_params = valid_metrics
-            out_file = predict(tempDir,ontology_type=onto,
+            out_file, made = predict(tempDir,ontology_type=onto,
                     current_method=metrics_for_params,
                     conf_arg=conf,
                     benchmarking=benchmarking,k_min_coexpressions=K,
                     pval_threshold=pval,fdr_threshold=fdr,
                     min_n=min_n, min_M=min_M, min_m=min_m)
-            output_files.append((out_file,onto))
+            if out_file != "":
+                output_files.append((out_file,onto))
+            if made:
+                created += 1
         else:
             print("No valid metrics for current confidence level")
     print("Writing annotation file with all ontologies")
-    if len(output_files) > 1:
+    if len(output_files) > 1 and created > 1:
         lines = []
         ontos = set()
         for output_file,onto_value in output_files:
