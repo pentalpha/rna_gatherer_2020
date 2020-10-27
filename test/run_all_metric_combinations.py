@@ -15,7 +15,7 @@ annotation_file = sys.argv[3]
 lnc_list_file = sys.argv[4]
 start, end = [int(x) for x in sys.argv[5].split(",")]
 model_name = sys.argv[6]
-threads = max(2, int(multiprocessing.cpu_count()*0.8))
+threads = max(2, int(multiprocessing.cpu_count()*0.4))
 
 def runCommand(cmd, print_cmd=True):
     if print_cmd:

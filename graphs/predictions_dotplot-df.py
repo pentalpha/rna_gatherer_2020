@@ -18,9 +18,11 @@ go_obo = sys.argv[2]
 aspect = sys.argv[3].split(",")
 output = sys.argv[4]
 annotation_path_dir = [sys.argv[5]]
+completion_w = 1
+has_path_w = int(sys.argv[6])
 external_anno = None
-if len(sys.argv) >= 7:
-    external_anno = sys.argv[6]
+if len(sys.argv) >= 8:
+    external_anno = sys.argv[7]
 
 def load_confidences(intervals_file):
     with open(intervals_file, 'r') as stream:
@@ -353,7 +355,7 @@ for label, conf_level, completion, missing_coef, number_of_metrics, has_path_per
 
     dist = euclids(np.array([completion, missing_coef]), top_point)*100.0
     distance_series[prediction_label] = dist
-    quality = completion * (has_path_perc/100.0)
+    quality = (completion*completion_w + has_path_perc*has_path_w)/(completion_w+has_path_w)
     quality_series[prediction_label] = quality
     if conf_level >= 0:
         if not conf_level in qualities_by_conf:
@@ -380,13 +382,12 @@ for label in prediction_labels:
         best_series[label] = "BEST"
     else:
         best_series[label] = "NOT_BEST"
-
-df = pd.concat([conf_series, metric_comb_series, completion_series,
-                missing_series, has_path_series, size_series,
-                number_of_metrics_series,
-                distance_series, quality_series, best_series],
+#missing_series, distance_series
+df = pd.concat([conf_series, metric_comb_series, number_of_metrics_series,
+                size_series, completion_series, has_path_series,
+                quality_series, best_series],
             axis=1)
-
+df = df.sort_values(by=["Completude", "hasPath"])
 df.to_csv(output + "-predictions_stats.tsv",sep=",",header=True,index=True)
 best_df = df[df['best']=='BEST']
 best_df.to_csv(output + "-best_predictions.tsv",sep="\t",header=True,index=True)
