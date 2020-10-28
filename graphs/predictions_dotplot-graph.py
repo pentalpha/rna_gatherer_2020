@@ -24,9 +24,10 @@ def find_aspect(file_name):
         return "Componente Celular"
     else:
         return "Processo Biológico"
-
-input_df_paths = [sys.argv[1], sys.argv[2], sys.argv[3]]
-output = sys.argv[4]
+annotations_dir = sys.argv[1]
+input_df_paths = [annotations_dir + "/" + mini_onto + "-predictions_stats.tsv" 
+                for mini_onto in ["MF", "BP", "CC"]]
+output = sys.argv[2]
 
 dfs = {find_aspect(input_df): pd.read_csv(input_df,sep=",",index_col=0) for input_df in input_df_paths}
 
