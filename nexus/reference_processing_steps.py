@@ -13,6 +13,8 @@ import json
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 def prepare_ref_annotation(args, confs, tmpDir, stepDir):
+    annotation_lines = 0
+    no_parent_lines = 0
     if "reference_gff" in args:
         ref = args["reference_gff"]
         prepared_gff = tmpDir + "/reference.gff"
@@ -20,11 +22,15 @@ def prepare_ref_annotation(args, confs, tmpDir, stepDir):
             with open(ref, 'r') as in_stream:
                 for line in in_stream:
                     if not (line.startswith("!") or line.startswith("#")):
+                        annotation_lines += 1
                         cells = line.rstrip("\n").split("\t")
-                        if not "Parent=" or "parent=" in cells[8]:
+                        if (not "Parent=" in cells[8]) and (not "parent=" in cells[8]):
+                            no_parent_lines += 1
                             cells[8] = cells[8].rstrip(";") + ";ref_db=" + cells[1]
                             cells[1] = "reference"
                             out_stream.write("\t".join(cells)+"\n")
+    print(annotation_lines, " annotation lines in reference gff.")
+    print(no_parent_lines, " lines in processed reference.")
     return True
 
 def map_to_genome(args, confs, tmpDir, stepDir):

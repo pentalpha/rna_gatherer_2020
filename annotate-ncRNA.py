@@ -52,7 +52,9 @@ def getArgs():
         help = "Minimum ORF length for a sequence be considered as coding (TransDecoder.LongOrfs).")
     ap.add_argument("-db", "--use-dbs", required=False, default="True",
         help = ("Map transcripts from ncRNA databases, when available, to genome."
-            +" True (default) / False."))  
+            +" True (default) / False."))
+    ap.add_argument("-edb", "--extra-db", required=False, default=None,
+        help = ("Add extra ncRNA databases for this run. Sintax: -edb db_name:db_path;db_name2:db_path2"))  
     return vars(ap.parse_args())
 
 #parsing arguments
@@ -87,7 +89,8 @@ if not os.path.exists(args["data_dir"]):
 
 args["genome_link"] = args["data_dir"] + "/genome.fasta"
 if "genome" in args:
-    runCommand("ln -s " + args["genome"] + " " + args["genome_link"])
+    runCommand("rm " + args["genome_link"])
+    runCommand("ln -s " + os.path.abspath(args["genome"]) + " " + args["genome_link"])
 else:
     if not os.path.exists(args["genome_link"]):
         print("No path to genome in arguments given now or previously,"
@@ -96,7 +99,7 @@ else:
 index_path = args["genome_link"] + ".mmi"
 if not os.path.exists(index_path):
     print("Indexing genome for future mappings...")
-    cmd = " ".join([confs["minimap2"], "-x splice:hq -uf -d", 
+    cmd = " ".join([confs["minimap2"], "-x splice:hq -uf -I 600M -d", 
          index_path, args["genome_link"]])
     code = runCommand(cmd)
     if code != 0:
@@ -106,6 +109,18 @@ args["genome_index"] = index_path
 
 global_data = os.path.dirname(os.path.realpath(__file__)) + "/data"
 confs["rfam2go"] = global_data + "/rfam2go"
+if "extra_db" in cmdArgs:
+    if cmdArgs["extra_db"] != None:
+        db_pairs = [(db_str.split(":")[0], db_str.split(":")[1]) 
+                    for db_str in cmdArgs["extra_db"].split(";")]
+        for db_name, db_path in db_pairs:
+            p = os.path.abspath(db_path)
+            if os.path.exists(p):
+                confs["rna_dbs"][db_name] = p
+            else:
+                print(p + " does not exist")
+    print("Current databases: " + str(confs["rna_dbs"]))
+
 if cmdArgs["use_dbs"] == "False":
     confs["rna_dbs"] = {}
 
@@ -129,6 +144,7 @@ if __name__ == '__main__':
                 ("prepare_ref_annotation", prepare_ref_annotation),
                 ("map_to_genome", map_to_genome),
                 ("get_info", get_info),
+                ("get_functional_info", get_functional_info),
                 ("run_gffcompare", run_gffcompare),
                 ("remove_redundancies", remove_redundancies),
                 ("review_annotations", review_annotations),

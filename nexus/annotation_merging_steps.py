@@ -36,7 +36,13 @@ def get_info(args, confs, tmpDir, stepDir):
         print("Information retrieval results: " + "\n\t".join([stat_name+": "+str(value)
                                     for stat_name, value in retrieval_stats.items()]))
         
-        retrieve_func_annotation(all_gff_path, tmpDir + "/retrieved_functions.id2go",
+        '''retrieve_func_annotation_rnacentral(all_gff_path, tmpDir + "/retrieved_functions.id2go",
+                                confs, args['taxon_id'])'''
+    return True
+
+def get_functional_info(args, confs, tmpDir, stepDir):
+    all_gff_path = stepDir["get_info"] + "/annotation_with_meta.gff"
+    retrieve_func_annotation_rnacentral(all_gff_path, tmpDir + "/retrieved_functions.id2go",
                                 confs, args['taxon_id'])
     return True
 

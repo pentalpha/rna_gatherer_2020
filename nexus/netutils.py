@@ -7,6 +7,8 @@ from nexus.bioinfo import *
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from nexus.rna_type import *
 import sys
+from tqdm import tqdm
+import obonet
 
 def get_md5(sequence):
     """
@@ -164,7 +166,7 @@ def parallel_rnacentral_requester(to_retrieve, seqs_dict, confs, tries = 3):
         to_retrieves = [list(chunk) for chunk in chunks(list(to_retrieve), 100)]
         for chunk in tqdm(to_retrieves):
             processes = []
-            with ThreadPoolExecutor(max_workers=40) as executor:
+            with ThreadPoolExecutor(max_workers=80) as executor:
                 for seq_id in to_retrieve:
                     if seq_id in chunk:
                         if seq_id in seqs_dict:
@@ -261,3 +263,113 @@ def retrieve_func_annotation(annotation_path, output, confs, taxon_id):
             for id_, go, aspect in results:
                 stream.write(id_+"\t"+go+"\t"+aspect+"\n")
 
+def get_gene_annotation(gene_name, base_url, taxid):
+    if base_url[-1] != '/':
+        base_url += "/"
+    #url = base_url+gene_name.split("_")[0]+"/go-annotations/"+gene_name.split("_")[1]
+    url = base_url+gene_name+"/go-annotations/"+str(taxid)
+    r = requests.get(url, params = {"format": "json"})
+    if r.status_code == 200:
+        data = r.json()
+        associations = []
+        for result in data:
+            associations.append((result["rna_id"], result["go_term_id"]))
+        return gene_name, associations, r.status_code
+    else:
+        return gene_name, None, r.status_code
+
+def go_from_rnacentral(id_list, api_url, taxid, tries = 3):
+    associations = set()
+    new_ids = list(set([x.split("_")[0].split(".")[0] for x in id_list]))
+    while tries > 0:
+        print("Trying to retrieve " + str(len(id_list)) + " ids.")
+        failed = 0
+        to_retrieves = [list(chunk) for chunk in chunks(list(new_ids), 100)]
+        too_many = False
+        for chunk in tqdm(to_retrieves):
+            processes = []
+            with ThreadPoolExecutor(max_workers=25) as executor:
+                for seq_id in new_ids:
+                    if seq_id in chunk:
+                        processes.append(
+                            executor.submit(get_gene_annotation, seq_id, api_url, taxid))
+
+                for task in as_completed(processes):
+                    gene_name, new_associations, response = task.result()
+                    if new_associations != None:
+                        if len(new_associations) > 0:
+                            associations.update(new_associations)
+                            #print(str(len(new_associations)) + " annotations for " + gene_id)
+                        else:
+                            print("No annotations for " + gene_name)
+                        new_ids.remove(gene_name)
+                    else:
+                        print(gene_name + " failed with " + str(response))
+                        if response == 429:
+                            too_many = True
+                        failed += 1
+        
+        print("\t" + str(failed) + " failed.")
+        if too_many:
+            time.sleep(3)
+        else:
+            tries -= 1
+        if failed == 0:
+            tries = 0
+    return associations
+
+def get_term_ontology(go_obo):
+    learned = {}
+    with open(go_obo, 'r') as stream:
+        ids_to_assign = []
+        namespace = ""
+        for line in stream:
+            if "[Term]" in line:
+                if namespace != "":
+                    for id_ in ids_to_assign:
+                        learned[id_] = namespace
+                        namespace = ""
+                ids_to_assign = []
+            elif "namespace: " in line:
+                namespace = line.replace("namespace: ", "").rstrip("\n")
+            elif "id: " in line:
+                new_id = line.replace("id: ", "").rstrip("\n")
+                ids_to_assign.append(new_id)
+            elif "alt_id: " in line:
+                new_id = line.replace("alt_id: ", "").rstrip("\n")
+                ids_to_assign.append(new_id)
+        if namespace != "":
+            for id_ in ids_to_assign:
+                learned[id_] = namespace
+                namespace = ""
+    return learned
+
+def retrieve_func_annotation_rnacentral(annotation_path, output, confs, taxon_id):
+    annotation = pd.read_csv(annotation_path, sep="\t", header=None, 
+                names=["seqname", "source", "feature", "start", "end", 
+                        "score", "strand", "frame", "attribute"])
+    
+    to_retrieve = get_ids_from_annotation(annotation)
+    term_ontologies = get_term_ontology(confs["go_obo"])
+    results = go_from_rnacentral(to_retrieve, confs['rna_central_api'], taxon_id)
+    final_results = []
+    for id_, go in results:
+        if go in term_ontologies:
+            final_results.append((id_,go,term_ontologies[go]))
+        else:
+            print(go, "from", id_, "is an unknown term.")
+    '''id_chunks = chunks(list(to_retrieve), 75)
+    results = set()
+    annotations_retrieved = False
+
+    for chunk in tqdm(list(id_chunks)):
+        annotations = retrieve_quickgo_annotations(chunk, confs["rna_central_api"], taxon_id)
+        for id_, go, aspect in annotations:
+            results.add((id_, go, aspect))
+            annotations_retrieved = True
+
+    if annotations_retrieved:'''
+    if len(final_results) > 0:
+        with open(output, 'w') as stream:
+            for id_, go, aspect in final_results:
+                stream.write(id_+"\t"+go+"\t"+aspect+"\n")
