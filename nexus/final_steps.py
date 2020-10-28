@@ -203,14 +203,15 @@ def write_transcriptome(args, confs, tmpDir, stepDir):
     print("Creating transcriptome file")
     for index, row in annotation.iterrows():
         #print(fasta_header)
-        s = genome_dict[str(row["seqname"])] #cant find key PGUA01000001.1 #TODO
-        new_header = get_gff_attributes(row["attribute"])["ID"]
-        from_seq = int(row["start"])
-        to_seq = int(row["end"])
-        begin = min(from_seq,to_seq)-1
-        up_to = max(from_seq,to_seq)
-        new_seq = s[begin:up_to]
-        transcriptome.append((new_header, new_seq))
+        if str(row["seqname"]) in genome_dict:
+            s = genome_dict[str(row["seqname"])] #cant find key PGUA01000001.1 #TODO
+            new_header = get_gff_attributes(row["attribute"])["ID"]
+            from_seq = int(row["start"])
+            to_seq = int(row["end"])
+            begin = min(from_seq,to_seq)-1
+            up_to = max(from_seq,to_seq)
+            new_seq = s[begin:up_to]
+            transcriptome.append((new_header, new_seq))
     print("Writing transcriptome")
     writeFastaSeqs(transcriptome, tmpDir + "/transcriptome.fasta")
     return True
@@ -236,7 +237,7 @@ def make_id2go(args, confs, tmpDir, stepDir):
                 if rfam_id in global_ids2go:
                     go_list = global_ids2go[rfam_id]
                     local_ids2go[ID] = set(go_list)
-        api_annotation = stepDir["get_info"] + "/retrieved_functions.id2go"
+        api_annotation = stepDir["get_functional_info"] + "/retrieved_functions.id2go"
         if os.path.exists(api_annotation):
             with open(api_annotation, 'r') as stream:
                 for line in stream:

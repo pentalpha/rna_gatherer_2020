@@ -91,12 +91,15 @@ def nr_alignment(args, confs, tmpDir, stepDir):
     if os.path.exists(query_fasta):
         if "non_redundant" in confs:
             db = confs["non_redundant"]
-            print("Starting diamond to blastx transcripts against NR proteins DB")
-            diamond_cmd = [confs["diamond"],"blastx","--db",db,'-q',query_fasta,
-                    "--out",tmpDir + "/blast.tsv","--outfmt","6",
-                    "--threads",str(confs['threads']),"--evalue","0.0001"]
-            code = runCommand("cd " + tmpDir + " && " + " ".join(diamond_cmd))
-            return code == 0
+            if os.path.exists(db):
+                print("Starting diamond to blastx transcripts against NR proteins DB")
+                diamond_cmd = [confs["diamond"],"blastx","--db",db,'-q',query_fasta,
+                        "--out",tmpDir + "/blast.tsv","--outfmt","6",
+                        "--threads",str(confs['threads']),"--evalue","0.0001"]
+                code = runCommand("cd " + tmpDir + " && " + " ".join(diamond_cmd))
+                return code == 0
+            else:
+                print("No NR database location defined.")
         else:
             print("No NR database location defined.")
     else:
