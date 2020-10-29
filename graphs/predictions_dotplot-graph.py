@@ -30,7 +30,8 @@ input_df_paths = [annotations_dir + "/" + mini_onto + "-predictions_stats.tsv"
 output = sys.argv[2]
 legend_offset = int(sys.argv[3])
 colors_offset = float(sys.argv[4])
-dfs = {find_aspect(input_df): pd.read_csv(input_df,sep=",",index_col=0) for input_df in input_df_paths}
+color_ratio = float(sys.argv[5])
+dfs = {find_aspect(input_df): pd.read_csv(input_df,sep="\t",index_col=0) for input_df in input_df_paths}
 
 has_path_percs = []
 for name, df in dfs.items():
@@ -57,7 +58,7 @@ colormap = {str(i): inferno100[convert_perc_to_position(i,min_path_perc,has_path
             for i in has_path_percs}
 print(str(colormap))
 
-f, ax = plt.subplots(4,figsize=(5,14),gridspec_kw={'height_ratios': [10, 10, 10, 0.8]})
+f, ax = plt.subplots(4,figsize=(4,10),gridspec_kw={'height_ratios': [10, 10, 10, 0.8]})
 current_axis = 0
 box = None
 y_values = set()
@@ -121,17 +122,20 @@ for name, df in dfs.items():
     xs.reverse()
     ys.reverse()
     colors.reverse()
-    axis.scatter(xs, ys, s=100, c=colors, alpha=0.75, marker='o', label = "Predição")
+    axis.scatter(xs, ys, s=100, c=colors, alpha=0.75, marker='o')
     
     '''axis.scatter(xs_best, ys_best, s=200, c='black', alpha=1.0, 
         marker='D')'''
     axis.scatter(xs_best, ys_best, s=100, c=colors_best, alpha=0.9, 
-        marker='D', label = 'Predição de Melhor Qualidade', edgecolors= ["#000000"]*len(xs_best))
+        marker='D', edgecolors= ["#000000"]*len(xs_best))
     
     '''axis.scatter(xs_others, ys_others, s=200, c='black', alpha=1.0, 
         marker='X')'''
     axis.scatter(xs_others, ys_others, s=100, c=colors_others, alpha=1.0, 
-        marker='X', label = 'Outras Ferramentas', edgecolors= ["#000000"]*len(xs_others))
+        marker='X', edgecolors= ["#000000"]*len(xs_others))
+    if len(xs_others) > 0:
+        axis.annotate("LNCRNA2GOA", (xs_others[0]-6.0, ys_others[0]-2.5), 
+        fontsize='x-small', horizontalalignment='center', verticalalignment='top')
     
     #ax.colorbar()
     axis.xaxis.set_minor_locator(ticker.MultipleLocator(5))
@@ -142,7 +146,7 @@ for name, df in dfs.items():
 
     axis.grid(axis='x')
     axis.grid(axis='y')
-    axis.set_ylabel('Associações relacionadas à uma referência (%)')
+    axis.set_ylabel('Associações relacionadas\nà uma referência (%)')
     axis.set_xlabel('Referências presentes na predição (%)')
 
     #box = axis.get_position()
@@ -161,8 +165,8 @@ y_min = math.floor(min(y_values)/20)*20
 x_max = math.ceil(max(x_values)/20)*20
 
 for axis in [ax[0],ax[1],ax[2]]:
-    axis.set_ylim(y_min,101)
-    axis.set_xlim(0,x_max)
+    axis.set_ylim(y_min,103)
+    axis.set_xlim(-4,105)
 
 cmap = plt.cm.get_cmap(pallete)
 colors = cmap(np.arange(cmap.N))
@@ -177,7 +181,7 @@ ax[current_axis].set_xlabel('Nível de Confiança')
 
 #circle = mlines.Line2D([], [], color='blue', marker='*',
 #                          markersize=15, label='Blue stars')
-texts = ['Predição', 'Outras Ferramentas', 'Predição de Melhor Qualidade']
+texts = ['Predição', 'Predição de Melhor Qualidade', 'Outras Ferramentas']
 markers = ['o','D','X']
 edgec = ["#DADAFF","#000000","#000000"]
 
