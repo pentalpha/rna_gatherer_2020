@@ -7,6 +7,23 @@ import os
 import statistics as stc
 import pandas as pd
 
+def combination_equality(comb1, comb2):
+    if comb1.split('.')[1] != comb2.split('.')[1]:
+        return False
+    comb1 = comb1.split('.')[0]
+    comb2 = comb2.split('.')[0]
+    l1 = comb1.split('-')
+    l1.sort()
+    l2 = comb2.split('-')
+    l2.sort()
+    if len(l1) != len(l2):
+        return False
+    else:
+        for i in range(len(l1)):
+            if l1[i] != l2[i]:
+                return False
+        return True
+
 def make_df(reference_path, go_obo, aspect, output, annotation_path_dir, 
     has_path_w, completion_w = 1, external_anno = None):
     def load_confidences(intervals_file):
@@ -29,9 +46,18 @@ def make_df(reference_path, go_obo, aspect, output, annotation_path_dir,
     #print(str(confidence_by_method))
     def get_annotations(dir, name_part):
         files = []
+        combs_stored = set()
         # r=root, d=directories, f = files
         for f in os.listdir(dir):
             if name_part in f:
+                f_comb = f.split(".")[0]+"."+f.split(".")[1]
+                use_this = True
+                for c in combs_stored:
+                    if combination_equality(f_comb, c):
+                        print(f_comb + " == " + c)
+                        use_this = False
+                if use_this:
+                    combs_stored.add(f_comb)
                     files.append(os.path.join(dir, f))
         return files
 
@@ -341,8 +367,8 @@ def make_df(reference_path, go_obo, aspect, output, annotation_path_dir,
 
         #dist = euclids(np.array([completion, missing_coef]), top_point)*100.0
         #distance_series[prediction_label] = dist
-        #quality = (completion*completion_w + has_path_perc*has_path_w)/(completion_w+has_path_w)
-        quality = has_path_perc
+        quality = (completion*100*completion_w + has_path_perc*has_path_w)/(completion_w+has_path_w)
+        #quality = has_path_perc
         quality_series[prediction_label] = quality
         if conf_level >= 0:
             if not conf_level in qualities_by_conf:
@@ -375,9 +401,14 @@ def make_df(reference_path, go_obo, aspect, output, annotation_path_dir,
                     quality_series, best_series],
                 axis=1)
     df = df.sort_values(by=["Completude", "hasPath"])
-    df.to_csv(output + "-predictions_stats.tsv",sep=",",header=True,index=True)
+    df.to_csv(output + "-predictions_stats.tsv",sep="\t",header=True,index=True)
     best_df = df[df['best']=='BEST']
     best_df.to_csv(output + "-best_predictions.tsv",sep="\t",header=True,index=True)
+    config = pd.concat([conf_series, metric_comb_series, best_series],
+                axis=1)
+    config = config[config['best']=='BEST']
+    del config['best']
+    config.to_csv(output + "-config.tsv",sep="\t",header=True,index=False)
 
 '''
 usage:
@@ -394,13 +425,19 @@ annotation_path_dirs = [annotation_path_dir + "/" + sub_dir + "/"
 output = annotation_path_dir + "/"
 output_prefixes = [output + sub_dir for sub_dir in sub_dirs]
 has_path_w = int(sys.argv[4])
-external_anno = None
+external_anno_prefix = None
 if len(sys.argv) >= 6:
-    external_anno = sys.argv[5]
+    external_anno_prefix = sys.argv[5]
+external_annos = [external_anno_prefix + sub_dir + ".tsv" for sub_dir in sub_dirs]
+for i in range(len(external_annos)):
+    if not os.path.exists(external_annos[i]):
+        external_annos[i] = None
+    else:
+        print("Using " + external_annos[i])
 
 for i in range(len(aspects)):
     print("Making annotation stats for", 
         aspects[i], output_prefixes[i], 
         annotation_path_dirs[i])
     make_df(reference_path, go_obo, aspects[i], output_prefixes[i], [annotation_path_dirs[i]], 
-        has_path_w, completion_w = 1, external_anno = None)
+        has_path_w, completion_w = 1, external_anno = external_annos[i])
