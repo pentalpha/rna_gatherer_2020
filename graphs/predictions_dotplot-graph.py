@@ -28,7 +28,8 @@ annotations_dir = sys.argv[1]
 input_df_paths = [annotations_dir + "/" + mini_onto + "-predictions_stats.tsv" 
                 for mini_onto in ["MF", "BP", "CC"]]
 output = sys.argv[2]
-
+legend_offset = int(sys.argv[3])
+colors_offset = float(sys.argv[4])
 dfs = {find_aspect(input_df): pd.read_csv(input_df,sep=",",index_col=0) for input_df in input_df_paths}
 
 has_path_percs = []
@@ -168,10 +169,10 @@ colors = cmap(np.arange(cmap.N))
 ax[current_axis].imshow([colors], extent=[min_path_perc, max_path_perc, 0, 0.3])
 plt.setp(ax[current_axis].get_yticklabels(), visible=False)
 ax[current_axis].tick_params(axis='y', which='both', length=0)
-ax[current_axis].xaxis.set_minor_locator(ticker.MultipleLocator(0.5))
-ax[current_axis].xaxis.set_major_locator(ticker.MultipleLocator(1))
+ax[current_axis].xaxis.set_minor_locator(ticker.MultipleLocator(1))
+ax[current_axis].xaxis.set_major_locator(ticker.MultipleLocator(2))
 box1 = ax[current_axis].get_position()
-ax[current_axis].set_position([box.x0, box.y0-0.21, 0.5, 0.2])
+ax[current_axis].set_position([box.x0, box.y0-0.21, 0.5, colors_offset])
 ax[current_axis].set_xlabel('Nível de Confiança')
 
 #circle = mlines.Line2D([], [], color='blue', marker='*',
@@ -184,7 +185,7 @@ patches = [plt.scatter([],[], marker=markers[i], color="#DADAFF", s=100,
             label="{:s}".format(texts[i]), edgecolors=edgec[i])  for i in range(len(texts)) ]
 legend = ax[current_axis].legend(handles=patches, ncol=1, facecolor="white", 
             numpoints=1, #bbox_to_anchor=(0., 1.02, 1., .102), 
-            loc='lower center', bbox_to_anchor=(0.0, -14),
+            loc='lower center', bbox_to_anchor=(0.0, -legend_offset),
             mode="expand", borderaxespad=0.)
 
 #plt.legend(handles=[blue_line])

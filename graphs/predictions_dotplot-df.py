@@ -335,12 +335,14 @@ def make_df(reference_path, go_obo, aspect, output, annotation_path_dir,
         completion_series[prediction_label] = completion*100.0
         missing_series[prediction_label] = missing_coef*100.0
         number_of_metrics_series[prediction_label] = int(number_of_metrics)
+        #has_path_perc -= 50
         has_path_series[prediction_label] = has_path_perc
         size_series[prediction_label] = size
 
-        dist = euclids(np.array([completion, missing_coef]), top_point)*100.0
-        distance_series[prediction_label] = dist
-        quality = (completion*completion_w + has_path_perc*has_path_w)/(completion_w+has_path_w)
+        #dist = euclids(np.array([completion, missing_coef]), top_point)*100.0
+        #distance_series[prediction_label] = dist
+        #quality = (completion*completion_w + has_path_perc*has_path_w)/(completion_w+has_path_w)
+        quality = has_path_perc
         quality_series[prediction_label] = quality
         if conf_level >= 0:
             if not conf_level in qualities_by_conf:
@@ -355,7 +357,7 @@ def make_df(reference_path, go_obo, aspect, output, annotation_path_dir,
         for i in range(len(tuples)):
             if tuples[i][1] >= tuples[max_i][1]:
                 max_i = i
-        return tuples[i][0]
+        return tuples[max_i][0]
 
     bests = []
     for conf_level, qualities in qualities_by_conf.items():
@@ -400,5 +402,5 @@ for i in range(len(aspects)):
     print("Making annotation stats for", 
         aspects[i], output_prefixes[i], 
         annotation_path_dirs[i])
-    make_df(reference_path, go_obo, aspects[i], output_prefixes[i], annotation_path_dirs[i], 
+    make_df(reference_path, go_obo, aspects[i], output_prefixes[i], [annotation_path_dirs[i]], 
         has_path_w, completion_w = 1, external_anno = None)
