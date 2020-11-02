@@ -561,18 +561,6 @@ def get_gff_attributes_str(attrs):
     x = x.rstrip(";")
     return x
 
-def load_metrics(table_path):
-    metric_combinations = {}
-    with open(table_path,'r') as stream:
-        for raw_line in stream.readlines():
-            cells = raw_line.rstrip("\n").split("\t")
-            metric_combinations[cells[0]] = {
-                "biological_process": cells[1].split("-"),
-                "molecular_function": cells[2].split("-"),
-                "cellular_component": cells[3].split("-")
-            }
-    return metric_combinations
-
 def get_ids_from_annotation(annotation):
     ids = []
     def update_attribute(row):

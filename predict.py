@@ -51,8 +51,8 @@ display_cache = get_cache()
 
 all_methods = ["MIC","DC","PRS","SPR","SOB","FSH"]
 all_ontologies = ["molecular_function","cellular_component","biological_process"]
-default_methods = load_metrics(confs["metrics_table"])
-highest_confidence = str(max([int(conf) for conf in default_methods.keys()]))
+#default_methods = load_metrics(confs["metrics_table"])
+#highest_confidence = str(max([int(conf) for conf in default_methods.keys()]))
 
 def getArgs():
     ap = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -64,20 +64,20 @@ def getArgs():
     ap.add_argument("-ann", "--annotation", required=True,
         help=("Functional annotation file of the genes."))
     ap.add_argument("-o", "--output-dir", required=True, help=("Output directory."))
-    ap.add_argument("-conf", "--confidence-level", required=False,
-        default=highest_confidence, help=("Level of confidence in the correlation metrics. Lower values "
-        +"result in more results and false positives, higher values result in less "
-        +"results and less false positives. Values: 0, 1, 2, 3, 4, 5 (default)."))
+    ap.add_argument("-conf", "--confidence-level", required=False, 
+    help=("Overwrites 'quality'. Level of confidence in the correlation metrics. Values: 0 to 24."))
     ap.add_argument("-ont", "--ontology-type", required=False,
         default="molecular_function", help=("One of the following: molecular_function (default),"
         +" cellular_component or biological_process."))
-    ap.add_argument("-met", "--method", required=False,
+    ap.add_argument("-q", "--quality", help=("'normal': ~85% precision, more predictions."
+        + " 'high': ~100% precision, very few predictions. Default=high."))
+    '''ap.add_argument("-met", "--method", required=False,
         default=None, help=("Correlation coefficient calculation method:"
         +" MIC (Maximal Information Coefficient), "
         +"DC (Distance Correlation), SPR (Spearman Coefficient), PRS (Pearson Coefficient), "
         +"FSH (Fisher Information Metric) or SOB (Sobolev Metric)."
         +"\nRNA Nexus is configured to use the best method combination for each ontology and "
-        +"confidence level, if you set this option the defaults will be overwriten."))
+        +"confidence level, if you set this option the defaults will be overwriten."))'''
     ap.add_argument("-bh", "--benchmarking", required=False,
         default=False, help=("Enables the (much slower) leave one out strategy: regulators can be regulated too."
         +"Default: False."))
@@ -103,10 +103,6 @@ def getArgs():
         default=1, help=("Minimum M value. Default: 1"))
     ap.add_argument("-n", "--min-n", required=False,
         default=1, help=("Minimum n value. Default: 1"))
-    ap.add_argument("-H", "--high-precision", required=False,
-        default=False, help=("Set of arguments to find only high quality annotations. "
-        +" Number of annotations is greatly reduced. Default: False.\n\t"
-        +"Overrides other arguments: threshold=0.85, K=2, pval=0.05, fdr=0.05, n=3, M=8, m=1"))
 
     ap.add_argument("-chu", "--cache-usage", required=False,
         default=0.6, help=("Portion of the cache memory to use for storing the counts table."))
@@ -142,19 +138,38 @@ if not model_name in available_species:
 
 print("Loading confidence levels for " + model_name)
 confidence_thresholds = load_confidence_levels(model_name)
-confidence_levels = [int(x) for x in cmdArgs["confidence_level"].split(",")]
+default_methods = get_best_metrics(model_name)
+conf_presets = get_preset_confs(model_name)
+confidence_levels = conf_presets['high']
+if "quality" in cmdArgs:
+    if cmdArgs["quality"] == "normal":
+        confidence_levels = conf_presets['normal']
+    elif cmdArgs["quality"] != "high":
+        print("Invalid quality preset. Valid values: " + str(list(conf_presets.keys())))
+elif "confidence_level" in cmdArgs:
+    print("Loading custom confidence levels.")
+    for onto in all_ontologies:
+        confidence_levels[onto] = [int(x) for x in cmdArgs["confidence_level"].split(",")]
+
+for onto in all_ontologies:
+    vals = confidence_levels[onto]
+    if not isinstance(vals, list):
+        confidence_levels[onto] = [vals]
 
 if cmdArgs["threshold"] != None:
     universal_th = float(cmdArgs["threshold"])
     #print(str(len(confidence_thresholds)))
     #print(str(confidence_levels))
-    for i in confidence_levels:
-        for onto in confidence_thresholds.keys():
+    for onto, confs in confidence_levels:
+        for i in confs:
             for metric in confidence_thresholds[onto][i].keys():
                 confidence_thresholds[onto][i][metric] = universal_th
 
-min_confidence = confidence_levels[0]
-min_thresholds_by_onto = {onto: confs[min_confidence] 
+min_confidence = min([min(confs) for onto, confs in confidence_levels])
+#min_confidence = confidence_levels[0]
+'''min_thresholds_by_onto = {onto: confs[min_confidence] 
+                        for onto, confs in confidence_thresholds.items()}'''
+min_thresholds_by_onto = {onto: confs[confidence_levels[onto][0]] 
                         for onto, confs in confidence_thresholds.items()}
 print(str(min_thresholds_by_onto))
 min_thresholds = {}
@@ -170,10 +185,10 @@ for metric in min_thresholds_by_onto["MF"].keys():
     else:
         min_thresholds[metric] = None
 
-print("Minimum thrsholds to load correlations:")
+print("Minimum thresholds to load correlations:")
 print(str(min_thresholds))
 
-if cmdArgs["method"] != None:
+'''if cmdArgs["method"] != None:
     new_metrics = {}
     method = cmdArgs["method"].split(",")
     if method[0] == "ALL":
@@ -187,9 +202,9 @@ if cmdArgs["method"] != None:
                 + onto + ", not using it.")
     method = list(metrics_with_minimum_conf)
 
-    for conf in confidence_levels:
+    for onto, conf in confidence_levels:
         new_metrics[str(conf)] = {o: method for o in all_ontologies}    
-    default_methods = new_metrics
+    default_methods = new_metrics'''
 
 metrics_used = set()
 for conf, metrics_by_onto in default_methods.items():
@@ -630,32 +645,40 @@ def predict(tempDir,ontology_type="molecular_function",current_method=["MIC","SP
             stream.write("\t".join([rna,term,ontology_type,str(pvalue),str(fdr)])+"\n")
     return output_file, True
 
-for conf in confidence_levels:
+all_confs = set()
+for onto, confs in confidence_levels:
+    all_confs.update(confs)
+all_confs = list(all_confs)
+all_confs.sort(key=lambda x: int(x))
+
+for conf in all_confs:
     output_files = []
     created = 0
     for onto in ontology_types_arg:
-        metrics_for_params = default_methods[str(conf)][onto]
+        confs_to_use = confidence_levels[onto]:
+        if conf in confs_to_use:
+            metrics_for_params = default_methods[str(conf)][onto]
 
-        valid_metrics = []
-        current_ths = confidence_thresholds[short_ontology_name(onto)][conf]
-        for metric_name in metrics_for_params:
-            if current_ths[metric_name] != None:
-                valid_metrics.append(metric_name)
-        if len(valid_metrics) > 0:
-            metrics_for_params = valid_metrics
-            out_file, made = predict(tempDir,ontology_type=onto,
-                    current_method=metrics_for_params,
-                    conf_arg=conf,
-                    benchmarking=benchmarking,k_min_coexpressions=K,
-                    pval_threshold=pval,fdr_threshold=fdr,
-                    min_n=min_n, min_M=min_M, min_m=min_m)
-            if out_file != "":
-                output_files.append((out_file,onto))
-            if made:
-                created += 1
-        else:
-            print("No valid metrics for current confidence level")
-    print("Writing annotation file with all ontologies")
+            valid_metrics = []
+            current_ths = confidence_thresholds[short_ontology_name(onto)][conf]
+            for metric_name in metrics_for_params:
+                if current_ths[metric_name] != None:
+                    valid_metrics.append(metric_name)
+            if len(valid_metrics) > 0:
+                metrics_for_params = valid_metrics
+                out_file, made = predict(tempDir,ontology_type=onto,
+                        current_method=metrics_for_params,
+                        conf_arg=conf,
+                        benchmarking=benchmarking,k_min_coexpressions=K,
+                        pval_threshold=pval,fdr_threshold=fdr,
+                        min_n=min_n, min_M=min_M, min_m=min_m)
+                if out_file != "":
+                    output_files.append((out_file,onto))
+                if made:
+                    created += 1
+            else:
+                print("No valid metrics for current confidence level")
+        print("Writing annotation file with all ontologies")
     if len(output_files) > 1 and created > 1:
         lines = []
         ontos = set()

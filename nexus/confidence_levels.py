@@ -25,14 +25,59 @@ def get_available_species():
     species_dirs = get_subdirs(confs_dir)
     return [file_name(f) for f in species_dirs]
 
-def load_confidence_levels(species):
+def get_species_dir(species):
     confs_dir = (os.path.dirname(os.path.realpath(__file__)) 
                     + "/../data/confidence_levels/")
-    species_dir = confs_dir+"/"+species
+    return confs_dir+"/"+species
+
+def load_confidence_levels(species):
+    species_dir = get_species_dir(species)
     confs = {"MF": load_confidence(species_dir+"/confidence_intervals-MF.tsv"),
             "BP": load_confidence(species_dir+"/confidence_intervals-BP.tsv"),
             "CC": load_confidence(species_dir+"/confidence_intervals-CC.tsv")}
     return confs
+
+'''def load_metrics(table_path):
+    metric_combinations = {}
+    with open(table_path,'r') as stream:
+        for raw_line in stream.readlines():
+            cells = raw_line.rstrip("\n").split("\t")
+            metric_combinations[cells[0]] = {
+                "biological_process": cells[1].split("-"),
+                "molecular_function": cells[2].split("-"),
+                "cellular_component": cells[3].split("-")
+            }
+    return metric_combinations'''
+
+def get_best_metrics(species):
+    short_names = ["MF","BP","CC"]
+    full_names = ["molecular_function", 
+        "biological_process", 
+        "cellular_component"]
+    species_dir = get_species_dir(species)
+    config_files = [species_dir+"/"+ont+"-config.tsv"
+                    for ont in short_names]
+    metric_combinations = {}
+    for i in range(len(full_names)):
+        ont_name = full_names[i]
+        with open(config_files[i], 'r') as stream:
+            for line in stream.readlines():
+                cells = line.rstrip("\n").split("\t")
+                if cells[0] != "confidenceLevel":
+                    conf_level = cells[0]
+                    if not conf_level in metric_combinations:
+                        metric_combinations[conf_level] = {}
+                    metrics_list = cells[1].split("-")
+                    metrics_list.sort()
+                    metric_combinations[conf_level][ont_name] = metrics_list
+    return metric_combinations
+
+def get_preset_confs(species):
+    optimal_path = get_species_dir(species) + "/optimal.json"
+    optimal_str = open(optimal_path, 'r').read()
+    optimal_obj = json.loads(optimal_str)
+    return optimal_obj
+
 
 def geometric_filter(value, th):
     if value <= th:
