@@ -165,7 +165,7 @@ if cmdArgs["threshold"] != None:
             for metric in confidence_thresholds[onto][i].keys():
                 confidence_thresholds[onto][i][metric] = universal_th
 
-min_confidence = min([min(confs) for onto, confs in confidence_levels])
+min_confidence = min([min(confs) for onto, confs in confidence_levels.items()])
 #min_confidence = confidence_levels[0]
 '''min_thresholds_by_onto = {onto: confs[min_confidence] 
                         for onto, confs in confidence_thresholds.items()}'''
@@ -646,7 +646,7 @@ def predict(tempDir,ontology_type="molecular_function",current_method=["MIC","SP
     return output_file, True
 
 all_confs = set()
-for onto, confs in confidence_levels:
+for onto, confs in confidence_levels.items():
     all_confs.update(confs)
 all_confs = list(all_confs)
 all_confs.sort(key=lambda x: int(x))
