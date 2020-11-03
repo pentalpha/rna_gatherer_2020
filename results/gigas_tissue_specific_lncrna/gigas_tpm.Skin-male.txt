@@ -25,11 +25,11 @@ Transcript_262250.0	41.0835
 Transcript_230312.0	35.4504
 Transcript_243039.0	32.9836
 Transcript_216479.0	32.8974
-Transcript_92687.0	31.7941
 Transcript_52608.0	31.7941
+Transcript_92687.0	31.7941
 Transcript_240964.0	31.4426
-Transcript_61937.0	28.299
 Transcript_6963.0	28.299
+Transcript_61937.0	28.299
 Transcript_233776.0	27.3466
 Transcript_75112.0	27.2158
 Transcript_268665.0	27.0862

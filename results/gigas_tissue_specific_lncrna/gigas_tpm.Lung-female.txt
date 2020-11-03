@@ -53,8 +53,8 @@ Transcript_169508.0	60.4159
 Transcript_84675.0	59.2461
 Transcript_102292.0	57.6608
 Transcript_38584.0	56.4441
-Transcript_236306.0	54.9737
 Transcript_228499.0	54.9737
+Transcript_236306.0	54.9737
 Transcript_238306.0	54.9294
 Transcript_62093.0	53.2101
 Transcript_94428.0	51.0317

@@ -11,8 +11,8 @@ Transcript_40729.0	745.799
 Transcript_91850.0	717.6260000000001
 Transcript_37574.0	615.98
 Transcript_264458.0	561.09
-Transcript_162100.0	521.663
 Transcript_248750.0	521.663
+Transcript_162100.0	521.663
 Transcript_73067.0	494.55400000000003
 Transcript_32795.0	348.775
 Transcript_48237.0	265.312
@@ -23,7 +23,7 @@ Transcript_79525.0	119.541
 Transcript_69216.0	96.204
 Transcript_154297.0	92.1649
 Transcript_26038.0	72.9523
-Transcript_88431.0	70.4
 Transcript_25197.0	70.4
+Transcript_88431.0	70.4
 Transcript_115305.0	30.6048
 Transcript_27723.0	24.1231

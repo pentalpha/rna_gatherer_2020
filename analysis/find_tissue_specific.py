@@ -28,7 +28,13 @@ groups = {'Heart': ['Heart_Male'],
           'Lung': ['Lung_Female', 'Lung_Male'],
           'Kidney': ['Kidney_Female', 'Kidney_Male']}
 
-sample_names = df.columns.tolist()[1:]
+sample_names = ['Heart_Male', 'Muscle_Female',
+    'Brain_Female', 'Brain_Male',
+    'Liver_Female', 'Liver_Male',
+    'Skin_Female', 'Skin_Male',
+    'Gonad_Female', 'Gonad_Male',
+    'Lung_Female', 'Lung_Male',
+    'Kidney_Female', 'Kidney_Male']
 
 def is_specific(sample_count, other_samples, counts):
     for other_sample in other_samples:
@@ -112,10 +118,12 @@ def write_names_to_file(names, f):
     with open(f,'w') as stream:
         for name, max_expression in name_and_expression:
             stream.write(name+"\t"+str(max_expression)+"\n")
+    return [name for name, exp in name_and_expression]
 
 df2 = pd.read_csv(df2_path, sep="\t", header=0)
 tissue_data = []
 summary_path = output_path+".tissue_sumarry.tsv"
+name_lists = {}
 for tissue_name, tissue_df in tqdm(
         list(df2[df2['Classification'] == 'Tissue Specific'].groupby('Specific_Tissue'))):
     print(tissue_name)
@@ -134,11 +142,12 @@ for tissue_name, tissue_df in tqdm(
     
     name_lists_prefix = output_path +"."+tissue_name+"-"
     print("\tWriting genes")
-    write_names_to_file(names, name_lists_prefix+"all.txt")
+    names = write_names_to_file(names, name_lists_prefix+"all.txt")
     print("\tWriting male genes")
-    write_names_to_file(male_specific, name_lists_prefix+"male.txt")
+    male_specific = write_names_to_file(male_specific, name_lists_prefix+"male.txt")
     print("\tWriting female genes")
-    write_names_to_file(female_specific, name_lists_prefix+"female.txt")
+    female_specific = write_names_to_file(female_specific, name_lists_prefix+"female.txt")
+    name_lists[tissue_name] = [list(sex_indiferent), male_specific, female_specific]
 
 tissue_data.append({'Tissue Name': "Others", 
          'Tissue Specific': len(df2[df2['Classification'] == 'Others']),
@@ -159,3 +168,48 @@ write_names_to_file(df2[df2['Classification'] == 'Expressed in All']['Name'].tol
                     output_path +".housekeeping.txt")
 summary_df = pd.DataFrame(data=tissue_data,columns=tissue_data[0].keys())
 summary_df.to_csv(summary_path, sep='\t', index=False, header=True)
+
+#%%
+from math import log
+import numpy as np
+import matplotlib
+import matplotlib.pyplot as plt
+from random import shuffle
+def get_counts_list(name):
+    row = df[df['Name'] == name].iloc[0]
+    return [row[sample_name] for sample_name in sample_names]
+
+def convert_to_log(vec, base=2):
+    return [log(x+1, base) for x in vec]
+
+sking_others, skin_male, skin_female = name_lists['Skin']
+#shuffle(sking_others)
+#shuffle(skin_male)
+#shuffle(skin_female)
+counts = [convert_to_log(get_counts_list(name)) 
+          for name in skin_male+skin_female]
+
+name_axis_labels = skin_male+skin_female
+sample_name_axis = sample_names
+
+fig, ax = plt.subplots(figsize=(8,14))
+im = ax.imshow(counts, interpolation='nearest', aspect='auto')
+#ax.set_title("Heatmap of expression counts for sex-specific skin lncRNA")
+
+ax.set_xticks(np.arange(len(sample_name_axis)))
+ax.set_yticks(np.arange(len(name_axis_labels)))
+# ... and label them with the respective list entries
+ax.set_xticklabels(sample_name_axis)
+ax.set_yticklabels(name_axis_labels, fontsize=9)
+
+cbarlabel_0 = "log2(TPM+1)"
+cbar = ax.figure.colorbar(im, ax=ax, 
+                          cmap="YlGn")
+cbar.ax.set_ylabel(cbarlabel_0, rotation=-90, va="bottom")
+
+plt.setp(ax.get_xticklabels(), rotation=45, ha="right",
+         rotation_mode="anchor")
+
+fig.tight_layout()
+plt.show()
+fig.savefig(output_path+"_sking_sex-heatmap.png")
