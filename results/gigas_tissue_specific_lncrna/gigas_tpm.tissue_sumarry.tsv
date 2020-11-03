@@ -1,12 +1,12 @@
 Tissue Name	Tissue Specific	Male Specific	Female Specific	Not Sex Specific
 Brain	7486	1368.0	931.0	5187.0
 Gonad	4807	160.0	2978.0	1669.0
-Skin	3319	58.0	29.0	3232.0
-Lung	1413	255.0	145.0	1013.0
-Kidney	964	92.0	53.0	819.0
-Muscle	785	0.0	0.0	785.0
-Liver	726	9.0	8.0	709.0
 Heart	354	0.0	0.0	354.0
+Kidney	964	92.0	53.0	819.0
+Liver	726	9.0	8.0	709.0
+Lung	1413	255.0	145.0	1013.0
+Muscle	785	0.0	0.0	785.0
+Skin	3319	58.0	29.0	3232.0
 Others	38434			
 House-keeping	256			
 Not Expressed	655			

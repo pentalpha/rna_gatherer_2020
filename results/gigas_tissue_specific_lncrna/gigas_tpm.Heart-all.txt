@@ -97,8 +97,8 @@ Transcript_42826.0	89.1143
 Transcript_39503.0	89.0319
 Transcript_199838.0	88.9185
 Transcript_24519.0	88.4977
-Transcript_257888.0	86.2362
 Transcript_193049.0	86.2362
+Transcript_257888.0	86.2362
 Transcript_23798.0	86.0658
 Transcript_15403.0	85.7993
 Transcript_61695.0	85.7394
@@ -133,8 +133,8 @@ Transcript_196906.0	72.6641
 Transcript_44604.0	71.7475
 Transcript_91097.0	70.7673
 Transcript_196588.0	70.7357
-Transcript_59260.0	70.4108
 Transcript_142592.0	70.4108
+Transcript_59260.0	70.4108
 Transcript_231299.0	70.1342
 Transcript_63593.0	69.3222
 Transcript_47838.0	68.8717
@@ -174,8 +174,8 @@ Transcript_251966.0	59.4013
 Transcript_23469.0	59.0765
 Transcript_36321.0	59.0287
 Transcript_25986.0	58.8756
-Transcript_83712.0	58.8155
 Transcript_234455.0	58.8155
+Transcript_83712.0	58.8155
 Transcript_267040.0	58.4906
 Transcript_32938.0	58.041000000000004
 Transcript_28672.0	57.1491
@@ -205,8 +205,8 @@ Transcript_234849.0	49.4993
 Transcript_252506.0	49.3848
 Transcript_150161.0	48.4553
 Transcript_25136.0	48.0835
-Transcript_45824.0	47.912
 Transcript_192957.0	47.912
+Transcript_45824.0	47.912
 Transcript_165407.0	47.555
 Transcript_265743.0	47.5473
 Transcript_49653.0	47.3195
@@ -267,8 +267,8 @@ Transcript_258783.0	36.8542
 Transcript_95154.0	36.8274
 Transcript_100228.0	36.6977
 Transcript_58796.0	36.5914
-Transcript_237862.0	36.563
 Transcript_228604.0	36.563
+Transcript_237862.0	36.563
 Transcript_270318.0	36.5423
 Transcript_183846.0	35.9372
 Transcript_76993.0	35.0883
@@ -280,8 +280,8 @@ Transcript_42280.0	32.9616
 Transcript_174870.0	32.8584
 Transcript_46586.0	32.7383
 Transcript_62390.0	32.6588
-Transcript_48156.0	32.6528
 Transcript_76669.0	32.6528
+Transcript_48156.0	32.6528
 Transcript_170498.0	32.2487
 Transcript_76950.0	31.9616
 Transcript_231511.0	31.7123
