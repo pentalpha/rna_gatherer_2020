@@ -1,0 +1,13 @@
+Set of Genes	MF	BP	CC
+Brain	248	809	181
+Gonad	218	626	161
+Heart	53	164	36
+Kidney	96	275	52
+Liver	78	227	49
+Lung	105	463	54
+Muscle	54	317	70
+Skin	161	590	130
+Skin-male	120	440	67
+housekeeping	51	204	29
+female-diff	110	360	64
+male-diff	79	265	56
