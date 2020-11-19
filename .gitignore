@@ -7,6 +7,9 @@ config.json
 .f*
 .Rhistory
 test/*
+*.vscode*
+*.ipynb_checkpoints*
+*.spyproject*
 !test/run_all_metric_combinations.py
 !test/test_mic.py
 !test/LNCRNA2GOA_MF.tsv
