@@ -1,5 +1,7 @@
 test_data.tar.gz
 test_data/*
+result_data/*
+result_data.tar.gz
 output/*
 __pycache__
 .vscode/*
