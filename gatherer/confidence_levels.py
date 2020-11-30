@@ -1,4 +1,4 @@
-from nexus.util import get_subdirs, file_name
+from gatherer.util import get_subdirs, file_name
 import os
 
 def load_confidence(intervals_file):

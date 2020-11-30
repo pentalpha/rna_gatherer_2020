@@ -41,7 +41,7 @@ def short_method_name(name):
     name = name.replace("-pval=0.01-fdr=0.01", "-pval=fdr=0.01")
     return name
 
-predictor = "../predict.py"
+predictor = "../prophet.py"
 counts_file = "../test_data/counts/mus_musculus_tpm.tsv"
 annotation_file = "../test_data/annotation/mgi_genes_annotation.tsv"
 reference_file = "../test_data/reference/mgi_lncRNA_annotation.tsv"

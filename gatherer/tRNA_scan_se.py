@@ -1,5 +1,5 @@
 import os
-from nexus.util import runCommand
+from gatherer.util import runCommand
 
 def run_trnascan(args, confs, tmpDir, stepDir):
     genome_path = args["genome_link"]

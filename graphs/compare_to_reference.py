@@ -1,7 +1,7 @@
 import sys
 import obonet
 import networkx
-from nexus.functional_prediction import get_ancestors, get_descendants
+from gatherer.functional_prediction import get_ancestors, get_descendants
 from tqdm import tqdm
 import numpy as np
 import matplotlib.pyplot as plt

@@ -1,8 +1,8 @@
 
-from nexus.bioinfo import get_gff_attributes, get_gff_attributes_str
-from nexus.bioinfo import header_to_id
-from nexus.util import *
-from nexus.rna_type import *
+from gatherer.bioinfo import get_gff_attributes, get_gff_attributes_str
+from gatherer.bioinfo import header_to_id
+from gatherer.util import *
+from gatherer.rna_type import *
 import sys
 import pandas as pd
 

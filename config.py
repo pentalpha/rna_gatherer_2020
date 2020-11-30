@@ -4,7 +4,7 @@ import multiprocessing
 import os
 import json
 import psutil
-from nexus.util import runCommand
+from gatherer.util import runCommand
 
 project_dir = os.path.dirname(os.path.realpath(__file__))
 config_json = project_dir + "/config.json"

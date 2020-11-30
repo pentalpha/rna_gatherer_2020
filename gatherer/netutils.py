@@ -2,10 +2,10 @@ import hashlib
 import requests
 import time
 import json
-from nexus.util import *
-from nexus.bioinfo import *
+from gatherer.util import *
+from gatherer.bioinfo import *
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from nexus.rna_type import *
+from gatherer.rna_type import *
 import sys
 from tqdm import tqdm
 import obonet

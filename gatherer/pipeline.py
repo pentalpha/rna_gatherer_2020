@@ -1,6 +1,6 @@
 import os
 import sys
-from nexus.util import runCommand
+from gatherer.util import runCommand
 
 class Pipeline:
     def __init__(self, args, confs, funcs, output_dir):

@@ -8,14 +8,14 @@ Created on Thu Nov 19 09:04:37 2020
 import pandas as pd
 import numpy as np
 
-df_path = "/home/pitagoras/main/dev/on-going/rna_nexus/results/gigas_tissue_specific_lncrna/tissue_analysis.tsv"
-associations_name = "/home/pitagoras/main/dev/on-going/rna_nexus/results/gigas_tissue_specific_lncrna/enrichment_analysis/associations.tsv"
+df_path = "/home/pitagoras/main/dev/on-going/rna_gatherer/results/gigas_tissue_specific_lncrna/tissue_analysis.tsv"
+associations_name = "/home/pitagoras/main/dev/on-going/rna_gatherer/results/gigas_tissue_specific_lncrna/enrichment_analysis/associations.tsv"
 correlations_name = "/home/pitagoras/main/experiments/enrich_tissues/SPR.tsv"
-growth_genes_path = "/home/pitagoras/main/dev/on-going/rna_nexus/data/function_sets/growth_functions.txt"
+growth_genes_path = "/home/pitagoras/main/dev/on-going/rna_gatherer/data/function_sets/growth_functions.txt"
 
-coding_ass_path = "/home/pitagoras/main/dev/on-going/rna_nexus/test_data/annotation/identified_annotated_coding_mRNA.id2go.tsv"
+coding_ass_path = "/home/pitagoras/main/dev/on-going/rna_gatherer/test_data/annotation/identified_annotated_coding_mRNA.id2go.tsv"
 coding_realnames_path = "/home/pitagoras/main/experiments/danilo_annotation/res.final.filter4.tsv"
-analysis_dir = '/home/pitagoras/main/dev/on-going/rna_nexus/results/gigas_tissue_specific_lncrna/'
+analysis_dir = '/home/pitagoras/main/dev/on-going/rna_gatherer/results/gigas_tissue_specific_lncrna/'
 
 df = pd.read_csv(df_path,sep="\t")
 df = df[df['Classification'] == "Expressed in All"]

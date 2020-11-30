@@ -2,8 +2,8 @@ import os
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
-from nexus.bioinfo import *
-from nexus.util import *
+from gatherer.bioinfo import *
+from gatherer.util import *
 
 def read_ids2go(filepath):
     gos_dict = {}

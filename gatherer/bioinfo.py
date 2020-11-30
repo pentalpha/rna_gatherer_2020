@@ -1,7 +1,7 @@
 #Module: bioinfo.py
 
-from nexus.util import sliceString
-from nexus.util import runCommand
+from gatherer.util import sliceString
+from gatherer.util import runCommand
 import pandas as pd
 #import hashlib
 import requests

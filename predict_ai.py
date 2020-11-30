@@ -23,11 +23,11 @@ Author: Pitágoras Alves (github.com/pentalpha)
 """
 
 import sys
-from nexus.functional_prediction import *
-from nexus.util import *
-from nexus.confidence_levels import *
-from nexus.bioinfo import load_metrics, short_ontology_name
-from nexus.interaction_predictor import *
+from gatherer.functional_prediction import *
+from gatherer.util import *
+from gatherer.confidence_levels import *
+from gatherer.bioinfo import load_metrics, short_ontology_name
+from gatherer.interaction_predictor import *
 import obonet
 import networkx
 import numpy as np

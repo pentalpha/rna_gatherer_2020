@@ -2,22 +2,22 @@ Wants to annotate ncRNA in a genome, but is having trouble navigating the dozens
 
 This software may help you solve those problems.
 
-# RNA Nexus
+# RNA Gatherer
 
-RNA Nexus is a software with ready to use pipelines for:
+RNA Gatherer is a software with ready to use pipelines for:
 
-- annotate-ncRNA.py: Annotation and prediction of ncRNA in genomes, taking into account transcriptome data, covariance models, reference sequences, reference annotations and data from public APIs;
-- predict.py: Computational prediction of lncRNA functions using gene coexpression;
+- explorer.py: Annotation and prediction of ncRNA in genomes, taking into account transcriptome data, covariance models, reference sequences, reference annotations and data from public APIs;
+- prophet.py: Computational prediction of lncRNA functions using gene coexpression;
 
 ## Installation
 
-RNA Nexus requires some databases and software in order to run. It was developed for Linux x64 environments and uses a command line interface.
+RNA Gatherer requires some databases and software in order to run. It was developed for Linux x64 environments and uses a command line interface.
 
-First of all, you should clone (or [download](https://github.com/pentalpha/rna_nexus/archive/master.zip)) this repository:
+First of all, you should clone (or [download](https://github.com/pentalpha/rna_gatherer/archive/master.zip)) this repository:
 
 ```sh
-git clone https://github.com/pentalpha/rna_nexus.git
-cd rna_nexus
+git clone https://github.com/pentalpha/rna_gatherer.git
+cd rna_gatherer
 ```
 ### Databases
 
@@ -65,14 +65,14 @@ conda activate rna
 
 ## How To Use
 
-### annotate-ncRNA.py
+### explorer.py
 
 This is an extensive pipeline for detecting ncRNA in a given genome. Given a genome (and maybe some optional inputs), it will give you a non-redundant .GFF annotation file and a .TSV file with functional annotations, based on RFAM and other databases.
 
 A basic command would be:
 
 ```sh
-python annotate-ncRNA.py -g [genome.fasta] \
+python explorer.py -g [genome.fasta] \
     -tx [taxonomic ID for species] \
     -o [output directory]
 ```
@@ -81,7 +81,7 @@ These are the only required input arguments. But other inputs can be passed in o
 
 This enables the annotation of lncRNA transcripts:
 ```sh
-python annotate-ncRNA.py -g [genome.fasta]\
+python explorer.py -g [genome.fasta]\
     -tx [taxonomic ID for species] \
     -tr [transcriptome.fasta] \
     -o [output directory]
@@ -89,16 +89,16 @@ python annotate-ncRNA.py -g [genome.fasta]\
 
 This includes a ncRNA reference annotation file (.gff format):
 ```sh
-python annotate-ncRNA.py -g [genome.fasta] \
+python explorer.py -g [genome.fasta] \
     -tx [taxonomic ID for species] \
     -gff [reference.gff] \
     -o [output directory]
 ```
 You can find reference files like these for many species [here](ftp://ftp.ebi.ac.uk/pub/databases/RNAcentral/current_release/genome_coordinates/gff3/). Please note that inclusing mRNA in the reference annotation can mess things up a little bit...
 
-Many species have reference ncRNA sequences out there with no position in the genome. RNA Nexus can map them for you:
+Many species have reference ncRNA sequences out there with no position in the genome. RNA Gatherer can map them for you:
 ```sh
-python annotate-ncRNA.py -g [genome.fasta]\
+python explorer.py -g [genome.fasta]\
     -tx [taxonomic ID for species] \
     -ref [reference.fasta] \
     -o [output directory]
@@ -106,16 +106,16 @@ python annotate-ncRNA.py -g [genome.fasta]\
 
 For more detailed description of the command line arguments, use --help:
 ```sh
-python annotate-ncRNA.py --help
+python explorer.py --help
 ```
 
-### predict.py
+### prophet.py
 
 Given a count reads table, a list of lncRNA names and a annotation of coding genes, this tool enables you to predict the functions (Gene Ontology terms) of lncRNA.
 
 An example command:
 ```sh
-python predict.py -cr test_data/counts/mus_musculus_tpm.tsv \
+python prophet.py -cr test_data/counts/mus_musculus_tpm.tsv \
     -reg test_data/lnc_list/mus_musculus_lncRNA.txt \
     -ann test_data/annotation/mgi_genes_annotation.tsv \
     -o output_directory
@@ -129,7 +129,7 @@ python predict.py -cr test_data/counts/mus_musculus_tpm.tsv \
 
 For more detailed description of the command line arguments, use --help:
 ```sh
-python predict.py --help
+python prophet.py --help
 ```
 
 ## Project structure

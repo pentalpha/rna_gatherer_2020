@@ -44,7 +44,7 @@ confs_str = ",".join([str(x) for x in conf_levels])
 
 print(str(n_predictions))
 base_command = ("cd ../ && "
-            +"python predict.py -cr " + counts_file
+            +"python prophet.py -cr " + counts_file
             +" -reg " + lnc_list_file
             +" -ann " + annotation_file
             +" -o " + prediction_dir + " -conf " + confs_str

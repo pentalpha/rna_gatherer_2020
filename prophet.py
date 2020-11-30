@@ -23,10 +23,10 @@ Author: Pitágoras Alves (github.com/pentalpha)
 """
 
 import sys
-from nexus.functional_prediction import *
-from nexus.util import *
-from nexus.confidence_levels import *
-from nexus.bioinfo import load_metrics, short_ontology_name
+from gatherer.functional_prediction import *
+from gatherer.util import *
+from gatherer.confidence_levels import *
+from gatherer.bioinfo import load_metrics, short_ontology_name
 import obonet
 import networkx
 import numpy as np
@@ -76,7 +76,7 @@ def getArgs():
         +" MIC (Maximal Information Coefficient), "
         +"DC (Distance Correlation), SPR (Spearman Coefficient), PRS (Pearson Coefficient), "
         +"FSH (Fisher Information Metric) or SOB (Sobolev Metric)."
-        +"\nRNA Nexus is configured to use the best method combination for each ontology and "
+        +"\nRNA Gatherer is configured to use the best method combination for each ontology and "
         +"confidence level, if you set this option the defaults will be overwriten."))'''
     ap.add_argument("-bh", "--benchmarking", required=False,
         default=False, help=("Enables the (much slower) leave one out strategy: regulators can be regulated too."

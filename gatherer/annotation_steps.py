@@ -3,11 +3,11 @@ import sys
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
-from nexus.bioinfo import readSeqsFromFasta, filterSeqs, writeFastaSeqs, getFastaHeaders, seqListToDict
-from nexus.bioinfo import cluster_all_ranges, shortFastaHeader
-from nexus.bioinfo import read_plast_extended
-from nexus.bioinfo import get_gff_attributes, get_gff_attributes_str
-from nexus.util import runCommand, write_file, getFilesWith
+from gatherer.bioinfo import readSeqsFromFasta, filterSeqs, writeFastaSeqs, getFastaHeaders, seqListToDict
+from gatherer.bioinfo import cluster_all_ranges, shortFastaHeader
+from gatherer.bioinfo import read_plast_extended
+from gatherer.bioinfo import get_gff_attributes, get_gff_attributes_str
+from gatherer.util import runCommand, write_file, getFilesWith
 
 def infernal(fasta, cmscan, rfam, threads):
     output_name = fasta.rstrip(".fasta") + ".tsv"

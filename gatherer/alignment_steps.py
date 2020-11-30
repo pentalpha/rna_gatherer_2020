@@ -1,6 +1,6 @@
-from nexus.bioinfo import *
-from nexus.util import *
-from nexus.netutils import *
+from gatherer.bioinfo import *
+from gatherer.util import *
+from gatherer.netutils import *
 import pandas as pd
 import os
 from tqdm import tqdm

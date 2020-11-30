@@ -10,12 +10,12 @@ import networkx as nx
 import os
 
 gene_list_dir = sys.argv[1]
-#gene_list_dir = "/home/pitagoras/main/dev/on-going/rna_nexus/results/gigas_tissue_specific_lncrna/"
+#gene_list_dir = "/home/pitagoras/main/dev/on-going/rna_gatherer/results/gigas_tissue_specific_lncrna/"
 obo_path = sys.argv[2]
 predictions_file = sys.argv[3]
 #predictions_file = "gigas_predictions/lnc_rna_prediction_normal.tsv"
 population_file = sys.argv[4]
-#population_file = "/home/pitagoras/main/dev/on-going/rna_nexus/test_data/lnc_list/gigas_lnc.txt"
+#population_file = "/home/pitagoras/main/dev/on-going/rna_gatherer/test_data/lnc_list/gigas_lnc.txt"
 max_pval = 0.01
 if len(sys.argv) > 5:
     max_pval = float(sys.argv[5])

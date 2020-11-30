@@ -3,9 +3,9 @@ import sys
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
-from nexus.bioinfo import *
-from nexus.netutils import *
-from nexus.util import *
+from gatherer.bioinfo import *
+from gatherer.netutils import *
+from gatherer.util import *
 import hashlib
 import requests
 import time

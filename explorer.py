@@ -4,19 +4,19 @@ import argparse
 import pandas as pd
 import numpy as np
 from tqdm import tqdm
-from nexus.util import runCommand
+from gatherer.util import runCommand
 
 from config import *
 
-from nexus.pipeline import Pipeline
+from gatherer.pipeline import Pipeline
 
-from nexus.annotation_steps import *
-from nexus.tRNA_scan_se import *
-from nexus.reference_processing_steps import *
-from nexus.annotation_merging_steps import *
-from nexus.lnc_steps import *
-from nexus.final_steps import *
-from nexus.alignment_steps import *
+from gatherer.annotation_steps import *
+from gatherer.tRNA_scan_se import *
+from gatherer.reference_processing_steps import *
+from gatherer.annotation_merging_steps import *
+from gatherer.lnc_steps import *
+from gatherer.final_steps import *
+from gatherer.alignment_steps import *
 
 optional_files = ["non_redundant", "rna_dbs"]
 require_files(optional_files, mandatory=False)
@@ -42,7 +42,7 @@ def getArgs():
         help=("Reference annotation for the given genome. Such reference annotations are"
             +" available for several species at " + confs["coordinates_ftp"]))
     ap.add_argument("-ref", "--reference-fasta", required=False,
-        help=("Reference sequences of ncRNA for this genome. RNA Nexus will try to find "
+        help=("Reference sequences of ncRNA for this genome. RNA Gatherer will try to find "
             +" their genomic mapping and also retrieve information about them from RNACentral and QuickGO."))
     ap.add_argument("-tx", "--taxon-id", required=False,
         help="Taxon ID for the species, required to retrieve annotations from QuickGo")

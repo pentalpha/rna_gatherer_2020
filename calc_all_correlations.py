@@ -1,6 +1,6 @@
 import sys
-from nexus.functional_prediction import *
-from nexus.util import getFilesWith
+from gatherer.functional_prediction import *
+from gatherer.util import getFilesWith
 import argparse
 import multiprocessing
 from config import configs

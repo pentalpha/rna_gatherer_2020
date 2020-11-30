@@ -3,7 +3,7 @@ import threading
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
-from nexus.util import *
+from gatherer.util import *
 import math
 from scipy.stats.stats import pearsonr, spearmanr
 from scipy.special import comb
@@ -16,7 +16,7 @@ import dcor
 from minepy import MINE
 from sys import getsizeof
 import warnings
-from nexus.confidence_levels import *
+from gatherer.confidence_levels import *
 
 def is_constant(vec):
     first = vec[0]

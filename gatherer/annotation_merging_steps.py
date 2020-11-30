@@ -3,10 +3,10 @@ import sys
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
-from nexus.bioinfo import *
-from nexus.util import *
-from nexus.netutils import *
-from nexus.rna_type import *
+from gatherer.bioinfo import *
+from gatherer.util import *
+from gatherer.netutils import *
+from gatherer.rna_type import *
 
 def filter_non_transcripts(gff_path, gff_output_path):
     ref_annotation = pd.read_csv(gff_path, sep="\t", header=None, names=["seqname", 
