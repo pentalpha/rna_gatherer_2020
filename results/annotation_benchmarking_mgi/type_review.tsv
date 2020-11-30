@@ -1,0 +1,16 @@
+ncRNA Type	Total	Families	reference_mapping	cmscan	tRNAscan-SE	rnasamba
+All	79812	687	19	42647	37050	96
+Gene	76343	638	0	39179	0	0
+Gene;tRNA	37060	1	0	10	37050	0
+Gene;miRNA	10027	237	0	10027	0	0
+Gene;snRNA	3192	229	0	3186	0	0
+Gene;snRNA;splicing	1338	9	0	1338	0	0
+Gene;rRNA	278	9	0	278	0	0
+Gene;lncRNA	267	147	11	160	0	96
+Gene;sRNA	51	3	0	51	0	0
+Gene;ribozyme	22	4	0	22	0	0
+Gene;scRNA	1	0	1	0	0	0
+Cis-reg	3468	49	0	3468	0	0
+Cis-reg;IRES	20	17	0	20	0	0
+Cis-reg;frameshift_element	15	5	0	15	0	0
+other	1	0	1	0	0	0
