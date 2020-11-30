@@ -1,0 +1,9 @@
+Transcript_119298.0	7013.15
+Transcript_241403.0	2820.1
+Transcript_148836.0	831.112
+Transcript_85880.0	741.72
+Transcript_79591.0	684.258
+Transcript_251121.0	415.556
+Transcript_35445.0	91.4865
+Transcript_99755.0	14.421
+Transcript_54948.0	11.4226
