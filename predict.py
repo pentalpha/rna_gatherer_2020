@@ -26,13 +26,13 @@ import sys
 from nexus.functional_prediction import *
 from nexus.util import *
 from nexus.confidence_levels import *
-from nexus.bioinfo import load_metrics, short_ontology_name
+from nexus.bioinfo import short_ontology_name, long_ontology_name
 import obonet
 import networkx
 import numpy as np
 import argparse
 import multiprocessing
-
+import json
 '''
 Loading configurations and command line arguments
 '''
@@ -150,6 +150,7 @@ elif "confidence_level" in cmdArgs:
     print("Loading custom confidence levels.")
     for onto in all_ontologies:
         confidence_levels[onto] = [int(x) for x in cmdArgs["confidence_level"].split(",")]
+print("Confidence levels used:", confidence_levels)
 
 for onto in all_ontologies:
     vals = confidence_levels[onto]
@@ -165,13 +166,15 @@ if cmdArgs["threshold"] != None:
             for metric in confidence_thresholds[onto][i].keys():
                 confidence_thresholds[onto][i][metric] = universal_th
 
-min_confidence = min([min(confs) for onto, confs in confidence_levels])
+min_confidence = min([min(confs) for onto, confs in confidence_levels.items()])
+print("Min confidence:", min_confidence)
 #min_confidence = confidence_levels[0]
 '''min_thresholds_by_onto = {onto: confs[min_confidence] 
                         for onto, confs in confidence_thresholds.items()}'''
-min_thresholds_by_onto = {onto: confs[confidence_levels[onto][0]] 
+min_thresholds_by_onto = {onto: confs[confidence_levels[long_ontology_name(onto)][0]] 
                         for onto, confs in confidence_thresholds.items()}
 print(str(min_thresholds_by_onto))
+
 min_thresholds = {}
 for metric in min_thresholds_by_onto["MF"].keys():
     values = [mins[metric] 
@@ -207,12 +210,24 @@ print(str(min_thresholds))
     default_methods = new_metrics'''
 
 metrics_used = set()
-for conf, metrics_by_onto in default_methods.items():
-    if int(conf) >= min_confidence:
+for onto, confs in confidence_levels.items():
+    print(onto, confs)
+    if onto in ontology_types_arg:
+        print("using this ontology")
+        for conf, metrics_by_onto in default_methods.items():
+            print("\t",conf,metrics_by_onto)
+            if int(conf) in confs:
+                print("\t\tusing")
+                metrics_used.update(metrics_by_onto[onto])
+            else:
+                print("\t\tnot using")
+    else:
+        print("not using this ontology")
+'''if int(conf) >= min_confidence:
         for onto, metrics in metrics_by_onto.items():
             if onto in ontology_types_arg:
-                metrics_used.update(metrics)
-
+                metrics_used.update(metrics)'''
+print("Metrics used:", metrics_used)
 pval = float(cmdArgs["pvalue"])
 fdr = float(cmdArgs["fdr"])
 min_n = int(cmdArgs["min_n"])
@@ -455,13 +470,15 @@ with open(coding_gene_ontology_path,'r') as stream:
     for raw_line in stream.readlines():
         cells = raw_line.rstrip("\n").split("\t")
         if len(cells) == 3 or len(cells) == 4:
-            gene = cells[0].upper()
+            gene = cells[0]
             go = cells[1]
             onto = cells[2]
             if onto in onto_id2gos.keys():
                 id2gos = onto_id2gos[onto]
                 genes_annotated_with_term = onto_genes_annotated_with_term[onto]
                 #coding_genes.add(gene)
+                if not (gene in coding_genes):
+                    gene = gene.upper()
                 if gene in coding_genes:
                     if not gene in id2gos:
                         id2gos[gene] = set()
@@ -470,6 +487,9 @@ with open(coding_gene_ontology_path,'r') as stream:
                         genes_annotated_with_term[go] = set()
                     genes_annotated_with_term[go].add(gene)
                     associations += 1
+                else:
+                    invalid_lines += 1
+                    print("Invalid coding gene" + gene)
             else:
                 invalid_lines += 1
         else:
@@ -646,7 +666,7 @@ def predict(tempDir,ontology_type="molecular_function",current_method=["MIC","SP
     return output_file, True
 
 all_confs = set()
-for onto, confs in confidence_levels:
+for onto, confs in confidence_levels.items():
     all_confs.update(confs)
 all_confs = list(all_confs)
 all_confs.sort(key=lambda x: int(x))
@@ -655,7 +675,7 @@ for conf in all_confs:
     output_files = []
     created = 0
     for onto in ontology_types_arg:
-        confs_to_use = confidence_levels[onto]:
+        confs_to_use = confidence_levels[onto]
         if conf in confs_to_use:
             metrics_for_params = default_methods[str(conf)][onto]
 
