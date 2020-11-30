@@ -1,6 +1,6 @@
 from gatherer.util import get_subdirs, file_name
 import os
-
+import json
 def load_confidence(intervals_file):
     #print("Reading " + intervals_file)
     with open(intervals_file, 'r') as stream:

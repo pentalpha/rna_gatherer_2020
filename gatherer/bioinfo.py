@@ -585,3 +585,9 @@ def short_ontology_name(onto_type):
     onto_type = onto_type.replace("molecular_function","MF")
     onto_type = onto_type.replace("cellular_component","CC")
     return onto_type
+
+def long_ontology_name(onto_type):
+    onto_type = onto_type.replace("BP","biological_process")
+    onto_type = onto_type.replace("MF","molecular_function")
+    onto_type = onto_type.replace("CC","cellular_component")
+    return onto_type

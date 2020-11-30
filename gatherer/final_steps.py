@@ -200,6 +200,7 @@ def write_transcriptome(args, confs, tmpDir, stepDir):
     print("Loading genome: " + args['genome_link'])
     genome_dict = seqListToDict(readSeqsFromFasta(args['genome_link']), header_to_name = header_to_id)
     transcriptome = []
+    lncRNA_seqs = []
     print("Creating transcriptome file")
     for index, row in annotation.iterrows():
         #print(fasta_header)
@@ -211,9 +212,12 @@ def write_transcriptome(args, confs, tmpDir, stepDir):
             begin = min(from_seq,to_seq)-1
             up_to = max(from_seq,to_seq)
             new_seq = s[begin:up_to]
+            if "lncRNA" in row["attribute"]:
+                lncRNA_seqs.append((new_header, new_seq))
             transcriptome.append((new_header, new_seq))
     print("Writing transcriptome")
     writeFastaSeqs(transcriptome, tmpDir + "/transcriptome.fasta")
+    writeFastaSeqs(lncRNA_seqs, tmpDir + "/lncRNA.fasta")
     return True
 
 def make_id2go(args, confs, tmpDir, stepDir):
