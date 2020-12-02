@@ -2,7 +2,6 @@ from matplotlib.cm import get_cmap
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
-import matplotlib.patches as mpatches
 from matplotlib.ticker import MultipleLocator
 import random
 import sys
@@ -20,10 +19,23 @@ translate_dict = {"cc": "Componente Celular", "CC": "Componente Celular",
                 "spr": "Spearman", "SPR": "Spearman",
                 "dc": "Distance\nCorrelation", "DC": "Distance\nCorrelation"}
 
+translate_dict_eng = {"cc": "Cellular Component", "CC": "Cellular Component",
+                "mf": "Molecular Function", "MF": "Molecular Function",
+                "bp": "Biological Process", "BP": "Biological Process",
+                "max": "Maximum Semantic Similarity", 
+                "avg": "Average Semantic Similarity",
+                "fsh": "Fisher", "FSH": "Fisher",
+                "sob": "Sobolev", "SOB": "Sobolev",
+                "mic": "Maximal Information\nCoefficient", 
+                "MIC": "Maximal Information\nCoefficient",
+                "prs": "Pearson", "PRS": "Pearson",
+                "spr": "Spearman", "SPR": "Spearman",
+                "dc": "Distance\nCorrelation", "DC": "Distance\nCorrelation"}
+
 def translator(name):
     name.replace("_"," ")
     words = name.split()
-    new_words = [(translate_dict[word] if word in translate_dict else word)
+    new_words = [(translate_dict_eng[word] if word in translate_dict_eng else word)
                     for word in words]
     new_name = " ".join(new_words)
     return new_name
@@ -74,7 +86,7 @@ comb_colors = {all_combs[i]: colors[i] for i in range(len(all_combs))}
 all_combs.sort(key=lambda x: comb_freq[x], reverse=True)
 output_plot = confs_dir + "/bests_plot.png"
 #%%
-fig, axes = plt.subplots(3, 1, figsize=(7, 7))
+fig, axes = plt.subplots(3, 1, figsize=(7, 8))
 y_start = 0.0
 for onto_name, df, ax in zip(ontos, dfs, axes):
     confs_list, comb_list, completion_list, path_perc_list = df
@@ -113,15 +125,17 @@ for onto_name, df, ax in zip(ontos, dfs, axes):
                     horizontalalignment='center',
                     verticalalignment='bottom',
                     rotation='vertical',
-                    fontsize='small')
+                    fontsize='medium')
     
     ax.set_ylim(y_start,103.0)
     ax.set_xlim(-0.5,confs_list[-1]+0.5)
     ax.xaxis.set_major_locator(MultipleLocator(2))
     ax.set_title(translator(onto_name))
 
-axes[-2].set_ylabel("Associações relacionadas\nà uma referência (%)")
-axes[-1].set_xlabel("Nível de Confiança")
+#axes[-2].set_ylabel("Associações relacionadas\nà uma referência (%)")
+#axes[-1].set_xlabel("Nível de Confiança")
+axes[-2].set_ylabel("Associations related\nto a reference (Q2)")
+axes[-1].set_xlabel("Confidence Level")
 
 '''leg_patches = [plt.plot([],[], marker="s", ms=10, ls="", 
                      mec=None, color=comb_colors[all_combs[i]], 

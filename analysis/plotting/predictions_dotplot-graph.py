@@ -13,24 +13,37 @@ import matplotlib.ticker as ticker
 import numpy as np
 import math
 
+lang_id = 1
+mf_long_str = ['Função Molecular', 'Molecular Function'][lang_id]
+cc_long_str = ['Componente Celular', 'Cellular Component'][lang_id]
+bp_long_str = ['Processo Biológico', 'Biological Process'][lang_id]
+q2_description = ['Associações relacionadas\nà uma referência (Q2)', 
+                'Associations related\nto a reference (Q2)'][lang_id]
+q1_description = ['Referências presentes na predição (Q1)',
+                'References in the prediction (Q1)'][lang_id]
+conf_str = ['Nível de Confiança', 'Confidence Level'][lang_id]
+marker_type_labels = [['Predição', 'Predição de Melhor Qualidade', 'Outras Ferramentas'], 
+                    ['Prediction', 'Best Quality Prediction', 'Other Tools']][lang_id]
+
 def find_aspect(file_name):
     name = file_name.split("/")[-1].upper()
     mf_count = name.count("MF")
     cc_count = name.count("CC")
     bp_count = name.count("BP")
     if mf_count > cc_count and mf_count > bp_count:
-        return "Função Molecular"
+        return mf_long_str
     elif cc_count > bp_count:
-        return "Componente Celular"
+        return cc_long_str
     else:
-        return "Processo Biológico"
+        return bp_long_str
+
 annotations_dir = sys.argv[1]
 input_df_paths = [annotations_dir + "/" + mini_onto + "-predictions_stats.tsv" 
                 for mini_onto in ["MF", "BP", "CC"]]
 output = sys.argv[2]
 legend_offset = int(sys.argv[3])
 colors_offset = float(sys.argv[4])
-color_ratio = float(sys.argv[5])
+#color_ratio = float(sys.argv[5])
 dfs = {find_aspect(input_df): pd.read_csv(input_df,sep="\t",index_col=0) for input_df in input_df_paths}
 
 has_path_percs = []
@@ -146,8 +159,8 @@ for name, df in dfs.items():
 
     axis.grid(axis='x')
     axis.grid(axis='y')
-    axis.set_ylabel('Associações relacionadas\nà uma referência (%)')
-    axis.set_xlabel('Referências presentes na predição (%)')
+    axis.set_ylabel(q2_description)
+    axis.set_xlabel(q1_description)
 
     #box = axis.get_position()
     
@@ -177,16 +190,16 @@ ax[current_axis].xaxis.set_minor_locator(ticker.MultipleLocator(1))
 ax[current_axis].xaxis.set_major_locator(ticker.MultipleLocator(2))
 box1 = ax[current_axis].get_position()
 ax[current_axis].set_position([box.x0, box.y0-0.21, 0.5, colors_offset])
-ax[current_axis].set_xlabel('Nível de Confiança')
+ax[current_axis].set_xlabel(conf_str)
 
 #circle = mlines.Line2D([], [], color='blue', marker='*',
 #                          markersize=15, label='Blue stars')
-texts = ['Predição', 'Predição de Melhor Qualidade', 'Outras Ferramentas']
+
 markers = ['o','D','X']
 edgec = ["#DADAFF","#000000","#000000"]
 
 patches = [plt.scatter([],[], marker=markers[i], color="#DADAFF", s=100,
-            label="{:s}".format(texts[i]), edgecolors=edgec[i])  for i in range(len(texts)) ]
+            label="{:s}".format(marker_type_labels[i]), edgecolors=edgec[i])  for i in range(len(marker_type_labels)) ]
 legend = ax[current_axis].legend(handles=patches, ncol=1, facecolor="white", 
             numpoints=1, #bbox_to_anchor=(0., 1.02, 1., .102), 
             loc='lower center', bbox_to_anchor=(0.0, -legend_offset),
