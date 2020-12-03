@@ -1,6 +1,8 @@
 test_data.tar.gz
 test_data/*
+test_data
 result_data/*
+result_data
 result_data.tar.gz
 output/*
 __pycache__

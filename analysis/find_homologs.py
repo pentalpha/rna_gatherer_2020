@@ -63,6 +63,8 @@ def runCommand(cmd, print_cmd=True):
     return process
 
 def align(query, db, outdir):
+    if not os.path.exists(outdir):
+        os.mkdir(outdir)
     outfile = outdir+"/alignments.paf"
     if not os.path.exists(outfile):
         cmd = " ".join(["minimap2",
@@ -90,7 +92,10 @@ if paf_file == None:
     quit()
 
 print("Reading taxon names")
-taxid = read_name_dump(names_dump_path)
+#taxid = read_name_dump(names_dump_path)
+
+from ete3 import NCBITaxa
+ncbi = NCBITaxa()
 
 print("Reading gff annotation for ncRNA details")
 gene_details = read_annotation(gff_annotation)
@@ -135,9 +140,15 @@ print(str(len(minimap_df)) + " alignments after filtering by identity")
 minimap_df = minimap_df[minimap_df["qcovs"] >= min_cov]
 print(str(len(minimap_df)) + " alignments after filtering by coverage")'''
 
+def get_tax_name(id):
+    ids = ncbi.translate_to_names([int(id)])
+    return str(ids[0])
+
 print("Making new rows")
 minimap_df["taxid"] = minimap_df.apply(
-    lambda row: taxid[str(row['sseqid'].split("_")[-1])], axis=1)
+    lambda row: get_tax_name(str(row['sseqid'].split("_")[-1])), axis=1)
+
+minimap_df = minimap_df[minimap_df['taxid'] != "Arapaima gigas"]
 
 def get_rna_type_str(rna_name):
     tp = gene_details[rna_name]['type'].split(";")
@@ -176,13 +187,22 @@ print(str(len(minimap_df)) + " total ncRNA with homologs.")
 print("Calculating group stats for sumarry")
 def group_stats(col_name, df):  
     data = []
+    others = [0,0,0,0]
     for name, homologs in df.groupby([col_name]):
         high = len(homologs[homologs['result'] == "HIGH"])
         medium = len(homologs[homologs['result'] == "MEDIUM"])
         low = len(homologs[homologs['result'] == "LOW"])
         total = len(homologs)
-        data.append([name, low, medium, high, total])
+        if total < 10:
+            others[0] += low
+            others[1] += medium
+            others[2] += high
+            others[3] += total
+        else:
+            data.append([name, low, medium, high, total])
     data.sort(key=lambda x: x[-1], reverse=True)
+    if others[-1] > 0:
+        data.append(['Others'] + others)
     return data
 
 total_data = [len(minimap_df[minimap_df['result'] == val]) for val in ['LOW','MEDIUM','HIGH']] + [len(minimap_df)]
