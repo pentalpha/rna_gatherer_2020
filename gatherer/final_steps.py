@@ -2,8 +2,177 @@ import os
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
+from ete3 import NCBITaxa
 from gatherer.bioinfo import *
 from gatherer.util import *
+
+def make_transcriptome_file(annotation_path, genome_path, outdir):
+    print("Loading annotation")
+    annotation = pd.read_csv(annotation_path, sep="\t", header=None,
+                names = ["seqname", "source", "feature", "start", "end", "score", "strand", "frame", "attribute"])
+    print("Loading genome: " + args['genome_link'])
+    genome_dict = seqListToDict(readSeqsFromFasta(genome_path), header_to_name = header_to_id)
+    transcriptome = []
+    lncRNA_seqs = []
+    print("Creating transcriptome file")
+    for index, row in annotation.iterrows():
+        #print(fasta_header)
+        if str(row["seqname"]) in genome_dict:
+            s = genome_dict[str(row["seqname"])] #cant find key PGUA01000001.1 #TODO
+            new_header = get_gff_attributes(row["attribute"])["ID"]
+            from_seq = int(row["start"])
+            to_seq = int(row["end"])
+            begin = min(from_seq,to_seq)-1
+            up_to = max(from_seq,to_seq)
+            new_seq = s[begin:up_to]
+            if "lncRNA" in row["attribute"]:
+                lncRNA_seqs.append((new_header, new_seq))
+            transcriptome.append((new_header, new_seq))
+    print("Writing transcriptome")
+    writeFastaSeqs(transcriptome, outdir + "/transcriptome.fasta")
+    writeFastaSeqs(lncRNA_seqs, outdir + "/lncRNA.fasta")
+
+def evol_sim(taxid1, taxid2):
+    l1 = set(ncbi.get_lineage(taxid1))
+    l2 = set(ncbi.get_lineage(taxid2))
+    common_taxid = l1.intersection(l2)
+    return len(common_taxid)
+
+def read_annotation(gff_path):
+    details = {}
+    with open(gff_path,'r') as stream:
+        for line in stream:
+            cells = line.rstrip("\n").split("\t")
+            source = cells[1]
+            attrs = get_gff_attributes(cells[-1])
+            attrs['source'] = source
+            details[attrs['ID']] = attrs
+    return details
+
+def get_best_homolog(df):
+    sorted = df.sort_values(["identity","qcovs","common_taxid"],
+            ascending=[False,False,False])
+    return sorted.iloc[0]
+
+def align(query, db, outdir, threads):
+    if not os.path.exists(outdir):
+        os.mkdir(outdir)
+    outfile = outdir+"/alignments.paf"
+    if not os.path.exists(outfile):
+        cmd = " ".join(["minimap2",
+            "-x splice:hq -uf -t", str(threads),
+            db, query,
+            ">", outfile])
+        code = runCommand(cmd)
+        if code != 0:
+            print("Error: Alignment unsucessful.")
+            os.remove(outfile)
+            return None
+    return outfile
+
+def get_tax_name(id, ncbi):
+    ids = ncbi.translate_to_names([id])
+    return str(ids[0])
+
+def get_rna_type_str(rna_name, gene_details):
+    tp = gene_details[rna_name]['type'].split(";")
+    if len(tp) == 1 or tp[0] == 'Cis-reg':
+        return tp[0]
+    else:
+        return tp[1]
+
+def count_type(tp_str, gene_details):
+    count = 0
+    for ID, details in gene_details.items():
+        if get_rna_type_str(ID) == tp_str:
+            count += 1
+    return count
+
+def classify(value, th):
+    return "VALID" if value >= th else "INVALID"
+
+def contaminant_removal(args, confs, tmpDir, stepDir):
+    if "contaminant_db" in confs:
+        make_transcriptome_file(stepDir["remove_redundancies"] + "/annotation.gff", 
+                            args['genome_link'], tmpDir)
+        contaminant_db = confs["contaminant_db"]
+        query = tmpDir+"/transcriptome.fasta"
+        db = contaminant_db
+        gff_annotation = stepDir["remove_redundancies"] + "/annotation.gff"
+        outdir = tmpDir
+        ncbi = NCBITaxa()
+        paf_file = align(query, db, outdir, int(confs['threads']))
+        if paf_file == None:
+            return False
+        
+        print("Reading gff annotation for ncRNA details")
+        gene_details = read_annotation(gff_annotation)
+
+        print('Reading paf file')
+        minimap_df = pd.read_csv(paf_file, sep='\t', header=None, index_col=False,
+                    names=["qseqid","qseq_len","qstart","qend","strand",
+                        "sseqid","sseq_len","sstart","send","matchs",
+                        "block_len","quality","13th","14th","15th","16th","17th","18th"])
+        minimap_df = minimap_df.astype({"qstart": 'int32', "qend": 'int32', "qseq_len": "int32",
+                    "sstart": 'int32', "send": 'int32', "sseq_len": "int32",
+                    "quality": 'int32', "block_len": "int32", "matchs": "int32"})
+
+        print("Making new columns")
+
+        minimap_df["type"] = minimap_df.apply(
+            lambda row:  get_rna_type_str(row['qseqid'], gene_details), axis=1)
+
+        minimap_df["id"] = np.arange(len(minimap_df))
+
+        print("Calculating taxonomic closeness")
+        minimap_df["common_taxid"] = minimap_df.apply(lambda row: evol_sim(row['taxid'], 113544), axis=1)
+
+        print("Filtering...")
+        minimap_df["qcovs"] = minimap_df.apply(
+            lambda row: (row["qend"]-row["qstart"]) / row["qseq_len"], axis=1)
+        minimap_df["identity"] = minimap_df.apply(
+            lambda row: row["matchs"] / row["block_len"], axis=1)
+        print(str(minimap_df.head()))
+        print(str(len(minimap_df)) + " alignments")
+        high_th = 0.90
+        minimap_df["result"] = minimap_df.apply(
+            lambda row: classify(min(row['identity'], row['qcovs']), high_th), axis=1)
+        minimap_filtered = minimap_df[minimap_df['result'] != "INVALID"]
+
+        print("Finding best hits")
+        best_hits = set()
+        for name, hits in minimap_filtered.groupby(["qseqid"]):
+            hit = get_best_homolog(hits)
+            best_hits.add(hit['id'])
+        minimap_filtered["best_hit"] = minimap_filtered.apply(
+            lambda row: row['id'] in best_hits, axis=1)
+        contaminated_df = minimap_filtered[minimap_filtered['best_hit'] == True]
+        
+        type_counts = {rna_type: len(type_rows) 
+                        for rna_type, type_rows in contaminated_df.groupby(['type'])}
+        contaminant_list = contaminated_df['qseqid'].tolist()
+        report = "Contaminant types:\n"
+        for tp, count in type_counts.items():
+            report += "\t"+tp+"\t"+str(count)+"\n"
+        report += "Contaminant list (removed from annotation):\n"
+        for cont in contaminant_list:
+            report += "\t"+cont+"\n"
+        
+        open(tmpDir+"/report.txt",'w').write(report)
+        print(report)
+        cleaned = 0
+        with open(gff_annotation, 'r') as in_stream:
+            with open(tmpDir+"/annotation.gff",'w') as out_stream:
+                for line in in_stream:
+                    cells = line.rstrip("\n").split("\t")
+                    attrs = get_gff_attributes(cells[-1])
+                    if "ID" in attrs:
+                        if attrs['ID'] in contaminant_list:
+                            cleaned += 1
+                        else:
+                            out_stream.write(line)
+        print("Cleaned ", cleaned, " lines from annotation")
+    return True
 
 def read_ids2go(filepath):
     gos_dict = {}
@@ -128,7 +297,7 @@ def sort_by_genes(input_rows):
 
 
 def review_annotations(args, confs, tmpDir, stepDir):
-    annotation = pd.read_csv(stepDir["remove_redundancies"] + "/annotation.gff", sep="\t", header=None,
+    annotation = pd.read_csv(stepDir["contaminant_removal"] + "/annotation.gff", sep="\t", header=None,
         names = ["seqname", "source", "feature", "start", "end", "score", "strand", "frame", "attribute"])
     print("Reviewing annotation sources")
     source_list = annotation["source"].unique().tolist()
@@ -194,30 +363,8 @@ def review_annotations(args, confs, tmpDir, stepDir):
     return True
 
 def write_transcriptome(args, confs, tmpDir, stepDir):
-    print("Loading annotation")
-    annotation = pd.read_csv(stepDir["remove_redundancies"] + "/annotation.gff", sep="\t", header=None,
-                names = ["seqname", "source", "feature", "start", "end", "score", "strand", "frame", "attribute"])
-    print("Loading genome: " + args['genome_link'])
-    genome_dict = seqListToDict(readSeqsFromFasta(args['genome_link']), header_to_name = header_to_id)
-    transcriptome = []
-    lncRNA_seqs = []
-    print("Creating transcriptome file")
-    for index, row in annotation.iterrows():
-        #print(fasta_header)
-        if str(row["seqname"]) in genome_dict:
-            s = genome_dict[str(row["seqname"])] #cant find key PGUA01000001.1 #TODO
-            new_header = get_gff_attributes(row["attribute"])["ID"]
-            from_seq = int(row["start"])
-            to_seq = int(row["end"])
-            begin = min(from_seq,to_seq)-1
-            up_to = max(from_seq,to_seq)
-            new_seq = s[begin:up_to]
-            if "lncRNA" in row["attribute"]:
-                lncRNA_seqs.append((new_header, new_seq))
-            transcriptome.append((new_header, new_seq))
-    print("Writing transcriptome")
-    writeFastaSeqs(transcriptome, tmpDir + "/transcriptome.fasta")
-    writeFastaSeqs(lncRNA_seqs, tmpDir + "/lncRNA.fasta")
+    make_transcriptome_file(stepDir["remove_redundancies"] + "/annotation.gff", 
+                            args['genome_link'], tmpDir)
     return True
 
 def make_id2go(args, confs, tmpDir, stepDir):
@@ -226,7 +373,7 @@ def make_id2go(args, confs, tmpDir, stepDir):
         print("Loading ids2go associations")
         global_ids2go = read_rfam2go(id2go_path)
         print("Loading annotation")
-        annotation = pd.read_csv(stepDir["remove_redundancies"] + "/annotation.gff", sep="\t", header=None,
+        annotation = pd.read_csv(stepDir["contaminant_removal"] + "/annotation.gff", sep="\t", header=None,
             names = ["seqname", "source", "feature", "start", "end", "score", "strand", "frame", "attribute"])
 
         print("Associating IDs to GO terms")

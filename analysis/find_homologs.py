@@ -100,37 +100,6 @@ minimap_df = minimap_df.astype({"qstart": 'int32', "qend": 'int32', "qseq_len": 
             "sstart": 'int32', "send": 'int32', "sseq_len": "int32",
             "quality": 'int32', "block_len": "int32", "matchs": "int32"})
 
-print("Filtering...")
-
-minimap_df["qcovs"] = minimap_df.apply(
-    lambda row: (row["qend"]-row["qstart"]) / row["qseq_len"], axis=1)
-minimap_df["identity"] = minimap_df.apply(
-    lambda row: row["matchs"] / row["block_len"], axis=1)
-
-print(str(minimap_df.head()))
-print(str(len(minimap_df)) + " alignments")
-
-low_th = 0.80
-medium_th = 0.85
-high_th = 0.90
-def classify(value):
-    if value >= high_th:
-        return "HIGH"
-    elif value >= medium_th:
-        return "MEDIUM"
-    elif value >= low_th:
-        return "LOW"
-    else:
-        return "INVALID"
-
-minimap_df["result"] = minimap_df.apply(
-    lambda row: classify(min(row['identity'], row['qcovs'])), axis=1)
-minimap_df = minimap_df[minimap_df['result'] != "INVALID"]
-'''minimap_df = minimap_df[minimap_df["identity"] >= min_id]
-print(str(len(minimap_df)) + " alignments after filtering by identity")
-minimap_df = minimap_df[minimap_df["qcovs"] >= min_cov]
-print(str(len(minimap_df)) + " alignments after filtering by coverage")'''
-
 def get_tax_name(id):
     ids = ncbi.translate_to_names([id])
     return str(ids[0])
@@ -171,18 +140,49 @@ minimap_df["id"] = np.arange(len(minimap_df))
 print("Calculating taxonomic closeness")
 minimap_df["common_taxid"] = minimap_df.apply(lambda row: evol_sim(row['taxid'], 113544), axis=1)
 
+print("Filtering...")
+
+minimap_df["qcovs"] = minimap_df.apply(
+    lambda row: (row["qend"]-row["qstart"]) / row["qseq_len"], axis=1)
+minimap_df["identity"] = minimap_df.apply(
+    lambda row: row["matchs"] / row["block_len"], axis=1)
+
+print(str(minimap_df.head()))
+print(str(len(minimap_df)) + " alignments")
+
+low_th = 0.80
+medium_th = 0.85
+high_th = 0.90
+def classify(value):
+    if value >= high_th:
+        return "HIGH"
+    elif value >= medium_th:
+        return "MEDIUM"
+    elif value >= low_th:
+        return "LOW"
+    else:
+        return "INVALID"
+
+minimap_df["result"] = minimap_df.apply(
+    lambda row: classify(min(row['identity'], row['qcovs'])), axis=1)
+minimap_filtered = minimap_df[minimap_df['result'] != "INVALID"]
+'''minimap_df = minimap_df[minimap_df["identity"] >= min_id]
+print(str(len(minimap_df)) + " alignments after filtering by identity")
+minimap_df = minimap_df[minimap_df["qcovs"] >= min_cov]
+print(str(len(minimap_df)) + " alignments after filtering by coverage")'''
+
 print("Finding best hits")
 best_hits = set()
-for name, hits in minimap_df.groupby(["qseqid"]):
+for name, hits in minimap_filtered.groupby(["qseqid"]):
     hit = get_best_mapping(hits)
     best_hits.add(hit['id'])
 
-minimap_df["best_hit"] = minimap_df.apply(
+minimap_filtered["best_hit"] = minimap_filtered.apply(
     lambda row: row['id'] in best_hits, axis=1)
 
-minimap_df = minimap_df[minimap_df['best_hit'] == True]
+minimap_bests = minimap_filtered[minimap_filtered['best_hit'] == True]
 
-print(str(len(minimap_df)) + " total ncRNA with homologs.")
+print(str(len(minimap_bests)) + " total ncRNA with homologs.")
 
 print("Calculating group stats for sumarry")
 def group_stats(col_name, df):  
@@ -205,10 +205,10 @@ def group_stats(col_name, df):
         data.append(['Others'] + others)'''
     return data
 
-total_data = [len(minimap_df[minimap_df['result'] == val]) for val in ['LOW','MEDIUM','HIGH']] + [len(minimap_df)]
-species_data = group_stats('taxid', minimap_df)
+total_data = [len(minimap_bests[minimap_bests['result'] == val]) for val in ['LOW','MEDIUM','HIGH']] + [len(minimap_bests)]
+species_data = group_stats('taxid', minimap_bests)
 #source_data = group_stats('source', minimap_df)
-type_data = group_stats('type', minimap_df)
+type_data = group_stats('type', minimap_bests)
 
 types_conserved = []
 for i in range(len(type_data)):
@@ -329,14 +329,47 @@ with open(outdir+"/by_taxon_full_list.tsv",'w') as stream:
     stream.write(species_str)
 
 with open(outdir+"/homologs.tsv", 'w') as stream:
-    print(minimap_df)
-    cols = ['id','qseqid','sseqid','result','taxid','species','identity','qcovs']
+    print(minimap_bests)
+    cols = ['id','qseqid','sseqid','result','taxid','species','type','identity','qcovs']
     stream.write("\t".join(cols)+"\n")
-    for name, hit in minimap_df.iterrows():
+    for name, hit in minimap_bests.iterrows():
         '''try:'''
         to_write = "\t".join([str(hit[cell_name]) for cell_name in cols])+"\n"
         stream.write(to_write)
         '''except Exception:
             print(hit)
             print(Exception)'''
+
+with open(outdir+"/alignments.tsv", 'w') as stream:
+    print(minimap_df)
+    cols = ['id','qseqid','sseqid','result','taxid','species','type','identity','qcovs']
+    stream.write("\t".join(cols)+"\n")
+    for name, hit in minimap_df.iterrows():
+        '''try:'''
+        to_write = "\t".join([str(hit[cell_name]) for cell_name in cols])+"\n"
+        stream.write(to_write)
         
+# %%
+print("Getting bacterial best hits")
+bacterial_types = {}
+is_bacterial = {x: 2 in ncbi.get_lineage(x) for x in set(minimap_df['taxid'].tolist())}
+bacterial_taxids = set([x for x,y in is_bacterial.items() if y == True])
+print(len(bacterial_taxids), " bacterial species found")
+bacterial_df = minimap_bests[minimap_bests['taxid'].isin(bacterial_taxids)]
+with_bact_homolog = bacterial_df['qseqid'].tolist()
+possible_hgt_df = minimap_filtered[minimap_filtered['qseqid'].isin(with_bact_homolog)]
+for query, data in possible_hgt_df.groupby(['qseqid']):
+    bact_homos = set(data[data['taxid'].isin(bacterial_taxids)]['species'].tolist())
+    euc_homos = set(data[~data['taxid'].isin(bacterial_taxids)]['species'].tolist())
+    if len(euc_homos) > 0:
+        print(query, " is homolog to these bacteria:")
+        print("\t"+"\n\t".join(bact_homos))
+        print("and these eucariots:")
+        print("\t"+"\n\t".join(euc_homos))
+        print("\n")
+'''eucariot_df = possible_hgt_df[~possible_hgt_df['taxid'].isin(bacterial_taxids)]
+print(len(eucariot_df))
+print(eucariot_df)'''
+
+#artificial sequences (vectors and etc)
+artificial_id = 29278

@@ -147,6 +147,7 @@ if __name__ == '__main__':
                 ("get_functional_info", get_functional_info),
                 ("run_gffcompare", run_gffcompare),
                 ("remove_redundancies", remove_redundancies),
+                ("contaminant_removal", contaminant_removal),
                 ("review_annotations", review_annotations),
                 ("write_transcriptome", write_transcriptome),
                 ("make_id2go", make_id2go)]
