@@ -10,7 +10,7 @@ def make_transcriptome_file(annotation_path, genome_path, outdir):
     print("Loading annotation")
     annotation = pd.read_csv(annotation_path, sep="\t", header=None,
                 names = ["seqname", "source", "feature", "start", "end", "score", "strand", "frame", "attribute"])
-    print("Loading genome: " + args['genome_link'])
+    print("Loading genome: " + genome_path)
     genome_dict = seqListToDict(readSeqsFromFasta(genome_path), header_to_name = header_to_id)
     transcriptome = []
     lncRNA_seqs = []
@@ -50,16 +50,16 @@ def read_annotation(gff_path):
     return details
 
 def get_best_homolog(df):
-    sorted = df.sort_values(["identity","qcovs","common_taxid"],
-            ascending=[False,False,False])
+    sorted = df.sort_values(["identity","qcovs"],
+            ascending=[False,False])
     return sorted.iloc[0]
 
-def align(query, db, outdir, threads):
+def align(query, db, outdir, threads, aligner):
     if not os.path.exists(outdir):
         os.mkdir(outdir)
     outfile = outdir+"/alignments.paf"
     if not os.path.exists(outfile):
-        cmd = " ".join(["minimap2",
+        cmd = " ".join([aligner,
             "-x splice:hq -uf -t", str(threads),
             db, query,
             ">", outfile])
@@ -101,7 +101,7 @@ def contaminant_removal(args, confs, tmpDir, stepDir):
         gff_annotation = stepDir["remove_redundancies"] + "/annotation.gff"
         outdir = tmpDir
         ncbi = NCBITaxa()
-        paf_file = align(query, db, outdir, int(confs['threads']))
+        paf_file = align(query, db, outdir, int(confs['threads']), confs['minimap2'])
         if paf_file == None:
             return False
         
@@ -121,12 +121,8 @@ def contaminant_removal(args, confs, tmpDir, stepDir):
 
         minimap_df["type"] = minimap_df.apply(
             lambda row:  get_rna_type_str(row['qseqid'], gene_details), axis=1)
-
         minimap_df["id"] = np.arange(len(minimap_df))
-
-        print("Calculating taxonomic closeness")
-        minimap_df["common_taxid"] = minimap_df.apply(lambda row: evol_sim(row['taxid'], 113544), axis=1)
-
+        
         print("Filtering...")
         minimap_df["qcovs"] = minimap_df.apply(
             lambda row: (row["qend"]-row["qstart"]) / row["qseq_len"], axis=1)

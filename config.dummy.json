@@ -19,5 +19,6 @@
     "rna_dbs": {},
     "non_redundant": "",
     "go_obo": "",
-    "rfam_cm": ""
+    "rfam_cm": "",
+    "contaminant_db": "",
 }
