@@ -92,13 +92,13 @@ def classify(value, th):
     return "VALID" if value >= th else "INVALID"
 
 def contaminant_removal(args, confs, tmpDir, stepDir):
+    gff_annotation = stepDir["remove_redundancies"] + "/annotation.gff"
     if "contaminant_db" in confs:
         make_transcriptome_file(stepDir["remove_redundancies"] + "/annotation.gff", 
                             args['genome_link'], tmpDir)
         contaminant_db = confs["contaminant_db"]
         query = tmpDir+"/transcriptome.fasta"
         db = contaminant_db
-        gff_annotation = stepDir["remove_redundancies"] + "/annotation.gff"
         outdir = tmpDir
         ncbi = NCBITaxa()
         paf_file = align(query, db, outdir, int(confs['threads']), confs['minimap2'])
@@ -168,6 +168,8 @@ def contaminant_removal(args, confs, tmpDir, stepDir):
                         else:
                             out_stream.write(line)
         print("Cleaned ", cleaned, " lines from annotation")
+    else:
+        runCommand("cp " + gff_annotation + " " + tmpDir+"/annotation.gff")
     return True
 
 def read_ids2go(filepath):
@@ -359,7 +361,7 @@ def review_annotations(args, confs, tmpDir, stepDir):
     return True
 
 def write_transcriptome(args, confs, tmpDir, stepDir):
-    make_transcriptome_file(stepDir["remove_redundancies"] + "/annotation.gff", 
+    make_transcriptome_file(stepDir["contaminant_removal"] + "/annotation.gff", 
                             args['genome_link'], tmpDir)
     return True
 
