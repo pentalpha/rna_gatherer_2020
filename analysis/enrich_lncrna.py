@@ -20,7 +20,7 @@ max_pval = 0.01
 if len(sys.argv) > 5:
     max_pval = float(sys.argv[5])
 #outdir = "goatools_results"
-outdir = gene_list_dir + "/enrichment_analysis"
+outdir = gene_list_dir + "/../gigas_geneset_enrichment_analysis"
 #obo_path = "/home/pitagoras/main/data/go/go.obo"
 
 def get_first_words(p):
@@ -79,10 +79,11 @@ for tissue in tissue_names:
 
 for sex in ["female", "male"]:
     lists_to_enrich.append(("Skin-"+sex, gene_list_dir+"/Skin."+sex+"_expressed.txt"))
-    lists_to_enrich.append((sex+"-diff", gene_list_dir+"/"+sex+"_diff.txt"))
+lists_to_enrich.append(("sex_diff", gene_list_dir+"/sex_diff.txt"))
 
 lists_to_enrich.append(("housekeeping",gene_list_dir+"/housekeeping.txt"))
 lists_to_enrich.append(("growth",gene_list_dir+"/involved_in_growth.txt"))
+lists_to_enrich.append(("growth_housekeeping",gene_list_dir+"/involved_in_growth-housekeeping.txt"))
 lists_to_enrich.append(("maturation",gene_list_dir+"/involved_in_maturation.txt"))
 
 associations, associations_file = make_id2gos(outdir, predictions_file)

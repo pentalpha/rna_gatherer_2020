@@ -16,7 +16,7 @@ obo_path = sys.argv[2]
 population_file = sys.argv[3]
 #population_file = "/home/pitagoras/main/dev/on-going/rna_gatherer/test_data/lnc_list/gigas_lnc.txt"
 #outdir = "goatools_results"
-outdir = gene_list_dir + "/enrichment_analysis"
+outdir = gene_list_dir + "/../gigas_geneset_enrichment_analysis"
 graphs_dir = outdir+"/graphs"
 enrichment_dir = outdir+"/enrichments"
 tissue_names = ['Brain', 'Gonad', 'Heart', 
@@ -69,7 +69,6 @@ def read_id2gos(id2gos_file):
                 id2gos[transcript_name].add(go_name)
     return id2gos
 
-
 #gene_list_dir = "/home/pitagoras/main/dev/on-going/rna_gatherer/results/gigas_tissue_specific_lncrna/"
 #population_file = "/home/pitagoras/main/dev/on-going/rna_gatherer/test_data/lnc_list/gigas_lnc.txt"
 #predictions_file = "gigas_predictions/lnc_rna_prediction_normal.tsv"
@@ -103,7 +102,9 @@ print("Solved " + str(len(correct_id.keys())))
 associations = read_id2gos(outdir+"/associations.tsv")
 
 #%%
-def filter_enrichment(lines, min_depth, min_genes, min_fc):
+def filter_enrichment(lines, min_depth, min_genes, min_fc, small_enrichment=False):
+    if small_enrichment:
+        min_genes = 2
     try:
         return [line for line in lines 
                 if line[field_index['depth']] >= min_depth 
@@ -244,8 +245,8 @@ def write_parsed_funcs(lines_by_onto, outfile):
     write_parsed_lines(enrich_lines, outfile)
 
 print("Reading enrichment files")
-enrichment_names = (tissue_names + ['Skin-male', 'housekeeping',
-                                    'female-diff','male-diff'])
+enrichment_names = (tissue_names + ['Skin-male','Skin-female', 'housekeeping',
+                                    'sex_diff','growth_housekeeping'])
 
 raw_enrichment_lists = {name: enriched_list_from_outfile(outdir, 
                                                 enrichment_dir+"/"+name+".tsv")
@@ -260,7 +261,7 @@ for name, enrichments_by_ont in tqdm(raw_enrichment_lists.items()):
 print("Filtering enrichments")
 enrichment_lists = {name: {ont: filter_enrichment(enrichments, 
                                             min_depth, min_genes_involved,
-                                            min_fold_change)
+                                            min_fold_change, small_enrichment=(name in ['growth_housekeeping']))
                         for ont, enrichments in enrichments_by_ont.items()}  
                     for name, enrichments_by_ont in tqdm(raw_enrichment_lists.items())}
 
@@ -433,6 +434,9 @@ def get_graph(board, tissue_to_analyze, favorite_functions, n_best,
     log2fc = [indexed_lines[name][field_index['log2fc']] 
               if name in indexed_lines else 1.0 
               for name in names[:first_secondary]]
+    if len(log2fc) == 0:
+        print("Error plotting " + tissue_to_analyze + " not enough items in 'names'")
+        return None, highlight_goids
     sizes = [min_size*fc for fc in log2fc]
     indexed_sizes = {names[i]: sizes[i] for i in range(len(sizes))}
     norm_fdr = [-math.log(f,10) 
@@ -598,19 +602,19 @@ def get_graph(board, tissue_to_analyze, favorite_functions, n_best,
     return cbar, highlight_goids
 
 fig, ax1 = plt.subplots(1, figsize=(7,7))
-cbar, highlight_goids = get_graph(ax1, "Skin-male", ['pigment', 'melanosome', 'melanin'], 6,
+cbar, highlight_goids = get_graph(ax1, "sex_diff", ['pigment', 'melanosome', 'melanin', 'melanocyte'], 6,
           labels_for_all=True,
           sorting_col='log2fc',
           simplify = False)
 print(highlight_goids)
-ax1.set_title("Male Skin, Enriched Pigmentation Functions")
+ax1.set_title("Sex Differential lncRNA, Enriched Pigmentation Functions")
 fig.tight_layout()
 #fig.show()
 fig.savefig(graphs_dir+"/pigmentation_graph.png")
 
 transcripts = set()
 
-for ont, enrichments in enrichment_lists['Skin-male'].items():
+for ont, enrichments in enrichment_lists['sex_diff'].items():
     for enrich_line in enrichments:
         if enrich_line[0] in highlight_goids:
             transcripts.update(enrich_line[-1])
@@ -673,10 +677,8 @@ for field in ['n_genes', 'fdr', 'log2fc']:
     fig.savefig(graphs_dir+"/tissues_graph_"+field+".png")
 
 #%%
-
-other_analysis = ['housekeeping', 'female-diff', 'male-diff']
-cool_name = ['Housekeeping Genes', 'Female Differential Genes',
-    'Male Differential Genes']
+other_analysis = ['housekeeping', 'sex_diff', 'growth_housekeeping']
+cool_name = ['Housekeeping Genes', 'Sex Differential Genes', 'Housekeeping Growth Genes']
 onts_to_plt = ['MF', 'BP', 'CC']
 for field in ['fdr']:
     for i in range(len(other_analysis)):

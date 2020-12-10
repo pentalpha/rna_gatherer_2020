@@ -257,14 +257,14 @@ housekeeping_df = df2[df2['Classification'] == 'Housekeeping'][['Name', 'Lowest_
 housekeeping_df.sort_values(by=['Samples_With_Expression', 'Lowest_Expression_Count'], 
                             ascending = [False, False], inplace=True)
 housekeeping_df.to_csv(output_path +"/housekeeping.tsv", sep="\t")
-write_names_to_file(df2[df2['Classification'] == 'Housekeeping']['Name'].tolist(), 
+write_names_to_file(housekeeping_df['Name'].tolist(), 
                     output_path +"/housekeeping.txt")
 
 sex_diff_df = df2[df2['Diff_Sex'] == True][['Name', 'Classification', 'Specific_Tissue', 'Male_Mean_Expression', 'Female_Mean_Expression', 'Log_FC_Expression', 'Number_Of_DE_Packages']]
 sex_diff_df.sort_values(by=['Number_Of_DE_Packages', 'Log_FC_Expression'], 
                             ascending = [False, False], inplace=True)
 sex_diff_df.to_csv(output_path +"/sex_diff.tsv", sep="\t")
-write_names_to_file(df2[df2['Diff_Sex'] == True]['Name'].tolist(), 
+write_names_to_file(sex_diff_df['Name'].tolist(), 
                     output_path +"/sex_diff.txt")
 
 growth_df = df2[df2['Involved_in_Growth'] == True][['Name', 'Classification', 'Specific_Tissue', 'Growth_Functions', 'Growth_Functions_Percent']]
@@ -274,11 +274,12 @@ growth_df['Functions'] = growth_df.apply(lambda row: str(genes_annotations_in_se
 growth_df.sort_values(by=['Growth_Functions', 'Growth_Functions_Percent'], 
                             ascending = [False, False], inplace=True)
 growth_df.to_csv(output_path +"/involved_in_growth.tsv", sep="\t")
-write_names_to_file(df2[df2['Involved_in_Growth'] == True]['Name'].tolist(), 
+write_names_to_file(growth_df['Name'].tolist(), 
                     output_path +"/involved_in_growth.txt")
-
 growth_hk_df = growth_df[growth_df['Classification'] == 'Housekeeping']
 growth_hk_df.to_csv(output_path +"/involved_in_growth-housekeeping.tsv", sep="\t")
+write_names_to_file(growth_hk_df['Name'].tolist(), 
+                    output_path +"/involved_in_growth-housekeeping.txt")
 
 maturation_df = df2[df2['Involved_in_Maturation'] == True][['Name', 'Classification', 'Specific_Tissue', 'Maturation_Functions', 'Maturation_Functions_Percent', 'Diff_Sex', 'Male_Mean_Expression', 'Female_Mean_Expression']]
 maturation_df['Functions'] = maturation_df.apply(lambda row: str(genes_annotations_in_set(row['Name'], 
@@ -287,7 +288,7 @@ maturation_df['Functions'] = maturation_df.apply(lambda row: str(genes_annotatio
 maturation_df.sort_values(by=['Maturation_Functions', 'Maturation_Functions_Percent'], 
                             ascending = [False, False], inplace=True)
 maturation_df.to_csv(output_path +"/involved_in_maturation.tsv", sep="\t")
-write_names_to_file(df2[df2['Involved_in_Maturation'] == True]['Name'].tolist(), 
+write_names_to_file(maturation_df['Name'].tolist(), 
                     output_path +"/involved_in_maturation.txt")
 #%%
 

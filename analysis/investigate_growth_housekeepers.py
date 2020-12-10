@@ -7,20 +7,27 @@ Created on Thu Nov 19 09:04:37 2020
 """
 import pandas as pd
 import numpy as np
+import os
 
-df_path = "/home/pitagoras/main/dev/on-going/rna_gatherer/results/gigas_tissue_specific_lncrna/tissue_analysis.tsv"
-associations_name = "/home/pitagoras/main/dev/on-going/rna_gatherer/results/gigas_tissue_specific_lncrna/enrichment_analysis/associations.tsv"
-correlations_name = "/home/pitagoras/main/experiments/enrich_tissues/SPR.tsv"
-growth_genes_path = "/home/pitagoras/main/dev/on-going/rna_gatherer/data/function_sets/growth_functions.txt"
+gatherer_dir = os.path.abspath(os.path.dirname(os.path.realpath(__file__))+"/../")
+print("RNA Gatherer dir = ", gatherer_dir)
+df_path = gatherer_dir + "/result_data/gigas_expression_analysis/tissue_analysis.tsv"
 
-coding_ass_path = "/home/pitagoras/main/dev/on-going/rna_gatherer/test_data/annotation/identified_annotated_coding_mRNA.id2go.tsv"
-coding_realnames_path = "/home/pitagoras/main/experiments/danilo_annotation/res.final.filter4.tsv"
-analysis_dir = '/home/pitagoras/main/dev/on-going/rna_gatherer/results/gigas_tissue_specific_lncrna/'
+associations_name = gatherer_dir + "/result_data/gigas_geneset_enrichment_analysis/associations.tsv"
+correlations_name = gatherer_dir + "/result_data/gigas_annotation/gigas-lnc_coding-correlations-spearman.tsv"
+growth_genes_path = gatherer_dir + "/data/function_sets/growth_functions.txt"
+
+coding_ass_path = gatherer_dir + "/test_data/annotation/identified_annotated_coding_mRNA.id2go.tsv"
+coding_realnames_path = gatherer_dir + "/test_data/martins_annotation/gene_names.tsv"
+
+analysis_dir = gatherer_dir + '/result_data/gigas_expression_analysis'
 
 df = pd.read_csv(df_path,sep="\t")
-df = df[df['Classification'] == "Expressed in All"]
+df = df[df['Classification'] == "Housekeeping"]
 df = df[df['Involved_in_Growth'] == True]
 gene_names = df['Name'].tolist()
+
+print(len(gene_names), " housekeeping lncRNA")
 
 growth_funcs = {}
 
@@ -28,6 +35,8 @@ with open(growth_genes_path, 'r') as stream:
     for line in stream:
         name, description = line.rstrip('\n').split("\t")
         growth_funcs[name] = description
+
+print(len(growth_funcs.keys()), 'growth terms')
 
 growth_coding_genes = {}
 with open(coding_ass_path,'r') as stream:
@@ -38,6 +47,8 @@ with open(coding_ass_path,'r') as stream:
                 growth_coding_genes[name] = []
             growth_coding_genes[name].append(go)
 
+print(len(growth_coding_genes.keys()), 'growth coding genes')
+
 associations = {}
 with open(associations_name,'r') as stream:
     for line in stream:
@@ -47,10 +58,11 @@ with open(associations_name,'r') as stream:
             new_funcs = []
             for go in gos:
                 if go in growth_funcs:
-                    new_funcs.append(go)
+                    new_funcs.append((go, growth_funcs[go]))
             if len(new_funcs) > 0:
                 associations[name] = new_funcs
-            
+
+print(len(associations.keys()), 'growth lncrna')            
             
 correlations = {name: [] for name in associations.keys()}
 with open(correlations_name, 'r') as stream:
@@ -77,7 +89,7 @@ with open(coding_realnames_path, 'r') as stream:
 
 #%%
 
-corr_output = "\t".join(['lncRNA gene', 'correlated proteins', 'unique protein annotations', 'growth functions', 'protein descriptions'])+"\n"
+corr_output = "\t".join(['lncRNA transcript', 'Correlated Growth Proteins', 'Unique Protein Annotations', 'lncRNA Growth functions', 'Protein Descriptions'])+"\n"
 for lnc_name in associations:
     protein_transcripts = len(correlations[lnc_name])
     correlated = set([real_names[x]+": "+coding_descriptions[x].replace(' [Scleropages formosus]', '')
