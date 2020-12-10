@@ -1,0 +1,476 @@
+> args = commandArgs(trailingOnly = F)
+> 
+> localDir <- args[length(args)-3]
+> 
+> localDir
+[1] "/home/pitagoras/.r-peridot-files/scripts/DESeq2.AnalysisModule"
+> 
+> inputFilesDir <- args[length(args)-2]
+> 
+> inputFilesDir
+[1] "/home/pitagoras/.r-peridot-files/results"
+> 
+> outputFilesDir <- args[length(args)-1]
+> 
+> outputFilesDir
+[1] "/home/pitagoras/.r-peridot-files/scripts/DESeq2.AnalysisModule/results"
+> 
+> notFirstRun <- args[length(args)]
+> 
+> notFirstRun
+[1] "0"
+> 
+> localDir
+[1] "/home/pitagoras/.r-peridot-files/scripts/DESeq2.AnalysisModule"
+> setwd(localDir)
+> options(bitmapType='cairo')
+> #Get file config
+> FileConfigPath = paste(localDir, "config.txt", sep = "/")
+> 
+> #Read file config
+> FileConfig = read.table(FileConfigPath, header = TRUE, row.names = 1, sep = "|")
+> 
+> if(notFirstRun == "0"){
++   peridotConditions = read.table(paste(inputFilesDir, "condition-input.tsv", sep = "/"), header=TRUE, row.names=1)
++   peridotConditions
++ 
++   #Read Path file
++   inputTableFile = paste(inputFilesDir, "rna-seq-input.tsv", sep = "/")
++ 
++   #Read file
++   peridotCountTable = read.table(inputTableFile, header=TRUE, row.names=1 )
++ 
++   #Ignore samples with "not-use" indicated
++   #first, remove they from the conditions table
++   peridotConditions <- subset(peridotConditions, condition != "not-use")
++   #then, remove from the counts table
++   for(i in colnames(peridotCountTable)){
++     iContainsNotUse = length(grep("not.use", as.name(i))) > 0
++     if(iContainsNotUse){
++       #erases the column
++       peridotCountTable[, i] = NULL
++     }
++   }
++   #Finally, drop unused levels (not-use levels)
++   peridotConditions = droplevels(peridotConditions)
++   peridotConditions
++ 
++   countData <- data.matrix(peridotCountTable)
++ 
++   head(countData)
++ 
++   condFac <- as.factor(peridotConditions$condition)
++ 
++   condFac
++ 
++   library(DESeq2)
++ 
++   dds = DESeqDataSetFromMatrix(countData = countData, DataFrame(condFac), ~condFac)
++ 
++   dds
++ 
++   dds <- DESeq(dds)
++ 
++   res <- results(dds)
++ 
++   res
++ }else{
++   load(file = "DESeq2.RData")
++ }
+Loading required package: S4Vectors
+Loading required package: stats4
+Loading required package: BiocGenerics
+Loading required package: parallel
+
+Attaching package: ‘BiocGenerics’
+
+The following objects are masked from ‘package:parallel’:
+
+    clusterApply, clusterApplyLB, clusterCall, clusterEvalQ,
+    clusterExport, clusterMap, parApply, parCapply, parLapply,
+    parLapplyLB, parRapply, parSapply, parSapplyLB
+
+The following objects are masked from ‘package:stats’:
+
+    IQR, mad, xtabs
+
+The following objects are masked from ‘package:base’:
+
+    anyDuplicated, append, as.data.frame, as.vector, cbind, colnames,
+    do.call, duplicated, eval, evalq, Filter, Find, get, grep, grepl,
+    intersect, is.unsorted, lapply, lengths, Map, mapply, match, mget,
+    order, paste, pmax, pmax.int, pmin, pmin.int, Position, rank,
+    rbind, Reduce, rownames, sapply, setdiff, sort, table, tapply,
+    union, unique, unlist, unsplit
+
+Loading required package: IRanges
+Loading required package: GenomicRanges
+Loading required package: GenomeInfoDb
+Loading required package: SummarizedExperiment
+Loading required package: Biobase
+Welcome to Bioconductor
+
+    Vignettes contain introductory material; view with
+    'browseVignettes()'. To cite Bioconductor, see
+    'citation("Biobase")', and for packages 'citation("pkgname")'.
+
+Loading required package: Rcpp
+Loading required package: RcppArmadillo
+estimating size factors
+estimating dispersions
+gene-wise dispersion estimates
+mean-dispersion relationship
+final dispersion estimates
+fitting model and testing
+-- replacing outliers and refitting for 12675 genes
+-- DESeq argument 'minReplicatesForReplace' = 7 
+-- original counts are preserved in counts(dds)
+estimating dispersions
+fitting model and testing
+log2 fold change (MAP): condFac Male vs Female 
+Wald test p-value: condFac Male vs Female 
+DataFrame with 58602 rows and 6 columns
+                                 baseMean log2FoldChange     lfcSE       stat
+                                <numeric>      <numeric> <numeric>  <numeric>
+Transcript_100003.0             0.8784410       1.353139  1.733260  0.7806902
+Transcript_100004.0             5.5135418      -0.347479  1.309674 -0.2653171
+Transcript_100005.0             0.6204487       1.756910  1.747018  1.0056626
+Transcript_100011.0             0.0000000       0.000000  0.000000  0.0000000
+Transcript_100013.0             0.1899249       1.535899  1.807516  0.8497290
+...                                   ...            ...       ...        ...
+UFQX01001481.1_WT1-AS_7_0      0.06177407     -1.3229947 1.8136122 -0.7294805
+UFQX01002149.1_KCNQ1OT1_1_0    3.67443738      0.2269338 1.2181291  0.1862970
+UFQX01004564.1_TTC28-AS1_2_0   0.30996376      0.6384207 1.8063484  0.3534317
+UFQX01005169.1_Mico1_0         0.63988943      0.5208821 1.5922940  0.3271268
+UFQX01005174.1_HOXA11-AS1_6_0 32.68084955      0.8883498 0.9207087  0.9648544
+                                 pvalue      padj
+                              <numeric> <numeric>
+Transcript_100003.0           0.4349847 0.9999339
+Transcript_100004.0           0.7907652 0.9999339
+Transcript_100005.0           0.3145779 0.9999339
+Transcript_100011.0           1.0000000        NA
+Transcript_100013.0           0.3954757 0.9999339
+...                                 ...       ...
+UFQX01001481.1_WT1-AS_7_0     0.4657078 0.9999339
+UFQX01002149.1_KCNQ1OT1_1_0   0.8522118 0.9999339
+UFQX01004564.1_TTC28-AS1_2_0  0.7237649 0.9999339
+UFQX01005169.1_Mico1_0        0.7435720 0.9999339
+UFQX01005174.1_HOXA11-AS1_6_0 0.3346178 0.9999339
+Warning messages:
+1: replacing previous import by ‘ggplot2::unit’ when loading ‘Hmisc’ 
+2: replacing previous import by ‘ggplot2::arrow’ when loading ‘Hmisc’ 
+3: replacing previous import by ‘scales::alpha’ when loading ‘Hmisc’ 
+> 
+> adaptativeRowMeans <- function(columns){
++   if(is.null(dim(columns))){
++     return(columns)
++   }else{
++     return(rowMeans(columns))
++   }
++ }
+> 
+> if(notFirstRun == "0"){
++   resFinal <- data.frame(baseMean = res$baseMean, row.names =  rownames(res))
++ 
++   baseMeanPerLvl <- sapply( levels(condFac), function(lvl) adaptativeRowMeans( counts(dds,normalized=TRUE)[,condFac == lvl] ) )
++ 
++   colnames(baseMeanPerLvl) <- c("baseMeanB", "baseMeanA")
++ 
++   resFinal$baseMeanA <- baseMeanPerLvl[,1]
++ 
++   resFinal$baseMeanB <- baseMeanPerLvl[,2]
++ 
++   resFinal$foldChange <- 2^res$log2FoldChange
++ 
++   resFinal$log2FoldChange <- res$log2FoldChange
++ 
++   resFinal$pvalue <- res$pvalue
++ 
++   resFinal$padj <- res$padj
++ }
+> 
+> head(resFinal)
+                     baseMean baseMeanA baseMeanB foldChange log2FoldChange
+Transcript_100003.0 0.8784410 0.1923445 1.5645375  2.5546732     1.35313873
+Transcript_100004.0 5.5135418 5.9844598 5.0426239  0.7859563    -0.34747897
+Transcript_100005.0 0.6204487 1.4523665 1.1887431  3.3797354     1.75691031
+Transcript_100011.0 0.0000000 0.8236542 0.0000000  1.0000000     0.00000000
+Transcript_100013.0 0.1899249 0.0000000 0.3798498  2.8996897     1.53589852
+Transcript_100016.0 1.2988736 1.0484004 1.5493469  0.9715312    -0.04166772
+                       pvalue      padj
+Transcript_100003.0 0.4349847 0.9999339
+Transcript_100004.0 0.7907652 0.9999339
+Transcript_100005.0 0.3145779 0.9999339
+Transcript_100011.0 1.0000000        NA
+Transcript_100013.0 0.3954757 0.9999339
+Transcript_100016.0 0.9769830 0.9999339
+> 
+> #Histogram PValue and FDR Function
+> peridotPlotHist <- function(res){
++   p1 <- with(resFinal, hist(pvalue, breaks=100, plot = F))
++   p2 <- with(resFinal, hist(padj, breaks=100, plot = F))
++   plot( p1, col="skyblue", main = "R-Peridot: Histogram", xlab = "Values")  # first histogram
++   plot( p2, col=scales::alpha('red',.5), add=T)
++   legend('topleft', c("PValue", "FDR(padjust)"), fill = c("skyblue", scales::alpha('red',.5)), bty = 'o', border = NA, cex = 0.8, bg = "white")
++ }
+> 
+> #Colors and Texts for R-Peridot Plots
+> xlim = ylim = c(-1, 1) * quantile(abs(resFinal$log2FoldChange[is.finite(resFinal$log2FoldChange)]), 
++                            probs = 0.99) * 1.1
+> 
+> colFP = ifelse(resFinal$padj >= FileConfig$fdr & resFinal$pvalue >= FileConfig$pValue, "gray32", "red3")
+> 
+> colF = ifelse(resFinal$padj >= FileConfig$fdr, "gray32", "red3")
+> 
+> colP = ifelse(resFinal$pvalue >= FileConfig$pValue, "gray32", "red3")
+> 
+> col = "gray32"
+> 
+> textLegFP = c(paste("FDR(padj) < ", FileConfig$fdr, " & pvalue < ", FileConfig$pValue, sep = ""))
+> 
+> textLegP = c(paste("pvalue < ", FileConfig$pValue, sep = ""))
+> 
+> textLegF = c(paste("FDR(padj) < ", FileConfig$fdr, sep = ""))
+> 
+> textLine = paste("log2FoldChange = mod(", round(log2(FileConfig$foldChange), 3), ")", sep = "")
+> 
+> pardefault = par(no.readonly = T)
+> 
+> #Set Legend outside of plot
+> peridotPar <- function(){
++   par(fig = c(0, 1, 0, 1), oma = c(0, 0, 0, 0), mar = c(0, 0, 0, 0), new = TRUE)
++   
++   plot(0, 0, type = "n", bty = "n", xaxt = "n", yaxt = "n")
++ }
+> 
+> #MA Plot Function
+> peridotPlotMA <- function(res, config){
++   main = "R-Peridot: MA Plot"
++   
++   par(oma = c(3,1,1,1))
++   
++   if(FileConfig$foldChange != 0 & FileConfig$pValue != 0 & FileConfig$fdr != 0){
++     with(res, plot(log(baseMean), pmax(ylim[1], pmin(ylim[2], res$log2FoldChange)), 
++                    pch = ifelse(res$log2FoldChange < ylim[1], 6, ifelse(res$log2FoldChange > ylim[2], 2, 20)), 
++                    main = main, ylab = expression(log[2] ~ Fold ~ Change), ylim = ylim, col = colFP))
++     abline(h=c(log2(FileConfig$foldChange), log2(FileConfig$foldChange)*(-1)), col="blue")
++     
++     peridotPar()
++     
++     legend('bottomright', c(textLegFP, textLine), col = c("red", "blue"), bty = 'n', pch = c(20, NA), 
++            lty = c(NA, 1), bg = "white", cex = 0.8, xpd = T, inset = c(0,0.04))
++   }else if(FileConfig$foldChange != 0 & FileConfig$pValue != 0){
++     with(res, plot(log(baseMean), pmax(ylim[1], pmin(ylim[2], res$log2FoldChange)), 
++                    pch = ifelse(res$log2FoldChange < ylim[1], 6, ifelse(res$log2FoldChange > ylim[2], 2, 20)), 
++                    main = main, ylab = expression(log[2] ~ Fold ~ Change), ylim = ylim, col = colP))
++     
++     abline(h=c(log2(FileConfig$foldChange), log2(FileConfig$foldChange)*(-1)), col="blue")
++     
++     peridotPar()
++     
++     legend('bottom', c(textLegP, textLine), col = c("red", "blue"), bty = 'n', pch = c(20, NA), 
++            lty = c(NA, 1), bg = "white", cex = 0.8, xpd = T, inset = c(0,0.04))
++   }else if(FileConfig$foldChange != 0 & FileConfig$fdr != 0){
++     with(res, plot(log(baseMean), pmax(ylim[1], pmin(ylim[2], res$log2FoldChange)), 
++                    pch = ifelse(res$log2FoldChange < ylim[1], 6, ifelse(res$log2FoldChange > ylim[2], 2, 20)), 
++                    main = main, ylab = expression(log[2] ~ Fold ~ Change), ylim = ylim, col = colF))
++     
++     abline(h=c(log2(FileConfig$foldChange), log2(FileConfig$foldChange)*(-1)), col="blue")
++     
++     peridotPar()
++     
++     legend('bottom', c(textLegF, textLine), col = c("red", "blue"), bty = 'n', pch = c(20, NA), 
++            lty = c(NA, 1), bg = "white", cex = 0.8, xpd = T, inset = c(0,0.04))
++   }else if(FileConfig$pValue != 0 & FileConfig$fdr != 0){
++     with(res, plot(log(baseMean), pmax(ylim[1], pmin(ylim[2], res$log2FoldChange)), 
++                    pch = ifelse(res$log2FoldChange < ylim[1], 6, ifelse(res$log2FoldChange > ylim[2], 2, 20)), 
++                    main = main, ylab = expression(log[2] ~ Fold ~ Change), ylim = ylim, col = colFP))
++     
++     peridotPar()
++     
++     legend('bottom', textLegFP, col = "red", bty = 'n', pch = 20, 
++            bg = "white", cex = 0.8, xpd = T, inset = c(0,0.04))
++   }else if(FileConfig$foldChange != 0){
++     with(res, plot(log(baseMean), pmax(ylim[1], pmin(ylim[2], res$log2FoldChange)), 
++                    pch = ifelse(res$log2FoldChange < ylim[1], 6, ifelse(res$log2FoldChange > ylim[2], 2, 20)), 
++                    main = main, ylab = expression(log[2] ~ Fold ~ Change), ylim = ylim, col = col))
++     
++     abline(h=c(log2(FileConfig$foldChange), log2(FileConfig$foldChange)*(-1)), col="blue")
++     
++     peridotPar()
++     
++     legend('bottom', textLine, col = "blue", bty = 'n', lty = 1, 
++            bg = "white", cex = 0.8, xpd = T, inset = c(0,0.04))
++   }else if(FileConfig$pValue != 0){
++     with(res, plot(log(baseMean), pmax(ylim[1], pmin(ylim[2], res$log2FoldChange)), 
++                    pch = ifelse(res$log2FoldChange < ylim[1], 6, ifelse(res$log2FoldChange > ylim[2], 2, 20)), 
++                    main = main, ylab = expression(log[2] ~ Fold ~ Change), ylim = ylim, col = colP))
++     
++     peridotPar()
++     
++     legend('bottom', textLegP, col = "red", bty = 'n', pch = 20, 
++            bg = "white", cex = 0.8, xpd = T, inset = c(0,0.04))
++   }else if(FileConfig$fdr != 0){
++     with(res, plot(log(baseMean), pmax(ylim[1], pmin(ylim[2], res$log2FoldChange)), 
++                    pch = ifelse(res$log2FoldChange < ylim[1], 6, ifelse(res$log2FoldChange > ylim[2], 2, 20)), 
++                    main = main, ylab = expression(log[2] ~ Fold ~ Change), ylim = ylim, col = colF))
++     peridotPar()
++     
++     legend('bottom', textLegF, col = "red", bty = 'n', pch = 20, 
++            bg = "white", cex = 0.8, xpd = T, inset = c(0,0.04))
++   }
++   par(pardefault)
++ }
+> 
+> #Volcano Plot Function
+> peridotPlotVolcano <- function(res, config){
++   main = "R-Peridot: Volcano Plot"
++   
++   par(oma = c(3,1,1,1))
++   
++   if(FileConfig$foldChange != 0 & FileConfig$pValue != 0 & FileConfig$fdr != 0){
++     with(res, plot(pmax(xlim[1], pmin(xlim[2], res$log2FoldChange)), -log10(pvalue), 
++                    pch = ifelse(res$log2FoldChange < xlim[1], 6, ifelse(res$log2FoldChange > xlim[2], 2, 20)), 
++                    main = main, xlab = expression(log[2] ~ Fold ~ Change), xlim = xlim, col = colFP))
++     
++     abline(v=c(log2(FileConfig$foldChange), log2(FileConfig$foldChange)*(-1)), col="blue")
++     
++     peridotPar()
++     
++     legend('bottomright', c(textLegFP, textLine), col = c("red", "blue"), bty = 'n', pch = c(20, NA), 
++            lty = c(NA, 1), bg = "white", cex = 0.8, xpd = T, inset = c(0,0.04))
++   }else if(FileConfig$foldChange != 0 & FileConfig$pValue != 0){
++     with(res, plot(pmax(xlim[1], pmin(xlim[2], res$log2FoldChange)), -log10(pvalue), 
++                    pch = ifelse(res$log2FoldChange < xlim[1], 6, ifelse(res$log2FoldChange > xlim[2], 2, 20)), 
++                    main = main, xlab = expression(log[2] ~ Fold ~ Change), xlim = xlim, col = colP))
++     
++     abline(v=c(log2(FileConfig$foldChange), log2(FileConfig$foldChange)*(-1)), col="blue")
++     
++     peridotPar()
++     
++     legend('bottomright', c(textLegP, textLine), col = c("red", "blue"), bty = 'n', pch = c(20, NA), 
++            lty = c(NA, 1), bg = "white", cex = 0.8, xpd = T, inset = c(0,0.04))
++   }else if(FileConfig$foldChange != 0 & FileConfig$fdr != 0){
++     with(res, plot(pmax(xlim[1], pmin(xlim[2], res$log2FoldChange)), -log10(pvalue), 
++                    pch = ifelse(res$log2FoldChange < xlim[1], 6, ifelse(res$log2FoldChange > xlim[2], 2, 20)), 
++                    main = main, xlab = expression(log[2] ~ Fold ~ Change), xlim = xlim, col = colF))
++     
++     abline(v=c(log2(FileConfig$foldChange), log2(FileConfig$foldChange)*(-1)), col="blue")
++     
++     peridotPar()
++     
++     legend('bottomright', c(textLegF, textLine), col = c("red", "blue"), bty = 'n', pch = c(20, NA), 
++            lty = c(NA, 1), bg = "white", cex = 0.8, xpd = T, inset = c(0,0.04))
++   }else if(FileConfig$pValue != 0 & FileConfig$fdr != 0){
++     with(res, plot(pmax(xlim[1], pmin(xlim[2], res$log2FoldChange)), -log10(pvalue), 
++                    pch = ifelse(res$log2FoldChange < xlim[1], 6, ifelse(res$log2FoldChange > xlim[2], 2, 20)), 
++                    main = main, xlab = expression(log[2] ~ Fold ~ Change), xlim = xlim, col = colFP))
++     peridotPar()
++     
++     legend('bottomright', textLegFP, col = "red", bty = 'n', pch = 20, 
++            bg = "white", cex = 0.8, xpd = T, inset = c(0,0.04))
++   }else if(FileConfig$foldChange != 0){
++     with(res, plot(pmax(xlim[1], pmin(xlim[2], res$log2FoldChange)), -log10(pvalue), 
++                    pch = ifelse(res$log2FoldChange < xlim[1], 6, ifelse(res$log2FoldChange > xlim[2], 2, 20)), 
++                    main = main, xlab = expression(log[2] ~ Fold ~ Change), xlim = xlim, col = col))
++     
++     abline(v=c(log2(FileConfig$foldChange), log2(FileConfig$foldChange)*(-1)), col="blue")
++     
++     peridotPar()
++     
++     legend('bottomright', textLine, col = "blue", bty = 'n', lty = 1, 
++            bg = "white", cex = 0.8, xpd = T, inset = c(0,0.04))
++   }else if(FileConfig$pValue != 0){
++     with(res, plot(pmax(xlim[1], pmin(xlim[2], res$log2FoldChange)), -log10(pvalue), 
++                    pch = ifelse(res$log2FoldChange < xlim[1], 6, ifelse(res$log2FoldChange > xlim[2], 2, 20)), 
++                    main = main, xlab = expression(log[2] ~ Fold ~ Change), xlim = xlim, col = colP))
++     peridotPar()
++     
++     legend('bottomright', textLegP, col = "red", bty = 'n', pch = 20, 
++            bg = "white", cex = 0.8, xpd = T, inset = c(0,0.04))
++   }else if(FileConfig$fdr != 0){
++     with(res, plot(pmax(xlim[1], pmin(xlim[2], res$log2FoldChange)), -log10(pvalue), 
++                    pch = ifelse(res$log2FoldChange < xlim[1], 6, ifelse(res$log2FoldChange > xlim[2], 2, 20)), 
++                    main = main, xlab = expression(log[2] ~ Fold ~ Change), xlim = xlim, col = colF))
++     peridotPar()
++     
++     legend('bottomright', textLegF, col = "red", bty = 'n', pch = 20, 
++            bg = "white", cex = 0.8, xpd = T, inset = c(0,0.04))
++   }
++   par(pardefault)
++ }
+> 
+> png(filename = paste(outputFilesDir, "2-histogram.png", sep = "/"), width=600, height=600)
+> 
+> peridotPlotHist(resFinal)
+> 
+> dev.off()
+pdf 
+  2 
+> 
+> png(filename = paste(outputFilesDir, "3-MAPlot.png", sep = "/"), width=600, height=600)
+> 
+> peridotPlotMA(resFinal, FileConfig)
+> 
+> dev.off()
+pdf 
+  2 
+> 
+> png(filename = paste(outputFilesDir, "4-volcanoPlot.png", sep = "/"), width=600, height=600)
+> 
+> peridotPlotVolcano(resFinal, FileConfig)
+> 
+> dev.off()
+pdf 
+  2 
+> 
+> #Subset com PValue < FileConfig$pValue, Fold Change < FileConfig$log2FoldChange e FDR < FileConfig$fdr
+> if(FileConfig$foldChange != 0 & FileConfig$pValue != 0 & FileConfig$fdr != 0){
++   resSig = subset(resFinal, c(abs(log2FoldChange) > log2(FileConfig$foldChange) & pvalue <FileConfig$pValue & padj < FileConfig$fdr))
++ }else if(FileConfig$foldChange != 0 & FileConfig$pValue != 0){
++   resSig = subset(resFinal, c(abs(log2FoldChange) > log2(FileConfig$foldChange) & pvalue <FileConfig$pValue))
++ }else if(FileConfig$foldChange != 0 & FileConfig$fdr != 0){
++   resSig = subset(resFinal, c(abs(log2FoldChange) > log2(FileConfig$foldChange) & padj < FileConfig$fdr))
++ }else if(FileConfig$pValue != 0 & FileConfig$fdr != 0){
++   resSig = subset(resFinal, c(pvalue <FileConfig$pValue & padj < FileConfig$fdr))
++ }else if(FileConfig$foldChange != 0){
++   resSig = subset(resFinal, abs(log2FoldChange) > log2(FileConfig$foldChange))
++ }else if(FileConfig$pValue != 0){
++   resSig = subset(resFinal, pvalue <FileConfig$pValue)
++ }else if(FileConfig$fdr != 0){
++   resSig = subset(resFinal, padj < FileConfig$fdr)
++ }else{
++   resSig = resFinal
++ }
+> 
+> ##Remove NA
+> resSig = na.omit(resSig)
+> 
+> if(FileConfig$tops > 0){
++   topRes = head(resSig, n = FileConfig$tops)
++ 
++   write.table(topRes, paste(outputFilesDir, "/TopResults.tsv", sep = ""), sep = "\t")
++ }
+> 
+> ##Create files csv
+> 
+> write.table(resSig, paste(outputFilesDir, "/1-res.tsv", sep = ""), sep = "\t")
+> 
+> 
+> pdf(file = paste(outputFilesDir, "5-plots.pdf", sep = "/"))
+> 
+> #Histogram
+> peridotPlotHist(resFinal)
+> 
+> #MA Plot
+> peridotPlotMA(resFinal, FileConfig)
+> 
+> #Volcano Plot
+> peridotPlotVolcano(resFinal, FileConfig)
+> 
+> dev.off()
+pdf 
+  2 
+> 
+> save(resFinal, file = "DESeq2.RData")
+> 
