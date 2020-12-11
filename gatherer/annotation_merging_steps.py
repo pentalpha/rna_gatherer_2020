@@ -61,6 +61,8 @@ def run_gffcompare(args, confs, tmpDir, stepDir):
     if os.path.exists(ref):
         gffs = [os.path.abspath(ref)] + gffs
 
+    gffs = remove_redundant_names(gffs, tmpDir)
+
     all_lines = []
     for gff in gffs:
         with open(gff,'r') as stream:
