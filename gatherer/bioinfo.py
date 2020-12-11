@@ -580,6 +580,39 @@ def get_ids_from_annotation(annotation):
     annotation.apply(lambda row: update_attribute(row),axis=1)
     return ids
 
+def join_gffs_in_one(inputs, output):
+    ids_used = set()
+    wrote = False
+    with open(output, 'w') as out_stream:
+        for input_file in inputs:
+            if os.path.exists(input_file):
+                wrote = True
+                with open(input_file, 'r') as in_stream:
+                    for line in in_stream:
+                        cells = line.rstrip("\n").split("\t")
+                        attrs = get_gff_attributes(cells[-1])
+                        id_used = attrs['ID']
+                        i = 0
+                        while id_used in ids_used:
+                            print("The ID", id_used, "has already been used.")
+                            parts = id_used.split('.')
+                            if len(parts) == 1:
+                                parts = [parts[0], ""]
+                            parts[-1] = str(i)
+                            id_used = ".".join(parts)
+                            i += 1
+                        if attrs['ID'] != id_used:
+                            print("Using", id_used, "instead.")
+                            attrs['ID'] = id_used
+                            cells[-1] = get_gff_attributes_str(attrs)
+                        new_line = "\t".join(cells)+"\n"
+                        out_stream.write(new_line)
+                        ids_used.adD(id_used)
+    if not wrote and os.path.exists(output):
+        os.remove(output)
+        return False
+    return wrote
+
 def short_ontology_name(onto_type):
     onto_type = onto_type.replace("biological_process","BP")
     onto_type = onto_type.replace("molecular_function","MF")

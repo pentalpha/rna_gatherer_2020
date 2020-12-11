@@ -21,7 +21,7 @@ def get_info(args, confs, tmpDir, stepDir):
     aln_gff_path = stepDir["ncrna_alignment_parsing"] + "/alignment_annotation.gff"
 
     all_gff_path = tmpDir + "/all_references.gff"
-    wrote = join_files_in_one([map_gff_path, ref_gff_path, aln_gff_path], 
+    wrote = join_gffs_in_one([map_gff_path, ref_gff_path, aln_gff_path], 
                                 all_gff_path)
 
     if wrote:

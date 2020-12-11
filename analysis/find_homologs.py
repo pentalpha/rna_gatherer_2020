@@ -5,11 +5,13 @@ import pandas as pd
 import numpy as np
 from ete3 import NCBITaxa
 
-query = sys.argv[1]
-db = sys.argv[2]
-gff_annotation = sys.argv[3]
-outdir = sys.argv[4]
-threads = int(sys.argv[5])
+gatherer_dir = os.path.abspath(os.path.dirname(os.path.realpath(__file__))+"/../")
+print("RNA Gatherer dir = ", gatherer_dir)
+query = gatherer_dir + "/result_data/gigas_annotation/transcriptome.fasta"
+db = sys.argv[1]
+gff_annotation = gatherer_dir + "/result_data/gigas_annotation/annotation.gff"
+outdir = gatherer_dir + "/result_data/gigas_homolog_ncRNA/"
+threads = 3
 
 ncbi = NCBITaxa()
 
@@ -51,6 +53,8 @@ def read_annotation(gff_path):
             source = cells[1]
             attrs = get_gff_attributes(cells[-1])
             attrs['source'] = source
+            if attrs['ID'] in details:
+                print("Error! repeated rna ID:", attrs['ID'])
             details[attrs['ID']] = attrs
     return details
 
@@ -91,6 +95,32 @@ print("Reading taxon names")
 print("Reading gff annotation for ncRNA details")
 gene_details = read_annotation(gff_annotation)
 
+def get_rna_type_str(rna_name):
+    tp = gene_details[rna_name]['type'].split(";")
+    if len(tp) == 1 or tp[0] == 'Cis-reg':
+        return tp[0]
+    else:
+        return tp[1]
+
+types_annotated = set(get_rna_type_str(ID) for ID in gene_details.keys())
+def count_type(tp_str):
+    count = 0
+    for ID, details in gene_details.items():
+        if get_rna_type_str(ID) == tp_str:
+            count += 1
+    return count
+type_size = {tp_str: count_type(tp_str) for tp_str in types_annotated}
+'''type_size = {}
+for ID, details in gene_details.items():
+    tp = details['type']
+    if not tp in type_size:
+        type_size[tp] = 0
+    type_size[tp] += 1'''
+tp_list = [tp + ": " + str(count) for tp, count in type_size.items()]
+tp_list.sort()
+print("\n".join(tp_list))
+
+
 print('Reading paf file')
 minimap_df = pd.read_csv(paf_file, sep='\t', header=None, index_col=False,
             names=["qseqid","qseq_len","qstart","qend","strand",
@@ -113,24 +143,8 @@ minimap_df["species"] = minimap_df.apply(
 
 minimap_df = minimap_df[minimap_df['species'] != "Arapaima gigas"]
 
-def get_rna_type_str(rna_name):
-    tp = gene_details[rna_name]['type'].split(";")
-    if len(tp) == 1 or tp[0] == 'Cis-reg':
-        return tp[0]
-    else:
-        return tp[1]
-
 minimap_df["type"] = minimap_df.apply(
     lambda row:  get_rna_type_str(row['qseqid']), axis=1)
-
-types_annotated = set(get_rna_type_str(ID) for ID in gene_details.keys())
-def count_type(tp_str):
-    count = 0
-    for ID, details in gene_details.items():
-        if get_rna_type_str(ID) == tp_str:
-            count += 1
-    return count
-type_size = {tp_str: count_type(tp_str) for tp_str in types_annotated}
 
 minimap_df["source"] = minimap_df.apply(
     lambda row:  gene_details[row['qseqid']]['source'], axis=1)
@@ -214,6 +228,7 @@ types_conserved = []
 for i in range(len(type_data)):
     tp, low, mid, high, total = type_data[i]
     conserved = round((total / type_size[tp])*100, 2)
+    print(tp, ":", type_size[tp], ",", total, ", ", conserved)
     type_data[i] += [str(conserved)]
     types_conserved.append(tp)
 

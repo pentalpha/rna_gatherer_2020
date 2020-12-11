@@ -179,3 +179,4 @@ def join_files_in_one(inputs, output):
                 os.remove(output)
                 return False
         return wrote
+
