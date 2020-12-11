@@ -614,7 +614,7 @@ def join_gffs_in_one(inputs, output):
     return wrote
 
 def remove_redundant_names(inputs, output_dir):
-    outputs = {f: output_dir + "/" os.path.basename(f) for f in inputs}
+    outputs = {f: output_dir + "/" + os.path.basename(f) for f in inputs}
     ids_used = set()
     for in_file, out_file in outputs.items():
         with open(out_file, 'w') as out_stream:
