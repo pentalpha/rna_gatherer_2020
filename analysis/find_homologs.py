@@ -8,7 +8,7 @@ from ete3 import NCBITaxa
 gatherer_dir = os.path.abspath(os.path.dirname(os.path.realpath(__file__))+"/../")
 print("RNA Gatherer dir = ", gatherer_dir)
 query = gatherer_dir + "/result_data/gigas_annotation/transcriptome.fasta"
-db = sys.argv[1]
+db = gatherer_dir + "/test_data/fasta/rnacentral_contaminants.fasta"
 gff_annotation = gatherer_dir + "/result_data/gigas_annotation/annotation.gff"
 outdir = gatherer_dir + "/result_data/gigas_homolog_ncRNA/"
 threads = 3

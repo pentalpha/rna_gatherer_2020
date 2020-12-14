@@ -9,11 +9,14 @@ import networkx as nx
 import math
 from scipy.spatial import distance
 import sys
+import os
+gatherer_dir = os.path.abspath(os.path.dirname(os.path.realpath(__file__))+"/../../")
+print("RNA Gatherer dir = ", gatherer_dir)
 
-gene_list_dir = sys.argv[1]
+gene_list_dir = gatherer_dir + "/result_data/gigas_expression_analysis/"
 #gene_list_dir = "/home/pitagoras/main/dev/on-going/rna_gatherer/results/gigas_tissue_specific_lncrna/"
-obo_path = sys.argv[2]
-population_file = sys.argv[3]
+obo_path = gatherer_dir + "/test_data/go.obo"
+population_file = gatherer_dir + "/test_data/lnc_list/gigas_lnc.txt"
 #population_file = "/home/pitagoras/main/dev/on-going/rna_gatherer/test_data/lnc_list/gigas_lnc.txt"
 #outdir = "goatools_results"
 outdir = gene_list_dir + "/../gigas_geneset_enrichment_analysis"
@@ -610,7 +613,7 @@ print(highlight_goids)
 ax1.set_title("Sex Differential lncRNA, Enriched Pigmentation Functions")
 fig.tight_layout()
 #fig.show()
-fig.savefig(graphs_dir+"/pigmentation_graph.png")
+fig.savefig(graphs_dir+"/pigmentation_graph.png", dpi=300)
 
 transcripts = set()
 
@@ -674,7 +677,7 @@ for field in ['n_genes', 'fdr', 'log2fc']:
         figure[tissue_name] = (ax,cb)
     fig.tight_layout()
     #fig.show()
-    fig.savefig(graphs_dir+"/tissues_graph_"+field+".png")
+    fig.savefig(graphs_dir+"/tissues_graph_"+field+".png", dpi=300)
 
 #%%
 other_analysis = ['housekeeping', 'sex_diff', 'growth_housekeeping']
@@ -693,4 +696,4 @@ for field in ['fdr']:
             ax.set_title(c_name + " - " + ont)
             fig.tight_layout()
             #fig.show()
-            fig.savefig(graphs_dir+"/"+other_key+"."+ont+".png")
+            fig.savefig(graphs_dir+"/"+other_key+"."+ont+".png", dpi=300)
