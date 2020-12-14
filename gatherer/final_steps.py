@@ -244,6 +244,13 @@ def get_ncrna_type(attrs_str):
     else:
         return "other"
 
+def get_subtype(tp):
+    parts = tp.split(";")
+    if len(parts) == 1:
+        return "No subtype"
+    else:
+        return parts[1]
+
 def group_rows(input_rows):
     higher_level = 100
     for row in input_rows:
@@ -293,18 +300,64 @@ def sort_by_genes(input_rows):
     new_rows = expand_groups(grouped)
     return new_rows
 
+def review_df(df, sources):
+    by_source = {src: len(src_group) for src, src_group in df.groupby(["source"])}
+    for src in sources:
+        if not src in by_source:
+            by_source[src] = 0
+    n_rnas = len(df)
+    families = get_rfam_ids(df)
+    return n_rnas, families, by_source
 
 def review_annotations(args, confs, tmpDir, stepDir):
     annotation = pd.read_csv(stepDir["contaminant_removal"] + "/annotation.gff", sep="\t", header=None,
         names = ["seqname", "source", "feature", "start", "end", "score", "strand", "frame", "attribute"])
     print("Reviewing annotation sources")
     source_list = annotation["source"].unique().tolist()
-    review_rows = []
-
+    
+    type_lists = []
     print("Retrieving rna_type")
-    annotation["rna_type"] = annotation.apply(lambda row: get_ncrna_type(row["attribute"]),
+    annotation["rna_type"]    = annotation.apply(lambda row: get_ncrna_type(row["attribute"]).split(";")[0],
                                                 axis = 1)
-    print("Counting RNA Types...")
+    annotation["rna_subtype"] = annotation.apply(lambda row: get_subtype(get_ncrna_type(row["attribute"])),
+                                                axis = 1)
+    sources = annotation["source"].tolist()
+    sources.sort()
+    for rna_type, type_df in annotation.groupby(['rna_type']):
+        type_rnas, families, by_source = review_df(type_df,sources)
+        type_line = [rna_type, type_rnas, families] + [by_source[src] for src in sources]
+
+        subtype_lines = []
+        for subtype, subtype_df in type_df.groupby(['rna_subtype']):
+            subtype_rnas, subtype_families, subtype_by_source = review_df(subtype_df, sources)
+            subtype_line = [subtype, subtype_rnas, subtype_families] + [subtype_by_source[src] for src in sources]
+            subtype_lines.append(subtype_line)
+        subtype_lines.sort(key=lambda x: x[1], reverse=True)
+        if len(subtype_lines) >= 2:
+            type_lists.append([type_line, subtype_lines])
+        else:
+            type_lists.append([type_line, []])
+    type_lists.sort(key=lambda x: x[0][1], reverse=True)
+
+    all_rnas, all_families, all_by_source = review_df(annotation, sources)
+    type_lists.append(["All", all_rnas, all_families] + [all_by_source[src] for src in sources])
+    review_rows = []
+    for tp, subtps in type_lists:
+        tp[0] += "\t"
+        review_rows.append(tp)
+        for subtp_line in subtps:
+            subtp_line[0] = "\t"+subtp_line[0]
+            review_rows.append(subtp_line)
+    for i in range(len(sources)):
+        sources[i] = sources[i].replace("reference_mapping","Reference Mapping")
+        sources[i] = sources[i].replace("rnasamba","RNA Samba")
+        sources[i] = sources[i].replace("db_alignment","Database Alignment")
+    with open(tmpDir+"/type_review.tsv",'w') as stream:
+        stream.write("\t".join(['ncRNA Types\t', 'Number of ncRNAs', 'RFAM Families'] + sources)+"\n")
+        for cells in review_rows:
+            stream.write("\t".join([str(x) for x in cells])+"\n")
+
+    '''print("Counting RNA Types...")
     def count_rna_types(df):
         type_counts = {rna_type: len(type_annotation) 
                     for rna_type, type_annotation in df.groupby(["rna_type"])}
@@ -357,7 +410,7 @@ def review_annotations(args, confs, tmpDir, stepDir):
     print("\n".join([str(row) for row in review_rows]))
     type_review_df = pd.DataFrame(review_rows, 
                             columns=["ncRNA Type", "Total", "Families"] + source_list)
-    type_review_df.to_csv(tmpDir+"/type_review.tsv", sep="\t", index = False)
+    type_review_df.to_csv(tmpDir+"/type_review.tsv", sep="\t", index = False)'''
     return True
 
 def write_transcriptome(args, confs, tmpDir, stepDir):
