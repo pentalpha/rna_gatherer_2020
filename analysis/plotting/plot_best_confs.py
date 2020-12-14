@@ -5,6 +5,7 @@ import matplotlib.patches as patches
 from matplotlib.ticker import MultipleLocator
 import random
 import sys
+import os
 
 translate_dict = {"cc": "Componente Celular", "CC": "Componente Celular",
                 "mf": "Função Molecular", "MF": "Função Molecular",
@@ -62,8 +63,10 @@ def read_df(df_path):
     
     return confs_list, comb_list, completion_list, path_perc_list
 
+gatherer_dir = os.path.abspath(os.path.dirname(os.path.realpath(__file__))+"/../../")
+print("RNA Gatherer dir = ", gatherer_dir)
 
-confs_dir = sys.argv[1]
+confs_dir = gatherer_dir + "/result_data/functional_prediction_benchmarking_mgi/"
 #confs_dir = "/home/pitagoras/main/experiments/predictions/mgi_simgic_tpm-exon"
 ontos = ["MF", "BP", "CC"]
 colors_a = [get_cmap('tab20').colors[((i+1)*2)-1] for i in range(10)]
@@ -130,12 +133,12 @@ for onto_name, df, ax in zip(ontos, dfs, axes):
     ax.set_ylim(y_start,103.0)
     ax.set_xlim(-0.5,confs_list[-1]+0.5)
     ax.xaxis.set_major_locator(MultipleLocator(2))
-    ax.set_title(translator(onto_name))
+    ax.set_title(translator(onto_name), fontweight='bold')
 
 #axes[-2].set_ylabel("Associações relacionadas\nà uma referência (%)")
 #axes[-1].set_xlabel("Nível de Confiança")
-axes[-2].set_ylabel("Associations related\nto a reference (Q2)")
-axes[-1].set_xlabel("Confidence Level")
+axes[-2].set_ylabel("Associations related\nto a reference (Q2)", fontsize=12)
+axes[-1].set_xlabel("Confidence Level", fontsize=12)
 
 '''leg_patches = [plt.plot([],[], marker="s", ms=10, ls="", 
                      mec=None, color=comb_colors[all_combs[i]], 
@@ -146,5 +149,5 @@ axes[-2].legend(handles=leg_patches, bbox_to_anchor=(1.5, 0.5),
            fontsize=9)'''
 
 fig.tight_layout()
-fig.savefig(confs_dir+"/bests.png", bbox_inches='tight')
+fig.savefig(confs_dir+"/bests.png", bbox_inches='tight', dpi=400)
 #%%

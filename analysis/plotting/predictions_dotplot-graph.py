@@ -1,6 +1,6 @@
 import pandas as pd
 import sys
-
+import os
 from bokeh.plotting import figure, output_file, save
 from bokeh.layouts import row
 from bokeh.plotting import ColumnDataSource
@@ -37,12 +37,17 @@ def find_aspect(file_name):
     else:
         return bp_long_str
 
-annotations_dir = sys.argv[1]
+gatherer_dir = os.path.abspath(os.path.dirname(os.path.realpath(__file__))+"/../../")
+print("RNA Gatherer dir = ", gatherer_dir)
+
+annotations_dir = gatherer_dir + "/result_data/functional_prediction_benchmarking_mgi/"
 input_df_paths = [annotations_dir + "/" + mini_onto + "-predictions_stats.tsv" 
                 for mini_onto in ["MF", "BP", "CC"]]
-output = sys.argv[2]
-legend_offset = int(sys.argv[3])
-colors_offset = float(sys.argv[4])
+output = annotations_dir + "/dotplot.png"
+#legend_offset = int(sys.argv[3])
+legend_offset = 35
+#colors_offset = float(sys.argv[4])
+colors_offset = 0.23
 #color_ratio = float(sys.argv[5])
 dfs = {find_aspect(input_df): pd.read_csv(input_df,sep="\t",index_col=0) for input_df in input_df_paths}
 
@@ -107,7 +112,7 @@ for name, df in dfs.items():
     colors_others = []
 
     print(name)
-    axis.set_title(name)
+    axis.set_title(name, fontweight='bold')
     for index, row in df.iterrows():
         x_value = row['Completude']
         y_value = row['hasPath']
@@ -148,7 +153,7 @@ for name, df in dfs.items():
         marker='X', edgecolors= ["#000000"]*len(xs_others))
     if len(xs_others) > 0:
         axis.annotate("LNCRNA2GOA", (xs_others[0]-6.0, ys_others[0]-2.5), 
-        fontsize='x-small', horizontalalignment='center', verticalalignment='top')
+        fontsize=8, horizontalalignment='center', verticalalignment='top')
     
     #ax.colorbar()
     axis.xaxis.set_minor_locator(ticker.MultipleLocator(5))
@@ -159,8 +164,10 @@ for name, df in dfs.items():
 
     axis.grid(axis='x')
     axis.grid(axis='y')
-    axis.set_ylabel(q2_description)
-    axis.set_xlabel(q1_description)
+    if current_axis == 1:
+        axis.set_ylabel(q2_description, fontsize=12)
+    if current_axis == 2:
+        axis.set_xlabel(q1_description, fontsize=12)
 
     #box = axis.get_position()
     
@@ -208,4 +215,4 @@ legend = ax[current_axis].legend(handles=patches, ncol=1, facecolor="white",
 #plt.legend(handles=[blue_line])
 
 f.tight_layout()
-f.savefig(output)
+f.savefig(output, dpi=400)
