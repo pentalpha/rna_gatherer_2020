@@ -331,9 +331,29 @@ def reduce_arrow_len(p1, p2, reducer):
     new_d1, new_d2 = pol2cart(new_len, angle)
     return new_d1, new_d2
 
+def fc_size_lambdas(min_size, max_size, min_fc, max_fc):
+    size_delta = max_size - min_size
+    fc_delta = max_fc - min_fc
+
+    size_pt = 1.0/size_delta
+    fc_pt = 1.0/fc_delta
+
+    size_to_pt = lambda size: (size-min_size)*size_pt
+    fc_to_pt = lambda fc: (fc-min_fc)*fc_pt
+    pt_to_size = lambda pt: min_size + pt*size_delta
+    pt_to_fc = lambda pt: min_fc + pt*fc_delta
+
+    fc_to_size = lambda fc: pt_to_size(fc_to_pt(fc))
+    size_to_fc = lambda size: pt_to_fc(size_to_pt(size))
+
+    return fc_to_size, size_to_fc
+
 def get_graph(board, tissue_to_analyze, favorite_functions, n_best,
               labels_for_all=True, sorting_col='n_genes',
-              simplify=True, ontologies_to_plot=['BP','MF','CC']):
+              simplify=True, ontologies_to_plot=['BP','MF','CC'],
+              graphviz_prog='dot', arrow_width = 6, arrow_head = 10,
+              reduce_arrow_factor = 15.0, max_size=320,
+              label_offset = 11):
     enrich_lines = []
     for ont_to_plot in ontologies_to_plot:
         enrich_lines += enrichment_lists[tissue_to_analyze][ont_to_plot]
@@ -378,7 +398,18 @@ def get_graph(board, tissue_to_analyze, favorite_functions, n_best,
     if simplify:
         simplify_graph(G, main_nodes)
     #print("Getting positions")
-    pos = nx.nx_agraph.graphviz_layout(G)
+    pos = nx.nx_agraph.graphviz_layout(G, 
+                                       root='Root', 
+                                       prog=graphviz_prog)
+    max_x = 0
+    for key in list(pos.keys()):
+        x,y = pos[key]
+        pos[key] = (y,x)
+        if y > max_x:
+            max_x = y
+    for key in list(pos.keys()):
+        x,y = pos[key]
+        pos[key] = (max_x-x,y)
     
     names = []
     x = []
@@ -399,7 +430,7 @@ def get_graph(board, tissue_to_analyze, favorite_functions, n_best,
     
     labels = []
     label_sizes = []
-    max_label_len = 32
+    max_label_len = 40
     for name in names:
         if labels_for_all:
             cond = name in descriptions
@@ -424,9 +455,8 @@ def get_graph(board, tissue_to_analyze, favorite_functions, n_best,
         if name in main_nodes:
             label_sizes.append(9)
         else:
-            label_sizes.append(7)
-    min_size = 50
-    max_size = 160
+            label_sizes.append(8)
+    min_size = 100
     '''n_genes = [indexed_lines[name][-3] if name in indexed_lines else min_size 
                for name in names]
     sizes_unorm = [genes_n+min_size for genes_n in n_genes]
@@ -440,7 +470,9 @@ def get_graph(board, tissue_to_analyze, favorite_functions, n_best,
     if len(log2fc) == 0:
         print("Error plotting " + tissue_to_analyze + " not enough items in 'names'")
         return None, highlight_goids
-    sizes = [min_size*fc for fc in log2fc]
+    fc_to_size, size_to_fc = fc_size_lambdas(min_size, max_size,
+                                            min(log2fc), max(log2fc))
+    sizes = [fc_to_size(fc) for fc in log2fc]
     indexed_sizes = {names[i]: sizes[i] for i in range(len(sizes))}
     norm_fdr = [-math.log(f,10) 
                 if f > 0 
@@ -449,13 +481,12 @@ def get_graph(board, tissue_to_analyze, favorite_functions, n_best,
     '''for i in range(first_secondary, len(names)):
         sizes[i] = min_size/2
         norm_fdr[i] = '''
-        
     lines = []
     for n1, n2 in G.edges:
         if (n1 in pos) and (n2 in pos):
             a = pos[n1]
             b = pos[n2]
-            c = reduce_arrow_len(a, b, 15.0)
+            c = reduce_arrow_len(a, b, reduce_arrow_factor)
             lines.append((a,c))
             '''d1, d2 = (n2_x-n1_x, n2_y-n1_y)
             angle = math.atan(d2/d1)
@@ -476,12 +507,13 @@ def get_graph(board, tissue_to_analyze, favorite_functions, n_best,
     handle_fcs = [min(log2fc), 
                   (max(log2fc)+min(log2fc))/2, max(log2fc)]
                           #(max(log2fc)-min(log2fc))/5)
-    handle_sizes = [min_size*0.75]+[fc*min_size for fc in handle_fcs]
+    unrelevant_balls_size = min_size*0.4
+    handle_sizes = [unrelevant_balls_size]+[fc_to_size(fc) for fc in handle_fcs]
     handle_labels = ["Not Enriched"] + [str(round(fc,2)) for fc in handle_fcs]
     patchs = []
     for i in range(len(handle_sizes)):
         if i == 0:
-            p = plt.scatter([1], [1], min_size*0.75, 
+            p = plt.scatter([1], [1], handle_sizes[i], 
                             'white', edgecolors='black',
                             linewidths=1,
                             alpha=0.6)
@@ -491,29 +523,34 @@ def get_graph(board, tissue_to_analyze, favorite_functions, n_best,
                             'blue',
                             alpha=0.9)
             patchs.append(p)
+    plt.scatter([1], [1], handle_sizes[-1]+100,
+                "white", edgecolors='white',
+                alpha=1.0)
     
     scatter = board.scatter(x[:first_secondary], y[:first_secondary],
                             sizes[:first_secondary], 
                             norm_fdr[:first_secondary], 
                           cmap="winter", label="Function", alpha=1.0)
     scatter = board.scatter(x[first_secondary:], y[first_secondary:],
-                            min_size*0.75, 
+                            unrelevant_balls_size, 
                             color="white",
                             linewidths=1,
                             edgecolors="black",
                             label="Function", alpha=1.0)
+    
     for start, end in lines:
         board.arrow(start[0], start[1], end[0], end[1],
-                alpha=0.3, width=6, color='blue',zorder=0,
-                length_includes_head=True, head_length=10.0)
+                alpha=0.3, width=arrow_width, color='blue',zorder=0,
+                length_includes_head=True, head_length=arrow_head)
     '''print(labels)
     print(log2fc)
     print(sizes)'''
     bbox_props = dict(boxstyle="round", fc="w", 
                       ec="0.5", alpha=0.6, edgecolor="white")
     label_down = [True for i in range(len(labels))]
+    
     def label_pos(x, y, is_down):
-        return (x, y - 11) if is_down else (x, y + 11)
+        return (x, y - label_offset) if is_down else (x, y + label_offset)
     dist_th_y = 10
     dist_th_x = 80
     def change_label_positions():
@@ -571,9 +608,7 @@ def get_graph(board, tissue_to_analyze, favorite_functions, n_best,
     '''#from matplotlib.patches import Patch
     from matplotlib.patches import Ellipse'''
     
-    plt.scatter([1], [1], handle_sizes[-1]+100,
-                "white", edgecolors='white',
-                alpha=1.0)
+    
     '''size_labels = [label.split('{')[0] 
                    + "{" + str(
                        round(
@@ -602,18 +637,19 @@ def get_graph(board, tissue_to_analyze, favorite_functions, n_best,
     plt.setp(cbar.ax.get_xticklabels(), rotation=25, ha="right",
          rotation_mode="anchor")
     cbar.ax.tick_params(axis='both', which='major', labelsize=8)
-    return cbar, highlight_goids
-
+    return pos, cbar, highlight_goids
+#%%
 fig, ax1 = plt.subplots(1, figsize=(7,7))
-cbar, highlight_goids = get_graph(ax1, "sex_diff", ['pigment', 'melanosome', 'melanin', 'melanocyte'], 6,
+pos, cbar, highlight_goids = get_graph(ax1, "sex_diff", ['pigment', 'melanosome', 'melanin', 'melanocyte'], 6,
           labels_for_all=True,
           sorting_col='log2fc',
-          simplify = False)
+          simplify = False,
+          graphviz_prog='fdp')
 print(highlight_goids)
 ax1.set_title("Sex Differential lncRNA, Enriched Pigmentation Functions")
 fig.tight_layout()
 #fig.show()
-fig.savefig(graphs_dir+"/pigmentation_graph.png", dpi=300)
+fig.savefig(graphs_dir+"/pigmentation_graph.png", dpi=400)
 
 transcripts = set()
 
@@ -659,7 +695,7 @@ for genename, genefuncs in associations.items():
 to_plot=['Brain', 'Gonad', 'Heart', 'Kidney', 
             'Liver', 'Lung', 'Muscle', 'Skin']
 
-for field in ['n_genes', 'fdr', 'log2fc']:
+for field in ['fdr']:
     fig, axes = plt.subplots(4,2, figsize=(14,28))
     i = 0
     ax_list = []
@@ -670,14 +706,17 @@ for field in ['n_genes', 'fdr', 'log2fc']:
     figure = {}
 
     for tissue_name, ax in tqdm(ax_list):
-        cb, hg_go = get_graph(ax, tissue_name, [], 12, 
+        pos, cb, hg_go = get_graph(ax, tissue_name, [], 12, 
                     labels_for_all=False, 
-                    sorting_col=field, simplify = False)
-        ax.set_title(tissue_name)
+                    sorting_col=field, simplify = False,
+                    label_offset=80, arrow_width = 8,
+                    reduce_arrow_factor = 15.0, 
+                    arrow_head = 24)
+        ax.set_title(tissue_name, pad=18)
         figure[tissue_name] = (ax,cb)
     fig.tight_layout()
     #fig.show()
-    fig.savefig(graphs_dir+"/tissues_graph_"+field+".png", dpi=300)
+    fig.savefig(graphs_dir+"/tissues_graph_"+field+".png", dpi=400)
 
 #%%
 other_analysis = ['housekeeping', 'sex_diff', 'growth_housekeeping']
@@ -689,11 +728,41 @@ for field in ['fdr']:
         c_name = cool_name[i]
         for ont in onts_to_plt:
             fig, ax = plt.subplots(1, figsize=(7,7))
-            cb, hg_go = get_graph(ax, other_key, [], 10, 
+            pos, cb, hg_go = get_graph(ax, other_key, [], 10, 
                     labels_for_all=False, 
                     sorting_col=field, simplify = False,
-                    ontologies_to_plot=[ont])
-            ax.set_title(c_name + " - " + ont)
+                    ontologies_to_plot=[ont],
+                    label_offset=80, arrow_width = 8,
+                    reduce_arrow_factor = 15.0, 
+                    arrow_head = 24)
+            ax.set_title(c_name + " - " + ont, pad=18)
             fig.tight_layout()
             #fig.show()
-            fig.savefig(graphs_dir+"/"+other_key+"."+ont+".png", dpi=300)
+            fig.savefig(graphs_dir+"/"+other_key+"."+ont+".png", dpi=400)
+
+#%%
+other_analysis = ['growth_housekeeping']
+cool_name = ['Housekeeping Growth Genes']
+onts_to_plt = ['BP']
+for field in ['fdr']:
+    for i in range(len(other_analysis)):
+        other_key = other_analysis[i]
+        c_name = cool_name[i]
+        for ont in onts_to_plt:
+            fig, ax = plt.subplots(1, figsize=(7,7))
+            pos, cb, hg_go = get_graph(ax, other_key, [], 10, 
+                    labels_for_all=False, 
+                    sorting_col=field, simplify = False,
+                    ontologies_to_plot=[ont],
+                    label_offset=90, arrow_width = 8,
+                    reduce_arrow_factor = 15.0, 
+                    arrow_head = 24)
+            ax.set_title(c_name + " - " + ont, pad=20)
+            fig.tight_layout()
+            #fig.show()
+            fig.savefig(graphs_dir+"/"+other_key+"."+ont+".png", dpi=400)
+
+''',
+                    graphviz_prog="fdp",
+                    arrow_width = 14, arrow_head = 24,
+                    reduce_arrow_factor = 35.0, max_size=400'''
