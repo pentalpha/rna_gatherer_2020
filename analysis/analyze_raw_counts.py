@@ -23,10 +23,12 @@ with open(counts_file,'r') as stream:
         name = cells[0]
         for i in range(len(reads_by_sample)):
             reads_by_sample[i] += float(cells[i+1])
-        reads = sum([float(x) for x in cells[1:]])
-        if reads < 1.0:
+        reads = [float(x) for x in cells[1:]]
+        reads_sum = sum(reads)
+        max_count = max(reads)
+        if max_count < 5.0:
             low_reads += 1
-        reads_aligned.append((name,reads))
+        reads_aligned.append((name,reads_sum))
 
 reads_aligned.sort(key=lambda x: x[1], reverse=True)
 reads_vec = np.array([y for x, y in reads_aligned])
@@ -44,7 +46,7 @@ with open(outfile,'w') as stream:
     stream.write("Median Reads Aligned: "+str(mean)+"\n")
     stream.write("\t25% Percentile: "+str(p25)+"\n")
     stream.write("\t75% Percentile: "+str(p75)+"\n")
-    stream.write(str((len(reads_aligned)-low_reads)/len(reads_aligned)*100)+ "% of reads with expression >= 1\n")
+    stream.write(str((len(reads_aligned)-low_reads)/len(reads_aligned)*100)+ "% of reads with expression >= 5\n")
     stream.write("Avg Reads Per Sample: "+str(avg_reads_per_sample)+"\n")
     stream.write("\tMin Reads Per Sample: "+str(min_reads_per_sample)+"\n")
     stream.write("\tMax Reads Per Sample: "+str(max_reads_per_sample)+"\n")

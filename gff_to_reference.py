@@ -5,6 +5,7 @@ from gatherer.util import *
 from gatherer.rna_type import *
 import sys
 import pandas as pd
+import os
 
 def matching_coords(a, b, max_outside):
     diff_end = max(0, a[1] - b[1])
@@ -117,9 +118,15 @@ def get_coords(df):
         coords_by_chr[str(chr_name)] = coords
     return coords_by_chr
 
-annotation_path = sys.argv[1]
-reference_path = sys.argv[2]
-output_path = sys.argv[3]
+gatherer_dir = os.path.abspath(os.path.dirname(os.path.realpath(__file__)))
+print("RNA Gatherer dir = ", gatherer_dir)
+
+#annotation_path = sys.argv[1]
+annotation_path = gatherer_dir + "/result_data/annotation_benchmarking_mgi/annotation.gff"
+#reference_path = sys.argv[2]
+reference_path = gatherer_dir + "/test_data/reference/mus_musculus.GRCm38.gff3"
+#output_path = sys.argv[3]
+output_path = gatherer_dir + "/result_data/annotation_benchmarking_mgi/reference_matchs.tsv"
 
 annotation_df = read_gff(annotation_path, get_types=True)
 reference_transcripts = read_gff(reference_path)
@@ -188,10 +195,42 @@ for rna_type, stats in expanded_matchs_by_type.items():
     raw_rows.append([rna_type, total, transcripts, perc])
 
 raw_rows.sort(key=lambda x: x[0], reverse=True)
-
-rows = "\n".join(["\t".join([str(x) for x in row]) 
-                            for row in raw_rows])+"\n"
+raw_lines = [[str(x) for x in row]
+                            for row in raw_rows]
+rows = "\n".join(["\t".join(line) for line in raw_lines])+"\n"
 with open(output_path, 'w') as stream:
-    stream.write("Tipo de ncRNA\tTotal\tCompatíveis com a Referência\tCompatíveis(%)\n")
+    stream.write("Tipos de ncRNA\tTotal\tCompatíveis com a Referência\tCompatíveis(%)\n")
     stream.write(rows)
 print(rows)
+
+class_stats = {}
+adapted_rows = []
+for rna_type, total, transcripts, perc in raw_lines:
+    tp_parts = rna_type.split(";")
+    if not tp_parts[0] in class_stats:
+        class_stats[tp_parts[0]] = [0,0]
+    tp = ""
+    class_stats[tp_parts[0]]
+    if len(tp_parts) == 1:
+        tp = tp_parts[0]+'\t'
+        class_stats[tp_parts[0]][1] += int(transcripts)
+        class_stats[tp_parts[0]][0] += int(total)
+    else:
+        if len(tp_parts) == 2:
+            class_stats[tp_parts[0]][1] -= int(transcripts)
+            class_stats[tp_parts[0]][0] -= int(total)
+            tp = "\t"+tp_parts[1]
+        else:
+            continue
+    adapted_rows.append("\t".join([tp, transcripts + " (" + str(round(float(perc),3)) + "%)"]))
+
+for tp, vals in class_stats.items():
+    total, transcripts = vals
+    adapted_rows.append("\t".join(["\t"+tp+" No subtype", str(transcripts) + " (" + str(round((transcripts/total)*100.0,3)) + "%)"]))
+
+adapted_lines = "\n".join(adapted_rows)+"\n"
+
+with open(output_path+".artigo.tsv", 'w') as stream:
+    stream.write("ncRNA Types\t\tMatching a Reference (%)\n")
+    stream.write(adapted_lines)
+print(adapted_lines)

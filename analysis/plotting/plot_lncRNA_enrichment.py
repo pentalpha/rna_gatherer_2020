@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 
 import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
+import matplotlib.cm as cm
 import numpy as np
 from tqdm import tqdm
 import subprocess
@@ -177,24 +179,36 @@ def get_edges(indented_nodes):
     for i in range(len(indented_nodes)):
         go_id, depth = indented_nodes[i]
         all_gos.add(go_id)
-        upper_nodes = graph.neighbors(go_id)
+        for child, parent, key in graph.out_edges(go_id, keys=True):
+            if key == "is_a":
+                edges.append((parent, child, 1))
+                has_parent.add(child)
+                all_gos.add(parent)
+                print(f'• {child} ⟶ {key} ⟶ {parent}')
+        '''upper_nodes = graph.neighbors(go_id)
         for node in upper_nodes:
             has_parent.add(go_id)
             edges.append((node, go_id, 1))
-            all_gos.add(node)
+            all_gos.add(node)'''
     found_parents = True
     while found_parents:
         no_parent = all_gos-has_parent
+        found_parents = False
         for go_id in no_parent:
-            found_parents = False
-            upper_nodes = list(graph.neighbors(go_id))
+            for child, parent, key in graph.out_edges(go_id, keys=True):
+                if key == "is_a":
+                    edges.append((parent, child, 1))
+                    has_parent.add(child)
+                    all_gos.add(parent)
+                    found_parents = True
+            '''upper_nodes = list(graph.neighbors(go_id))
             if len(upper_nodes) > 0:
                 for node in upper_nodes:
                     has_parent.add(go_id)
                     edges.append((node, go_id, 1))
                     all_gos.add(node)
                 has_parent.add(go_id)
-                found_parents = True
+                found_parents = True'''
     edges.append(("Root","GO:0008150", 1))
     edges.append(("Root","GO:0003674", 1))
     edges.append(("Root","GO:0005575", 1))
@@ -353,7 +367,9 @@ def get_graph(board, tissue_to_analyze, favorite_functions, n_best,
               simplify=True, ontologies_to_plot=['BP','MF','CC'],
               graphviz_prog='dot', arrow_width = 6, arrow_head = 10,
               reduce_arrow_factor = 15.0, max_size=320,
-              label_offset = 11):
+              label_offset = 11,
+              set_label_orientation=None,
+              y_offset=0.0):
     enrich_lines = []
     for ont_to_plot in ontologies_to_plot:
         enrich_lines += enrichment_lists[tissue_to_analyze][ont_to_plot]
@@ -407,9 +423,10 @@ def get_graph(board, tissue_to_analyze, favorite_functions, n_best,
         pos[key] = (y,x)
         if y > max_x:
             max_x = y
+    #print('min_y',min_y)
     for key in list(pos.keys()):
         x,y = pos[key]
-        pos[key] = (max_x-x,y)
+        pos[key] = (max_x-x,y-y_offset)
     
     names = []
     x = []
@@ -427,6 +444,11 @@ def get_graph(board, tissue_to_analyze, favorite_functions, n_best,
             names.append(name)
             x.append(xy[0])
             y.append(xy[1])
+    
+    '''min_x = min(x)
+    x = [a-min_x for a in x]
+    min_y = min(y)
+    y = [a-min_y for a in y]'''
     
     labels = []
     label_sizes = []
@@ -453,9 +475,9 @@ def get_graph(board, tissue_to_analyze, favorite_functions, n_best,
         else:
             labels.append("")
         if name in main_nodes:
-            label_sizes.append(9)
+            label_sizes.append(11)
         else:
-            label_sizes.append(8)
+            label_sizes.append(9)
     min_size = 100
     '''n_genes = [indexed_lines[name][-3] if name in indexed_lines else min_size 
                for name in names]
@@ -464,6 +486,7 @@ def get_graph(board, tissue_to_analyze, favorite_functions, n_best,
     sizes = [(max_size*x)/max_n for x in sizes_unorm]'''
     fdr = [indexed_lines[name][-4] if name in indexed_lines else 0.01 
            for name in names[:first_secondary]]
+    print(fdr)
     log2fc = [indexed_lines[name][field_index['log2fc']] 
               if name in indexed_lines else 1.0 
               for name in names[:first_secondary]]
@@ -474,10 +497,29 @@ def get_graph(board, tissue_to_analyze, favorite_functions, n_best,
                                             min(log2fc), max(log2fc))
     sizes = [fc_to_size(fc) for fc in log2fc]
     indexed_sizes = {names[i]: sizes[i] for i in range(len(sizes))}
-    norm_fdr = [-math.log(f,10) 
+    '''norm_fdr = [-math.log(f,10) 
                 if f > 0 
                 else -math.log(math.pow(10,-320),10)
-                for f in fdr]
+                for f in fdr]'''
+    '''min_fdr = min(fdr)
+    fdr_minus_min = [x-min_fdr for x in fdr]
+    max_fdr = max(fdr_minus_min)
+    norm_fdr = [1.0 - (x/max_fdr) for x in fdr_minus_min]
+    def recover_fdr(normalized):
+        x = normalized + 1.0
+        x = x * max_fdr
+        x += min_fdr
+        return x
+    #norm_fdr = fdr
+    print(norm_fdr)
+    print([recover_fdr(x) for x in norm_fdr])'''
+    min_fdr = min(fdr)
+    max_fdr = max(fdr)
+    normalizer = mcolors.Normalize(vmin=min_fdr,
+                             vmax=max_fdr,clip=True)
+    #smap = cm.ScalarMappable(norm=norm, cmap=cm.winter_r)
+    #fdr_colors = [smap.to_rgba(x) for x in fdr]
+    #print(fdr_colors)
     '''for i in range(first_secondary, len(names)):
         sizes[i] = min_size/2
         norm_fdr[i] = '''
@@ -526,11 +568,11 @@ def get_graph(board, tissue_to_analyze, favorite_functions, n_best,
     plt.scatter([1], [1], handle_sizes[-1]+100,
                 "white", edgecolors='white',
                 alpha=1.0)
-    
     scatter = board.scatter(x[:first_secondary], y[:first_secondary],
                             sizes[:first_secondary], 
-                            norm_fdr[:first_secondary], 
-                          cmap="winter", label="Function", alpha=1.0)
+                            fdr[:first_secondary], 
+                          cmap="winter_r", label="Function", alpha=1.0, 
+                          norm = normalizer)
     scatter = board.scatter(x[first_secondary:], y[first_secondary:],
                             unrelevant_balls_size, 
                             color="white",
@@ -548,7 +590,7 @@ def get_graph(board, tissue_to_analyze, favorite_functions, n_best,
     bbox_props = dict(boxstyle="round", fc="w", 
                       ec="0.5", alpha=0.6, edgecolor="white")
     label_down = [True for i in range(len(labels))]
-    
+    print(labels)
     def label_pos(x, y, is_down):
         return (x, y - label_offset) if is_down else (x, y + label_offset)
     dist_th_y = 10
@@ -565,27 +607,33 @@ def get_graph(board, tissue_to_analyze, favorite_functions, n_best,
             smaller_dist = -1
             for j in range(len(dists_y)):
                 if j != i:
-                    if dists_x[j] <= dist_th_x:
+                    #if dists_x[j] <= dist_th_x:
                         #print("small x distance:", labels[i], labels[j])
-                        if dists_y[j] <= dists_y[smaller_dist]:
-                            smaller_dist = j
+                    if dists_y[j] <= dists_y[smaller_dist]:
+                        smaller_dist = j
             if smaller_dist >= 0:
                 if i != smaller_dist:
-                    if dists_y[smaller_dist] <= dist_th_y:
-                        #print(labels[i])
-                        #print("\tsmaller distance is to", labels[smaller_dist])
-        
-                        #print("\t",labels[i],"and",labels[smaller_dist],
-                        #      "are too close")
-                        #print(i,smaller_dist)
-                        alternative_pos = label_pos(x[i],y[i],
-                                                    not label_down[i])
-                        if distance.euclidean(alternative_pos[1], 
-                                    positions[smaller_dist][1]) > dists_y[smaller_dist]:
-                            label_down[i] = not label_down[i]
-                            #print("\tSwitching position for " + labels[i])
+                    #if dists_y[smaller_dist] <= dist_th_y:
+                    #print(labels[i])
+                    #print("\tsmaller distance is to", labels[smaller_dist])
+    
+                    #print("\t",labels[i],"and",labels[smaller_dist],
+                    #      "are too close")
+                    #print(i,smaller_dist)
+                    alternative_pos = label_pos(x[i],y[i],
+                                                not label_down[i])
+                    if distance.euclidean(alternative_pos[1], 
+                                positions[smaller_dist][1]) > dists_y[smaller_dist]:
+                        label_down[i] = not label_down[i]
+                        #print("\tSwitching position for " + labels[i])
     change_label_positions()
-    change_label_positions()    
+    change_label_positions()
+    change_label_positions()
+    if set_label_orientation:
+        for i in range(len(labels)):
+            for label, is_down in set_label_orientation:
+                if labels[i] == label:
+                    label_down[i] = is_down
     def paint_label(index):
         label_x, label_y = label_pos(x[index],y[index],
                                      label_down[index])
@@ -625,26 +673,45 @@ def get_graph(board, tissue_to_analyze, favorite_functions, n_best,
         loc='upper center', title="abs(log2(foldChange))",
         ncol=len(patchs))
     
-    cbar = plt.colorbar(scatter, ax=board, orientation='horizontal')
+    cbar = plt.colorbar(cm.ScalarMappable(norm=normalizer, 
+                                          cmap=cm.winter_r), 
+                        ax=board, orientation='horizontal',
+                        aspect=40)
     cbar.set_label('FDR')
     #print(list(cbar.get_ticks()))
-    if tissue_to_analyze == "Lungug":
-        cbar.ax.set_xticklabels(["{:.1e}".format(math.pow(10,-tick)) 
-                             for tick in [50,100,150,200,250,300,320]])
-    else:
-        cbar.ax.set_xticklabels(["{:.1e}".format(math.pow(10,-tick)) 
-                                 for tick in cbar.get_ticks()])
+    #print("old fdr labels:", cbar.get_ticks())
+    '''fdr_labels = ["{:.1e}".format(float(tick))
+                             for tick in cbar.get_ticks()]'''
+    float_ticks = [float(x) for x in cbar.get_ticks()]
+    reduced_ticks = np.linspace(min(float_ticks),
+                                       max(float_ticks),
+                                       6)
+    cbar.set_ticks(reduced_ticks)
+    #print("new fdr ticks:"+str(reduced_ticks))
+    fdr_labels = ["{:.2e}".format(float(tick))
+                             for tick in cbar.get_ticks()]
+    cbar.ax.set_xticklabels(fdr_labels)
+    #print("new fdr tick labels:"+str(fdr_labels))
     plt.setp(cbar.ax.get_xticklabels(), rotation=25, ha="right",
          rotation_mode="anchor")
     cbar.ax.tick_params(axis='both', which='major', labelsize=8)
+    
     return pos, cbar, highlight_goids
-#%%
+
 fig, ax1 = plt.subplots(1, figsize=(7,7))
-pos, cbar, highlight_goids = get_graph(ax1, "sex_diff", ['pigment', 'melanosome', 'melanin', 'melanocyte'], 6,
-          labels_for_all=True,
-          sorting_col='log2fc',
-          simplify = False,
-          graphviz_prog='fdp')
+pos, cbar, highlight_goids = get_graph(ax1, 
+           "sex_diff", 
+           ['pigment', 'melanosome', 'melanin', 'melanocyte'], 
+           6,
+           labels_for_all=True,
+           label_offset=20,
+           sorting_col='log2fc',
+           simplify = False,
+           set_label_orientation=[['pigment granule', True],
+                                  ['intracellular organelle', True],
+                                  ['vesicle',True],
+                                  ['membrane-bounded organelle',True]],
+           y_offset=50)
 print(highlight_goids)
 ax1.set_title("Sex Differential lncRNA, Enriched Pigmentation Functions")
 fig.tight_layout()
@@ -660,6 +727,31 @@ for ont, enrichments in enrichment_lists['sex_diff'].items():
 print(len(transcripts), "pigmentation genes.")
 transcripts_out = "\n".join(transcripts)
 open(outdir+"/pigmentation.txt",'w').write(transcripts_out)
+
+other_analysis = ['growth_housekeeping']
+cool_name = ['Housekeeping Growth Genes']
+onts_to_plt = ['BP']
+for field in ['fdr']:
+    for i in range(len(other_analysis)):
+        other_key = other_analysis[i]
+        c_name = cool_name[i]
+        for ont in onts_to_plt:
+            fig, ax = plt.subplots(1, figsize=(7,8))
+            pos, cb, hg_go = get_graph(ax, other_key, [], 10, 
+                    labels_for_all=False, 
+                    sorting_col=field, simplify = False,
+                    ontologies_to_plot=[ont],
+                    label_offset=90, arrow_width = 8,
+                    reduce_arrow_factor = 15.0, 
+                    arrow_head = 24,
+                    set_label_orientation=[['cell death', True],
+                   ['sulfur compound metabolic process', True],
+           ['cell. modified amino acid metabolic[...]', True]])
+            ax.set_title(c_name + " - " + ont, pad=20)
+            fig.tight_layout()
+            #fig.show()
+            fig.savefig(graphs_dir+"/"+other_key+"."+ont+".png", dpi=400)
+
 #%%
 '''maturation_base_functions = ['GO:0061458', 'GO:0007548']
 def get_preds(data, go_id, depth = 0):
@@ -739,29 +831,6 @@ for field in ['fdr']:
             fig.tight_layout()
             #fig.show()
             fig.savefig(graphs_dir+"/"+other_key+"."+ont+".png", dpi=400)
-
-#%%
-other_analysis = ['growth_housekeeping']
-cool_name = ['Housekeeping Growth Genes']
-onts_to_plt = ['BP']
-for field in ['fdr']:
-    for i in range(len(other_analysis)):
-        other_key = other_analysis[i]
-        c_name = cool_name[i]
-        for ont in onts_to_plt:
-            fig, ax = plt.subplots(1, figsize=(7,7))
-            pos, cb, hg_go = get_graph(ax, other_key, [], 10, 
-                    labels_for_all=False, 
-                    sorting_col=field, simplify = False,
-                    ontologies_to_plot=[ont],
-                    label_offset=90, arrow_width = 8,
-                    reduce_arrow_factor = 15.0, 
-                    arrow_head = 24)
-            ax.set_title(c_name + " - " + ont, pad=20)
-            fig.tight_layout()
-            #fig.show()
-            fig.savefig(graphs_dir+"/"+other_key+"."+ont+".png", dpi=400)
-
 ''',
                     graphviz_prog="fdp",
                     arrow_width = 14, arrow_head = 24,
