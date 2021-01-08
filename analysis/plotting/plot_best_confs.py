@@ -36,7 +36,7 @@ translate_dict_eng = {"cc": "Cellular Component", "CC": "Cellular Component",
 def translator(name):
     name.replace("_"," ")
     words = name.split()
-    new_words = [(translate_dict_eng[word] if word in translate_dict_eng else word)
+    new_words = [(translate_dict[word] if word in translate_dict else word)
                     for word in words]
     new_name = " ".join(new_words)
     return new_name
@@ -87,7 +87,7 @@ all_combs = list(all_combs)
 all_combs.sort()
 comb_colors = {all_combs[i]: colors[i] for i in range(len(all_combs))}
 all_combs.sort(key=lambda x: comb_freq[x], reverse=True)
-output_plot = confs_dir + "/bests_plot.png"
+output_plot = confs_dir + "/bests_plot_pt.png"
 #%%
 fig, axes = plt.subplots(3, 1, figsize=(7, 8))
 y_start = 0.0
@@ -137,8 +137,10 @@ for onto_name, df, ax in zip(ontos, dfs, axes):
 
 #axes[-2].set_ylabel("Associações relacionadas\nà uma referência (%)")
 #axes[-1].set_xlabel("Nível de Confiança")
-axes[-2].set_ylabel("Associations related\nto a reference (Q2)", fontsize=12)
-axes[-1].set_xlabel("Confidence Level", fontsize=12)
+#axes[-2].set_ylabel("Associations related\nto a reference (Q2)", fontsize=12)
+#axes[-1].set_xlabel("Confidence Level", fontsize=12)
+axes[-2].set_ylabel("Associações relacionadas\nà uma referência (Q2)", fontsize=12)
+axes[-1].set_xlabel("Nível de Confiança", fontsize=12)
 
 '''leg_patches = [plt.plot([],[], marker="s", ms=10, ls="", 
                      mec=None, color=comb_colors[all_combs[i]], 
@@ -149,5 +151,5 @@ axes[-2].legend(handles=leg_patches, bbox_to_anchor=(1.5, 0.5),
            fontsize=9)'''
 
 fig.tight_layout()
-fig.savefig(confs_dir+"/bests.png", bbox_inches='tight', dpi=400)
+fig.savefig(confs_dir+"/bests_pt.png", bbox_inches='tight', dpi=400)
 #%%

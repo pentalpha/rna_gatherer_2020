@@ -551,7 +551,7 @@ def get_graph(board, tissue_to_analyze, favorite_functions, n_best,
                           #(max(log2fc)-min(log2fc))/5)
     unrelevant_balls_size = min_size*0.4
     handle_sizes = [unrelevant_balls_size]+[fc_to_size(fc) for fc in handle_fcs]
-    handle_labels = ["Not Enriched"] + [str(round(fc,2)) for fc in handle_fcs]
+    handle_labels = ["Sem Enriquecimento"] + [str(round(fc,2)) for fc in handle_fcs]
     patchs = []
     for i in range(len(handle_sizes)):
         if i == 0:
@@ -707,16 +707,21 @@ pos, cbar, highlight_goids = get_graph(ax1,
            label_offset=20,
            sorting_col='log2fc',
            simplify = False,
-           set_label_orientation=[['pigment granule', True],
+           set_label_orientation=[['pigment granule', False],
+                                  ['melanosome', True],
+                                  ['intracellular vesicle', False],
+                                  ['cytoplasmic vesicle', True],
                                   ['intracellular organelle', True],
-                                  ['vesicle',True],
-                                  ['membrane-bounded organelle',True]],
+                                  ['vesicle',False],
+                                  ['membrane-bounded organelle',True],
+                                  ['organelle', True],
+                                  ['CC',True]],
            y_offset=50)
 print(highlight_goids)
-ax1.set_title("Sex Differential lncRNA, Enriched Pigmentation Functions")
+#ax1.set_title("Sex Differential lncRNA, Enriched Pigmentation Functions")
 fig.tight_layout()
 #fig.show()
-fig.savefig(graphs_dir+"/pigmentation_graph.png", dpi=400)
+fig.savefig(graphs_dir+"/pigmentation_graph_pt.png", dpi=400)
 
 transcripts = set()
 
@@ -746,11 +751,12 @@ for field in ['fdr']:
                     arrow_head = 24,
                     set_label_orientation=[['cell death', True],
                    ['sulfur compound metabolic process', True],
-           ['cell. modified amino acid metabolic[...]', True]])
-            ax.set_title(c_name + " - " + ont, pad=20)
+                   ['cell. modified amino acid metabolic[...]', True],
+                   ['mitotic cell cycle phase transition', True]])
+            #ax.set_title(c_name + " - " + ont, pad=20)
             fig.tight_layout()
             #fig.show()
-            fig.savefig(graphs_dir+"/"+other_key+"."+ont+".png", dpi=400)
+            fig.savefig(graphs_dir+"/"+other_key+"."+ont+"_pt.png", dpi=400)
 
 #%%
 '''maturation_base_functions = ['GO:0061458', 'GO:0007548']

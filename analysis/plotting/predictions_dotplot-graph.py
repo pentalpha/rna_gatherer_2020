@@ -43,7 +43,7 @@ print("RNA Gatherer dir = ", gatherer_dir)
 annotations_dir = gatherer_dir + "/result_data/functional_prediction_benchmarking_mgi/"
 input_df_paths = [annotations_dir + "/" + mini_onto + "-predictions_stats.tsv" 
                 for mini_onto in ["MF", "BP", "CC"]]
-output = annotations_dir + "/dotplot.png"
+output = annotations_dir + "/dotplot"
 #legend_offset = int(sys.argv[3])
 legend_offset = 35
 #colors_offset = float(sys.argv[4])
@@ -205,7 +205,7 @@ ax[current_axis].set_xlabel(conf_str)
 markers = ['o','D','X']
 edgec = ["#DADAFF","#000000","#000000"]
 
-patches = [plt.scatter([],[], marker=markers[i], color="#DADAFF", s=100,
+patches = [plt.scatter([],[], marker=markers[i], color="#CACAEE", s=100,
             label="{:s}".format(marker_type_labels[i]), edgecolors=edgec[i])  for i in range(len(marker_type_labels)) ]
 legend = ax[current_axis].legend(handles=patches, ncol=1, facecolor="white", 
             numpoints=1, #bbox_to_anchor=(0., 1.02, 1., .102), 
@@ -215,4 +215,4 @@ legend = ax[current_axis].legend(handles=patches, ncol=1, facecolor="white",
 #plt.legend(handles=[blue_line])
 
 f.tight_layout()
-f.savefig(output, dpi=400)
+f.savefig(output+"_"+str(lang_id)+".png", dpi=400)
