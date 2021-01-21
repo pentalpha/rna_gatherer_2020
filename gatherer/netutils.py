@@ -9,6 +9,17 @@ from gatherer.rna_type import *
 import sys
 from tqdm import tqdm
 import obonet
+from urllib import request
+
+def download_to(url, final_path):
+    print("Downloading", url, "to", final_path)
+    try:
+        request.urlretrieve(url, final_path)
+    except Exception as err:
+        print(err)
+        return False
+    print("Download with success")
+    return True
 
 def get_md5(sequence):
     """
