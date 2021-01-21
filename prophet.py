@@ -69,8 +69,8 @@ def getArgs():
     ap.add_argument("-ont", "--ontology-type", required=False,
         default="molecular_function", help=("One of the following: molecular_function (default),"
         +" cellular_component or biological_process."))
-    ap.add_argument("-q", "--quality", help=("'normal': ~85% precision, more predictions."
-        + " 'high': ~100% precision, very few predictions. Default=high."))
+    ap.add_argument("-q", "--quality", help=("'normal': normal precision, more predictions."
+        + " 'high': high precision, very few predictions. Default=high."))
     '''ap.add_argument("-met", "--method", required=False,
         default=None, help=("Correlation coefficient calculation method:"
         +" MIC (Maximal Information Coefficient), "
