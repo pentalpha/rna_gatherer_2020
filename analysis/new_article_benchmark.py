@@ -4,6 +4,8 @@ import sys
 from os import path
 from tqdm import tqdm
 
+from semantic_similarity import calc_IC_indexes
+
 current_dir = path.dirname(path.abspath(__file__))
 proj_dir = path.dirname(current_dir)
 test_dir = path.join(proj_dir, 'test')
@@ -46,6 +48,7 @@ def read_id2go_annotation(filepath, go_tocorrect, translator=None):
         ann[name].append((goid, pval, fdr))
     
     return ann
+
 
 
 def read_gaf_annotation(filepath: str, go_tocorrect, translator = None, 
@@ -293,8 +296,11 @@ if __name__ == '__main__':
     all_genes = set(all_genes)
     print(len(all_genes), 'ncRNA genes annotated in all ontologies')
 
+    information_contents = calc_IC_indexes(ref_ann_path, go_tocorrect, go_graph)
+    
     ref_mf_ann, ref_bp_ann, ref_cc_ann = read_gaf_annotation(ref_ann_path, 
         go_tocorrect, translator=mgi2rnacentral, surely_are_lnc=all_genes)
+    
     all_ref_genes = list(ref_mf_ann.keys()) + list(ref_bp_ann.keys()) + list(ref_cc_ann.keys())
     all_ref_genes = set(all_ref_genes)
     print(len(all_ref_genes), 'ncRNA genes with reference annotations')
