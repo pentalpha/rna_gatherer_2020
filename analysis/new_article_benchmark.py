@@ -3,8 +3,9 @@ import networkx
 import sys
 from os import path
 from tqdm import tqdm
+import numpy as np
 
-from semantic_similarity import calc_IC_indexes
+from semantic_similarity import calc_IC_indexes, simgic
 
 current_dir = path.dirname(path.abspath(__file__))
 proj_dir = path.dirname(current_dir)
@@ -79,7 +80,8 @@ def read_gaf_annotation(filepath: str, go_tocorrect, translator = None,
                 if name in translator:
                     name = translator[name]
 
-            if db in ['RNAcentral', 'MGI']:
+            #if db in ['RNAcentral', 'MGI']:
+            if db in ['MGI']:
                 is_nc_rna = False
                 if db == 'RNAcentral':
                     #islncRNA = 'lnc' in cells[2] or 'long' in cells[2]
@@ -218,7 +220,7 @@ def make_filtered_obo(obo_path):
     return new_obo_path
     
 
-def compare_to_reference(new_ann_original, ref_ann_original):
+def compare_to_reference(new_ann_original, ref_ann_original, ic):
     new_ann = {}
     for key, values in new_ann_original.items():
         new_ann[key] = set([go for go, fdr, pval in values])
@@ -227,14 +229,14 @@ def compare_to_reference(new_ann_original, ref_ann_original):
         ref_ann[key] = set([go for go, fdr, pval in values])
     new_genes = set(new_ann.keys())
     ref_genes = set(ref_ann.keys())
-    print('Only new annotation:', len(new_genes-ref_genes))
-    print('Not predicted:', len(ref_genes-new_genes))
+    print('\tOnly new annotation:', len(new_genes-ref_genes))
+    print('\tNot predicted:', len(ref_genes-new_genes))
     predicted_and_annotated = ref_genes.intersection(new_genes)
     predicted_and_annotated_perc = len(predicted_and_annotated) / len(ref_genes)
-    print('% of Annotated covered:', predicted_and_annotated_perc*100)
+    print('\t% of Annotated covered:', predicted_and_annotated_perc*100)
     new_ass_total = sum([len(vals) for key, vals in new_ann.items()])
     ref_ass_total = sum([len(vals) for key, vals in ref_ann.items()])
-    print('Size compared to reference:', (new_ass_total/ref_ass_total)*100)
+    print('\tSize compared to reference:', (new_ass_total/ref_ass_total)*100)
     
     tp = 0
     fp = 0
@@ -247,8 +249,17 @@ def compare_to_reference(new_ann_original, ref_ann_original):
                     fp += 1
             else:
                 fp += 1
-    print('TP', tp)
-    print('FP', fp)
+    print('\tTP', tp)
+    print('\tFP', fp)
+
+    simgics = []
+    for genename in predicted_and_annotated:
+        new_goids_set = new_ann[genename]
+        ref_goids_set = ref_ann[genename]
+        simgics.append(simgic(new_goids_set, ref_goids_set, ic))
+    simgics.sort()
+    
+    print('\tSIMGIC:', np.quantile(simgics, 0.25), np.quantile(simgics, 0.5), np.quantile(simgics, 0.75))
     
     
 
@@ -331,11 +342,11 @@ if __name__ == '__main__':
         print(ont_name)
         _, ref_ann = reference_annotations[i]
         
-        compare_to_reference(ann, ref_ann)
+        compare_to_reference(ann, ref_ann, information_contents[ont_name])
     print('LNCRNA2GOA')
     for i in range(len(lncrna2goa_ann)):
         ont_name, ann = lncrna2goa_ann[i]
         print(ont_name)
         _, ref_ann = reference_annotations[i]
         
-        compare_to_reference(ann, ref_ann)
+        compare_to_reference(ann, ref_ann, information_contents[ont_name])

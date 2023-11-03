@@ -83,3 +83,15 @@ def calc_IC_indexes(filepath: str, go_tocorrect, graph):
     #quit()
     return ic_indexes
 
+def simgic(goids_a, goids_b, ontology_ic: dict):
+    a = set([x for x in goids_a if x in ontology_ic])
+    b = set([x for x in goids_b if x in ontology_ic])
+
+    go_union = a.union(b)
+    go_intersect = a.intersection(b)
+
+    union_sum = sum([ontology_ic[goid] for goid in go_union])
+    intersect_sum = sum([ontology_ic[goid] for goid in go_intersect])
+
+    return intersect_sum / union_sum
+
