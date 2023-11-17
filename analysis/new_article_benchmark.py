@@ -5,11 +5,13 @@ from os import path
 from tqdm import tqdm
 import numpy as np
 
-from semantic_similarity import calc_IC_indexes, simgic
+from semantic_similarity import calc_IC_indexes, resnik_combine, simgic
 
 current_dir = path.dirname(path.abspath(__file__))
 proj_dir = path.dirname(current_dir)
 test_dir = path.join(proj_dir, 'test')
+
+go_roots = ['GO:0005575', 'GO:0003674', 'GO:0008150']
 
 def read_rna_central_trans(filepath):
     print('Reading', filepath)
@@ -81,7 +83,7 @@ def read_gaf_annotation(filepath: str, go_tocorrect, translator = None,
                     name = translator[name]
 
             #if db in ['RNAcentral', 'MGI']:
-            if db in ['MGI']:
+            if db in ['MGI', 'RNAcentral']:
                 is_nc_rna = False
                 if db == 'RNAcentral':
                     #islncRNA = 'lnc' in cells[2] or 'long' in cells[2]
@@ -132,6 +134,26 @@ def read_gaf_annotation(filepath: str, go_tocorrect, translator = None,
 '''ref_mf_ann, ref_bp_ann, ref_cc_ann = read_gaf_annotation(ref_ann_path, 
     go_tocorrect, translator=mgi2rnacentral)'''
 
+def filter_ann(ann_dict, to_erase_path):
+    to_erase = set()
+
+    for rawline in open(to_erase_path, 'r'):
+        if rawline.startswith('id: GO'):
+            go = rawline.lstrip('id: ').rstrip('\n')
+            to_erase.add(go)
+
+    to_erase.update(go_roots)
+
+    for genename in ann_dict.keys():
+        go_list = ann_dict[genename]
+        ann_dict[genename] = [x for x in go_list if not x in to_erase]
+
+    empty_anns = [genename for genename in ann_dict.keys() if len(ann_dict[genename]) == 0]
+    for genename in empty_anns:
+        del ann_dict[genename]
+    print('Erased annotations to', len(empty_anns), 'genes')
+
+
 def expand_ann(go_graph, ann_dict, ont_name, term_to_namespace):
     ont = (ont_name.replace('MF', 'molecular_function')
         .replace('BP', 'biological_process')
@@ -174,6 +196,10 @@ def expand_ann(go_graph, ann_dict, ont_name, term_to_namespace):
         
     print('New associations:', new_associations)
 
+    for genename in ann_dict.keys():
+        go_list = ann_dict[genename]
+        ann_dict[genename] = [x[0] if len(x) == 3 else x for x,y,z in go_list]
+
 def load_obo(obo_path):
     print('Loading go graph')
     go_graph = obonet.read_obo(obo_path, ignore_obsolete=False)
@@ -190,7 +216,6 @@ def load_obo(obo_path):
             term_to_namespace[ID] = obo_nodes[ID]["namespace"]
     print("Solved " + str(len(alt_ids.keys())))
     return go_graph, alt_ids, term_to_namespace
-
 
 def make_filtered_obo(obo_path):
     new_obo_path = obo_path.replace('.obo', '.filtered.obo')
@@ -220,23 +245,28 @@ def make_filtered_obo(obo_path):
     return new_obo_path
     
 
-def compare_to_reference(new_ann_original, ref_ann_original, ic):
+def compare_to_reference(new_ann_original, ref_ann_original, ic, go_graph):
     new_ann = {}
     for key, values in new_ann_original.items():
-        new_ann[key] = set([go for go, fdr, pval in values])
+        #key_tuples = [go if type(go) == str else go[0] for go, fdr, pval in values]
+        #print(key_tuples)
+        new_ann[key] = set(values)
     ref_ann = {}
     for key, values in ref_ann_original.items():
-        ref_ann[key] = set([go for go, fdr, pval in values])
+        #key_tuples = [go if type(go) == str else go[0] for go, fdr, pval in values]
+        #print(key_tuples)
+        ref_ann[key] = set(values)
     new_genes = set(new_ann.keys())
     ref_genes = set(ref_ann.keys())
-    print('\tOnly new annotation:', len(new_genes-ref_genes))
-    print('\tNot predicted:', len(ref_genes-new_genes))
+    #print('\tOnly new annotation:', len(new_genes-ref_genes))
+    #print('\tNot predicted:', len(ref_genes-new_genes))
     predicted_and_annotated = ref_genes.intersection(new_genes)
     predicted_and_annotated_perc = len(predicted_and_annotated) / len(ref_genes)
-    print('\t% of Annotated covered:', predicted_and_annotated_perc*100)
+    #print('\t% of Annotated covered:', predicted_and_annotated_perc*100)
     new_ass_total = sum([len(vals) for key, vals in new_ann.items()])
     ref_ass_total = sum([len(vals) for key, vals in ref_ann.items()])
-    print('\tSize compared to reference:', (new_ass_total/ref_ass_total)*100)
+    size = (new_ass_total/ref_ass_total)*100
+    #print('\tSize compared to reference:', size)
     
     tp = 0
     fp = 0
@@ -249,18 +279,25 @@ def compare_to_reference(new_ann_original, ref_ann_original, ic):
                     fp += 1
             else:
                 fp += 1
-    print('\tTP', tp)
-    print('\tFP', fp)
+    #print('\tTP', tp)
+    #print('\tFP', fp)
 
     simgics = []
+    resniks = []
     for genename in predicted_and_annotated:
         new_goids_set = new_ann[genename]
+        '''for a in new_goids_set:
+            assert type(a) == str, 'a is' + str(a)'''
         ref_goids_set = ref_ann[genename]
         simgics.append(simgic(new_goids_set, ref_goids_set, ic))
+        resniks.append(resnik_combine(new_goids_set, ref_goids_set, ic, go_graph))
     simgics.sort()
+    resniks.sort()
     
-    print('\tSIMGIC:', np.quantile(simgics, 0.25), np.quantile(simgics, 0.5), np.quantile(simgics, 0.75))
+    #print('\tSIMGIC:', np.quantile(simgics, 0.25), np.mean(simgics), np.quantile(simgics, 0.75))
+    #print('\tResniks:', np.quantile(resniks, 0.25), np.mean(resniks), np.quantile(resniks, 0.75))
     
+    return [tp, round(tp/(tp+fp), 4), round(np.mean(simgics), 4), round(np.mean(resniks), 4), new_ass_total, ref_ass_total]
     
 
 #%%
@@ -270,6 +307,7 @@ if __name__ == '__main__':
     analysis_dir = "/home/pitagoras/main/experiments/mgi_simgic_tpm-exon-backup/"
     #analysis_dir = sys.argv[1]
     obo_path = path.join(analysis_dir, 'go.obo')
+    to_erase_path = path.join(analysis_dir, 'gocheck_do_not_annotate.obo')
     
     new_obo_path = make_filtered_obo(obo_path)
     go_graph, go_tocorrect, term_to_namespace = load_obo(new_obo_path)
@@ -307,7 +345,7 @@ if __name__ == '__main__':
     all_genes = set(all_genes)
     print(len(all_genes), 'ncRNA genes annotated in all ontologies')
 
-    information_contents = calc_IC_indexes(ref_ann_path, go_tocorrect, go_graph)
+    information_contents = calc_IC_indexes(ref_ann_path, go_tocorrect, go_graph, all_genes)
     
     ref_mf_ann, ref_bp_ann, ref_cc_ann = read_gaf_annotation(ref_ann_path, 
         go_tocorrect, translator=mgi2rnacentral, surely_are_lnc=all_genes)
@@ -326,27 +364,36 @@ if __name__ == '__main__':
     print('Expanding references')
     for ont_name, ann in reference_annotations:
         expand_ann(go_graph, ann, ont_name, term_to_namespace)
+        filter_ann(ann, to_erase_path)
     
     print('Expanding new annotations')
     for ont_name, ann in new_ann:
         expand_ann(go_graph, ann, ont_name, term_to_namespace)
+        #filter_ann(ann, to_erase_path)
     
     print('Expanding lncrna2goa')
     for ont_name, ann in lncrna2goa_ann:
         expand_ann(go_graph, ann, ont_name, term_to_namespace)
+        filter_ann(ann, to_erase_path)
         
     #%%
-    print('RNA Gatherer')
+    print('Annotation', 'True Positives', 'Precision', 'SIMGIC', 'Resnik', 
+          'Annotations Predicted', 'Ref. Annotations', sep='\t')
+    #print('RNA Gatherer')
     for i in range(len(new_ann)):
         ont_name, ann = new_ann[i]
-        print(ont_name)
+        #print(ont_name)
         _, ref_ann = reference_annotations[i]
         
-        compare_to_reference(ann, ref_ann, information_contents[ont_name])
-    print('LNCRNA2GOA')
+        result = compare_to_reference(ann, ref_ann, information_contents[ont_name], go_graph)
+        result_str = '\t'.join([str(x) for x in result])
+        print('RNA Gatherer '+ont_name + '\t' + result_str)
+    #print('LNCRNA2GOA')
     for i in range(len(lncrna2goa_ann)):
         ont_name, ann = lncrna2goa_ann[i]
-        print(ont_name)
+        #print(ont_name)
         _, ref_ann = reference_annotations[i]
         
-        compare_to_reference(ann, ref_ann, information_contents[ont_name])
+        result = compare_to_reference(ann, ref_ann, information_contents[ont_name], go_graph)
+        result_str = '\t'.join([str(x) for x in result])
+        print('LNCRNA2GOA '+ont_name + '\t' + result_str)
