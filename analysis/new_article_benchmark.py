@@ -4,6 +4,7 @@ import sys
 from os import path
 from tqdm import tqdm
 import numpy as np
+import pandas as pd
 
 from semantic_similarity import calc_IC_indexes, resnik_combine, simgic
 
@@ -361,23 +362,23 @@ if __name__ == '__main__':
                 del ann[genename]
     reference_annotations = [['MF',ref_mf_ann], ['BP', ref_bp_ann], ['CC', ref_cc_ann]]
     #%%
-    print('Expanding references')
+    '''print('Expanding references')
     for ont_name, ann in reference_annotations:
-        expand_ann(go_graph, ann, ont_name, term_to_namespace)
+        #expand_ann(go_graph, ann, ont_name, term_to_namespace)
         filter_ann(ann, to_erase_path)
     
     print('Expanding new annotations')
     for ont_name, ann in new_ann:
-        expand_ann(go_graph, ann, ont_name, term_to_namespace)
-        #filter_ann(ann, to_erase_path)
+        #expand_ann(go_graph, ann, ont_name, term_to_namespace)
+        filter_ann(ann, to_erase_path)'''
     
-    print('Expanding lncrna2goa')
+    '''print('Expanding lncrna2goa')
     for ont_name, ann in lncrna2goa_ann:
         expand_ann(go_graph, ann, ont_name, term_to_namespace)
-        filter_ann(ann, to_erase_path)
+        filter_ann(ann, to_erase_path)'''
         
     #%%
-    print('Annotation', 'True Positives', 'Precision', 'SIMGIC', 'Resnik', 
+    '''print('Annotation', 'True Positives', 'Precision', 'SIMGIC', 'Resnik', 
           'Annotations Predicted', 'Ref. Annotations', sep='\t')
     #print('RNA Gatherer')
     for i in range(len(new_ann)):
@@ -396,4 +397,53 @@ if __name__ == '__main__':
         
         result = compare_to_reference(ann, ref_ann, information_contents[ont_name], go_graph)
         result_str = '\t'.join([str(x) for x in result])
-        print('LNCRNA2GOA '+ont_name + '\t' + result_str)
+        print('LNCRNA2GOA '+ont_name + '\t' + result_str)'''
+    
+    #%%
+    enrichments_dir = ("/home/pitagoras/main/dev/rna_gatherer/result_data/gigas_geneset_enrichment_analysis/"
+                     +"enrichments/")
+    sex_diff_path = enrichments_dir+"sex_diff.filtered.tsv"
+    growth_housekeeping_path = enrichments_dir+"growth_housekeeping.filtered.tsv"
+    pigmentation_gos = "/home/pitagoras/main/dev/rna_gatherer/dissertation/go_sets/all_pigmentation.tsv"
+    pigmentation_gos = [rawline.split()[0] for rawline in open(pigmentation_gos, 'r').readlines()]
+    
+    sex_diff_df = pd.read_csv(sex_diff_path, sep='\t')
+    sex_diff_df = sex_diff_df[sex_diff_df['go'].isin(pigmentation_gos)]
+    print(sex_diff_df)
+    allowed_gos = set()
+    
+    for index, row in sex_diff_df.iterrows():
+        goid = row['go']
+        allowed_gos.update([superterm for superterm in networkx.descendants(go_graph, goid)])
+        allowed_gos.add(goid)
+
+        go_graph.nodes[goid]['enriched'] = True
+        go_graph.nodes[goid]['fdr'] = row['fdr']
+    
+    pigmentation_graph = go_graph.subgraph(list(allowed_gos)).copy()
+
+    networkx.readwrite.gml.write_gml(pigmentation_graph, 
+        ("/home/pitagoras/main/dev/rna_gatherer/result_data/gigas_geneset_enrichment_analysis/"+
+         "enrichments/pigmentation_graph.gml"))
+    
+    growth_df = pd.read_csv(growth_housekeeping_path, sep='\t')
+    growth_df = growth_df[growth_df['onto'] == 'BP']
+    growth_df = growth_df[growth_df['fdr'] <= 0.05]
+    print(growth_df)
+    allowed_gos2 = set()
+    
+    for index, row in growth_df.iterrows():
+        print(row['go'], row['onto'], row['fdr'], row['description'])
+        goid = row['go']
+        allowed_gos2.update([superterm for superterm in networkx.descendants(go_graph, goid)])
+        allowed_gos2.add(goid)
+
+        go_graph.nodes[goid]['enriched'] = True
+        go_graph.nodes[goid]['fdr'] = row['fdr']
+        go_graph.nodes[goid]['enriched_name'] = row['description']
+    
+    growth_graph = go_graph.subgraph(list(allowed_gos2)).copy()
+
+    networkx.readwrite.gml.write_gml(growth_graph, 
+        ("/home/pitagoras/main/dev/rna_gatherer/result_data/gigas_geneset_enrichment_analysis/"+
+         "enrichments/growth_housekeeping_graph.gml"))

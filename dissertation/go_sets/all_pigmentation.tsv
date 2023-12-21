@@ -1,0 +1,110 @@
+GO:0006583	melanin biosynthetic process from tyrosine
+GO:0006582	melanin metabolic process
+GO:0140614	1,8-dihydroxynaphthalene-melanin biosynthetic process
+GO:0046150	melanin catabolic process
+GO:0030273	melanin-concentrating hormone receptor activity
+GO:0030354	melanin-concentrating hormone activity
+GO:0042438	melanin biosynthetic process
+GO:0031778	type 2 melanin-concentrating hormone receptor binding
+GO:0031776	melanin-concentrating hormone receptor binding
+GO:0031777	type 1 melanin-concentrating hormone receptor binding
+GO:0048023	positive regulation of melanin biosynthetic process
+GO:0048022	negative regulation of melanin biosynthetic process
+GO:0048021	regulation of melanin biosynthetic process
+GO:1903232	melanosome assembly
+GO:0036160	melanocyte-stimulating hormone secretion
+GO:0030318	melanocyte differentiation
+GO:1990680	response to melanocyte-stimulating hormone
+GO:1902362	melanocyte apoptotic process
+GO:0097324	melanocyte migration
+GO:0097326	melanocyte adhesion
+GO:0097325	melanocyte proliferation
+GO:0004980	melanocyte-stimulating hormone receptor activity
+GO:0017044	melanocyte-stimulating hormone activity
+GO:0045634	regulation of melanocyte differentiation
+GO:0045635	negative regulation of melanocyte differentiation
+GO:0045636	positive regulation of melanocyte differentiation
+GO:0050947	negative regulation of early stripe melanocyte differentiation
+GO:0050949	negative regulation of late stripe melanocyte differentiation
+GO:0050948	positive regulation of early stripe melanocyte differentiation
+GO:0050950	positive regulation of late stripe melanocyte differentiation
+GO:0050934	late stripe melanocyte differentiation
+GO:0050933	early stripe melanocyte differentiation
+GO:0050939	regulation of early stripe melanocyte differentiation
+GO:0050940	regulation of late stripe melanocyte differentiation
+GO:1903232	melanosome assembly
+GO:0035646	endosome to melanosome transport
+GO:0034493	melanosome lumen
+GO:1902908	regulation of melanosome transport
+GO:1902909	negative regulation of melanosome transport
+GO:1902910	positive regulation of melanosome transport
+GO:0032401	establishment of melanosome localization
+GO:0032402	melanosome transport
+GO:0032400	melanosome localization
+GO:0032438	melanosome organization
+GO:0042470	melanosome
+GO:1903056	regulation of melanosome organization
+GO:1903057	negative regulation of melanosome organization
+GO:1903058	positive regulation of melanosome organization
+GO:0033162	melanosome membrane
+GO:0031409	GO:0031409	pigment binding
+GO:0048824	GO:0048824	pigment cell precursor differentiation
+GO:0048784	GO:0048784	pigment biosynthetic process involved in pigment granule maturation
+GO:0048770	GO:0048770	pigment granule
+GO:0046149	GO:0046149	pigment catabolic process
+GO:0046148	GO:0046148	pigment biosynthetic process
+GO:0046158	GO:0046158	ocellus pigment metabolic process
+GO:0046159	GO:0046159	ocellus pigment catabolic process
+GO:0042440	GO:0042440	pigment metabolic process
+GO:0003406	GO:0003406	retinal pigment epithelium development
+GO:0120305	GO:0120305	regulation of pigmentation
+GO:0008058	GO:0008058	ocellus pigment granule organization
+GO:0008055	GO:0008055	ocellus pigment biosynthetic process
+GO:0043477	GO:0043477	pigment biosynthetic process involved in pigment accumulation
+GO:0043476	GO:0043476	pigment accumulation
+GO:0043479	GO:0043479	pigment accumulation in tissues in response to UV light
+GO:0043478	GO:0043478	pigment accumulation in response to UV light
+GO:0043473	GO:0043473	pigmentation
+GO:0043475	GO:0043475	pigment metabolic process involved in pigment accumulation
+GO:0043474	GO:0043474	pigment metabolic process involved in pigmentation
+GO:0043480	GO:0043480	pigment accumulation in tissues
+GO:0043482	GO:0043482	cellular pigment accumulation
+GO:0043485	GO:0043485	endosome to pigment granule transport
+GO:0043324	GO:0043324	pigment metabolic process involved in developmental pigmentation
+GO:0070285	GO:0070285	pigment cell development
+GO:0033059	GO:0033059	cellular pigmentation
+GO:0033060	GO:0033060	ocellus pigmentation
+GO:0048094	GO:0048094	male pigmentation
+GO:0048093	GO:0048093	positive regulation of male pigmentation
+GO:0048092	GO:0048092	negative regulation of male pigmentation
+GO:0048091	GO:0048091	positive regulation of female pigmentation
+GO:0048095	GO:0048095	female pigmentation
+GO:0048090	GO:0048090	negative regulation of female pigmentation
+GO:0048067	GO:0048067	cuticle pigmentation
+GO:0048066	GO:0048066	developmental pigmentation
+GO:0048089	GO:0048089	regulation of female pigmentation
+GO:0048088	GO:0048088	regulation of male pigmentation
+GO:0048083	GO:0048083	negative regulation of adult chitin-containing cuticle pigmentation
+GO:0048082	GO:0048082	regulation of adult chitin-containing cuticle pigmentation
+GO:0048081	GO:0048081	positive regulation of cuticle pigmentation
+GO:0048080	GO:0048080	negative regulation of cuticle pigmentation
+GO:0048087	GO:0048087	positive regulation of developmental pigmentation
+GO:0048086	GO:0048086	negative regulation of developmental pigmentation
+GO:0048085	GO:0048085	adult chitin-containing cuticle pigmentation
+GO:0048084	GO:0048084	positive regulation of adult chitin-containing cuticle pigmentation
+GO:0048079	GO:0048079	regulation of cuticle pigmentation
+GO:0048071	GO:0048071	sex-specific pigmentation
+GO:0048070	GO:0048070	regulation of developmental pigmentation
+GO:0048757	GO:0048757	pigment granule maturation
+GO:0048753	GO:0048753	pigment granule organization
+GO:0051875	GO:0051875	pigment granule localization
+GO:0051876	GO:0051876	pigment granule dispersal
+GO:0050942	GO:0050942	positive regulation of pigment cell differentiation
+GO:0050932	GO:0050932	regulation of pigment cell differentiation
+GO:0050931	GO:0050931	pigment cell differentiation
+GO:0050941	GO:0050941	negative regulation of pigment cell differentiation
+GO:0090741	GO:0090741	pigment granule membrane
+GO:0051905	GO:0051905	establishment of pigment granule localization
+GO:0051906	GO:0051906	maintenance of pigment granule location
+GO:0051904	GO:0051904	pigment granule transport
+GO:0051877	GO:0051877	pigment granule aggregation in cell center
